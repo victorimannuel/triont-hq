@@ -6,18 +6,31 @@ import (
 	"time"
 )
 
-// Returning the credential's label needs a join, so the insert and update
-// statements return the bare row and then read it back through assetSelect.
-const assetColumns = `id, name, kind, provider, identifier, status,
-	cost_amount, cost_currency, billing_cycle, renews_on, auto_renew, notes,
-	credential_id, created_by, updated_by, created_at, updated_at`
-
-const assetSelect = `select a.id, a.name, a.kind, a.provider, a.identifier, a.status,
+// Every asset query shares one column list and one FROM. They used to be
+// copied per query, and adding a column to one copy is exactly how the
+// overview started returning 500s.
+const assetCols = `a.id, a.name, a.kind, a.provider, a.identifier, a.status,
 	a.cost_amount, a.cost_currency, a.billing_cycle, a.renews_on, a.auto_renew, a.notes,
 	a.credential_id, coalesce(c.label, ''), coalesce(c.username, ''),
-	a.created_by, a.updated_by, a.created_at, a.updated_at
-	from assets a
+	a.created_by, a.updated_by, a.created_at, a.updated_at`
+
+// The credential is joined for its label only; the asset stands on its own if
+// the credential is later thrown away.
+const assetFrom = ` from assets a
 	left join credentials c on c.id = a.credential_id and c.deleted_at is null`
+
+const assetSelect = `select ` + assetCols + assetFrom
+
+// scanAssetCounted reads assetCols plus the trailing project count. Keeping it
+// next to the column list is what stops the two drifting apart again.
+func scanAssetCounted(row interface{ Scan(...any) error }) (Asset, error) {
+	var a Asset
+	err := row.Scan(&a.ID, &a.Name, &a.Kind, &a.Provider, &a.Identifier, &a.Status,
+		&a.CostAmount, &a.CostCurrency, &a.BillingCycle, &a.RenewsOn, &a.AutoRenew, &a.Notes,
+		&a.CredentialID, &a.CredentialLabel, &a.CredentialUser,
+		&a.CreatedBy, &a.UpdatedBy, &a.CreatedAt, &a.UpdatedAt, &a.ProjectCount)
+	return a, err
+}
 
 func scanAsset(row interface{ Scan(...any) error }) (Asset, error) {
 	var a Asset
@@ -43,15 +56,9 @@ func parseDate(v string) (*time.Time, error) {
 }
 
 func (s *Store) ListAssets(ctx context.Context, f AssetFilter) ([]Asset, error) {
-	rows, err := s.pool.Query(ctx, `
-		select a.id, a.name, a.kind, a.provider, a.identifier, a.status,
-		       a.cost_amount, a.cost_currency, a.billing_cycle, a.renews_on,
-		       a.auto_renew, a.notes, a.credential_id,
-		       coalesce(c.label, ''), coalesce(c.username, ''),
-		       a.created_by, a.updated_by, a.created_at, a.updated_at,
-		       (select count(*) from project_assets pa where pa.asset_id = a.id)
-		from assets a
-		left join credentials c on c.id = a.credential_id and c.deleted_at is null
+	rows, err := s.pool.Query(ctx, `select `+assetCols+`,
+		       (select count(*) from project_assets pa where pa.asset_id = a.id)`+
+		assetFrom+`
 		where a.deleted_at is null
 		  and ($1 = '' or a.kind = $1)
 		  and ($2 = '' or a.status = $2)
@@ -76,12 +83,8 @@ func (s *Store) ListAssets(ctx context.Context, f AssetFilter) ([]Asset, error) 
 
 	out := []Asset{}
 	for rows.Next() {
-		var a Asset
-		if err := rows.Scan(&a.ID, &a.Name, &a.Kind, &a.Provider, &a.Identifier, &a.Status,
-			&a.CostAmount, &a.CostCurrency, &a.BillingCycle, &a.RenewsOn, &a.AutoRenew,
-			&a.Notes, &a.CredentialID, &a.CredentialLabel, &a.CredentialUser,
-			&a.CreatedBy, &a.UpdatedBy, &a.CreatedAt, &a.UpdatedAt,
-			&a.ProjectCount); err != nil {
+		a, err := scanAssetCounted(rows)
+		if err != nil {
 			return nil, err
 		}
 		out = append(out, a)
@@ -227,15 +230,14 @@ func (s *Store) ProjectsForAsset(ctx context.Context, assetID int64) ([]AssetUsa
 // RenewalsDue lists live assets whose renewal falls inside the next `days`,
 // plus anything already overdue, so nothing silently slips past.
 func (s *Store) RenewalsDue(ctx context.Context, days int) ([]Asset, error) {
-	rows, err := s.pool.Query(ctx, `
-		select `+assetColumns+`,
-		       (select count(*) from project_assets pa where pa.asset_id = assets.id)
-		from assets
-		where deleted_at is null
-		  and status = 'active'
-		  and renews_on is not null
-		  and renews_on <= current_date + make_interval(days => $1)
-		order by renews_on`, days)
+	rows, err := s.pool.Query(ctx, `select `+assetCols+`,
+		       (select count(*) from project_assets pa where pa.asset_id = a.id)`+
+		assetFrom+`
+		where a.deleted_at is null
+		  and a.status = 'active'
+		  and a.renews_on is not null
+		  and a.renews_on <= current_date + make_interval(days => $1)
+		order by a.renews_on`, days)
 	if err != nil {
 		return nil, err
 	}
@@ -243,11 +245,8 @@ func (s *Store) RenewalsDue(ctx context.Context, days int) ([]Asset, error) {
 
 	out := []Asset{}
 	for rows.Next() {
-		var a Asset
-		if err := rows.Scan(&a.ID, &a.Name, &a.Kind, &a.Provider, &a.Identifier, &a.Status,
-			&a.CostAmount, &a.CostCurrency, &a.BillingCycle, &a.RenewsOn, &a.AutoRenew,
-			&a.Notes, &a.CreatedBy, &a.UpdatedBy, &a.CreatedAt, &a.UpdatedAt,
-			&a.ProjectCount); err != nil {
+		a, err := scanAssetCounted(rows)
+		if err != nil {
 			return nil, err
 		}
 		out = append(out, a)
