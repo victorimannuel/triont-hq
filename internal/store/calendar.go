@@ -1,0 +1,100 @@
+package store
+
+import (
+	"context"
+	"time"
+)
+
+// CalendarEntry is one dated thing, flattened out of whichever table it came
+// from so the calendar page does not have to know about any of them.
+type CalendarEntry struct {
+	Date   time.Time `json:"date"`
+	Kind   string    `json:"kind"`
+	Label  string    `json:"label"`
+	Detail string    `json:"detail"`
+	URL    string    `json:"url"`
+}
+
+// Calendar collects every deadline the app knows about between two dates.
+// Birthdays are shifted onto the year they next fall in, so a date in 1990
+// still shows up on the right day this year.
+func (s *Store) Calendar(ctx context.Context, from, to time.Time) ([]CalendarEntry, error) {
+	rows, err := s.pool.Query(ctx, `
+		select renews_on, 'renewal', name,
+		       coalesce(nullif(provider, ''), 'perpanjangan'),
+		       '/assets/' || id
+		  from assets
+		 where deleted_at is null and status = 'active'
+		   and renews_on between $1 and $2
+
+		union all
+		select expires_on, 'document', name,
+		       coalesce(nullif(holder, ''), 'masa berlaku'),
+		       '/documents/' || id
+		  from documents
+		 where deleted_at is null and expires_on between $1 and $2
+
+		union all
+		select b.warranty_until, 'warranty', b.name, 'garansi habis',
+		       '/belongings/' || b.id
+		  from belongings b
+		 where b.deleted_at is null and b.warranty_until between $1 and $2
+
+		union all
+		select m.next_due, 'maintenance', b.name,
+		       coalesce(nullif(m.description, ''), 'perawatan berikutnya'),
+		       '/belongings/' || b.id
+		  from maintenance_logs m
+		  join belongings b on b.id = m.belonging_id and b.deleted_at is null
+		 where m.next_due between $1 and $2
+
+		union all
+		select b.rent_due_on, 'rent', b.name, 'sewa jatuh tempo', '/belongings/' || b.id
+		  from belongings b
+		 where b.deleted_at is null and b.ownership <> 'owned'
+		   and b.rent_due_on between $1 and $2
+
+		union all
+		select i.next_due_on, 'income', i.name, 'pemasukan masuk', '/income/' || i.id
+		  from income_streams i
+		 where i.deleted_at is null and i.status = 'active'
+		   and i.next_due_on between $1 and $2
+
+		union all
+		select e.next_due_on, 'expense', e.name, 'pengeluaran jatuh tempo',
+		       '/expenses/' || e.id
+		  from expense_streams e
+		 where e.deleted_at is null and e.status = 'active'
+		   and e.next_due_on between $1 and $2
+
+		union all
+		select occurrence, 'birthday', name, 'ulang tahun', '/people/' || id
+		  from (
+		    select c.id, c.name,
+		           make_date(y.year, extract(month from c.birthday)::int,
+		                     extract(day from c.birthday)::int) as occurrence
+		      from contacts c
+		      cross join (
+		        select generate_series(extract(year from $1::date)::int,
+		                               extract(year from $2::date)::int) as year
+		      ) y
+		     where c.deleted_at is null and c.birthday is not null
+		  ) b
+		 where occurrence between $1 and $2
+
+		order by 1, 3`, from, to)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []CalendarEntry{}
+	for rows.Next() {
+		var e CalendarEntry
+		if err := rows.Scan(&e.Date, &e.Kind, &e.Label, &e.Detail, &e.URL); err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}

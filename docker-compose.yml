@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hq
+      POSTGRES_USER: hq
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set it in .env}
+    volumes:
+      - hq_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hq -d hq"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    mem_limit: 192m
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://hq:${POSTGRES_PASSWORD}@postgres:5432/hq?sslmode=disable
+      HQ_SESSION_KEY: ${HQ_SESSION_KEY:?run `hq genkey`}
+      HQ_ENCRYPTION_KEY: ${HQ_ENCRYPTION_KEY:?run `hq genkey`}
+      HQ_OWNER_EMAIL: ${HQ_OWNER_EMAIL}
+      HQ_OWNER_PASSWORD: ${HQ_OWNER_PASSWORD}
+      HQ_SECURE_COOKIE: "true"
+    ports:
+      - "127.0.0.1:8080:8080"
+    mem_limit: 96m
+
+volumes:
+  hq_postgres_data:
