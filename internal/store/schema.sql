@@ -396,3 +396,19 @@ alter table webauthn_credentials add column if not exists last_used_location tex
 -- without copying the username into a second place.
 alter table assets add column if not exists credential_id bigint references credentials (id) on delete set null;
 create index if not exists assets_credential_idx on assets (credential_id);
+
+create table if not exists attachments (
+    id         bigserial primary key,
+    entity     text not null,
+    entity_id  bigint not null,
+    name       text not null,
+    mime_type  text not null default 'application/octet-stream',
+    -- The original size, not the ciphertext's.
+    size       bigint not null default 0,
+    notes      text not null default '',
+    content    bytea not null,
+    created_by text not null default '',
+    created_at timestamptz not null default now()
+);
+
+create index if not exists attachments_owner_idx on attachments (entity, entity_id);

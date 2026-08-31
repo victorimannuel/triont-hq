@@ -85,6 +85,13 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("POST /api/auth/passkeys/link", s.requireAuth(s.handleCreateEnrolLink))
 	mux.HandleFunc("POST /api/auth/enrol/begin", s.handleEnrolBegin)
 	mux.HandleFunc("POST /api/auth/enrol/finish", s.handleEnrolFinish)
+	// with {id}/download the way /files/counts/{entity} did.
+	mux.Handle("GET /api/files/{entity}/counts", s.requireAuth(s.handleAttachmentCounts))
+	mux.Handle("GET /api/files/{entity}/{id}", s.requireAuth(s.handleListAttachments))
+	mux.Handle("POST /api/files/{entity}/{id}", s.requireAuth(s.handleUpload))
+	mux.Handle("GET /api/files/{id}/download", s.requireAuth(s.handleDownload))
+	mux.Handle("DELETE /api/files/{id}", s.requireAuth(s.handleDeleteAttachment))
+
 
 	mux.Handle("GET /api/search", s.requireAuth(s.handleSearch))
 

@@ -62,3 +62,26 @@ func (b *Box) Decrypt(token string) (string, error) {
 	}
 	return string(plain), nil
 }
+
+// SealBytes and OpenBytes are the same construction without the base64: a file
+// goes into a bytea column, where text encoding would only cost a third more
+// space and buy nothing. The nonce is prepended, as above.
+func (b *Box) SealBytes(plain []byte) ([]byte, error) {
+	nonce := make([]byte, b.aead.NonceSize())
+	if _, err := rand.Read(nonce); err != nil {
+		return nil, err
+	}
+	return b.aead.Seal(nonce, nonce, plain, nil), nil
+}
+
+func (b *Box) OpenBytes(sealed []byte) ([]byte, error) {
+	n := b.aead.NonceSize()
+	if len(sealed) < n {
+		return nil, ErrFormat
+	}
+	plain, err := b.aead.Open(nil, sealed[:n], sealed[n:], nil)
+	if err != nil {
+		return nil, ErrFormat
+	}
+	return plain, nil
+}

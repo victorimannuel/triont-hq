@@ -20,6 +20,17 @@ export type Hit = {
   subtitle: string
   detail: string
   url: string
+export type Attachment = {
+  id: number
+  entity: string
+  entity_id: number
+  name: string
+  mime_type: string
+  /** The original file's size, not the ciphertext's. */
+  size: number
+  notes: string
+  created_by: string
+  created_at: string
 }
 
 export type Tag = {

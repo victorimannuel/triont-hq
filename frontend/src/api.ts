@@ -25,6 +25,7 @@ import type {
   MaintenanceInput,
   MaintenanceLog,
   Passkey,
+  Attachment,
   Person,
   PersonInput,
   Project,
@@ -272,6 +273,30 @@ export const api = {
   updateExpense: (id: number, input: ExpenseInput) =>
     send<ExpenseStream>('PUT', `/expenses/${id}`, input),
   deleteExpense: (id: number) => send<void>('DELETE', `/expenses/${id}`),
+
+  attachmentCounts: (entity: string) =>
+    request<{ counts: Record<string, number> }>(`/files/${entity}/counts`),
+  attachments: (entity: string, id: number) =>
+    request<{ attachments: Attachment[] }>(`/files/${entity}/${id}`),
+  // Multipart, so this one bypasses the JSON helper above.
+  upload: async (entity: string, id: number, file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    const response = await fetch(`/api/files/${entity}/${id}`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      body: form,
+    })
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}))
+      throw new ApiError(body.error ?? 'gagal unggah', response.status)
+    }
+    return (await response.json()) as Attachment
+  },
+  // A plain link: the browser fetches it with the session cookie, and the
+  // response is never cached because it is decrypted personal data.
+  downloadUrl: (id: number) => `/api/files/${id}/download`,
+  deleteAttachment: (id: number) => send<void>('DELETE', `/files/${id}`),
 
   rates: () => request<{ rates: FxRate[] }>('/fx'),
   refreshRates: () => send<{ rates: FxRate[] }>('POST', '/fx/refresh'),
