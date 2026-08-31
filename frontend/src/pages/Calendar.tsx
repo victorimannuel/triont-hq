@@ -1,64 +1,29 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import {
-  Banknote,
-  Cake,
-  CalendarDays,
-  ChevronLeft,
-  ChevronRight,
-  FileText,
-  Globe,
-  List,
-  Home,
-  Receipt,
-  ShieldCheck,
-  Wrench,
-} from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, Globe, List } from 'lucide-react'
 
 import { api } from '@/api'
 import { useT } from '@/i18n'
 import type { CalendarEntry } from '@/types'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { ErrorNote, daysUntil, formatDate, Loading, PageHeader } from '@/components/bits'
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
+import { ErrorNote, daysUntil, Loading, PageHeader } from '@/components/bits'
+import { EntryRow, KIND_ICON, tone, type Kind } from '@/components/EntryRow'
 import { cn } from '@/lib/utils'
-
-const KIND_ICON = {
-  renewal: Globe,
-  document: FileText,
-  warranty: ShieldCheck,
-  maintenance: Wrench,
-  birthday: Cake,
-  rent: Home,
-  income: Banknote,
-  expense: Receipt,
-} as const
-
-type Kind = keyof typeof KIND_ICON
-
-// One colour per kind, so a month reads at a glance without opening anything.
-const KIND_TONE: Record<Kind, string> = {
-  renewal: 'bg-blue-500/15 text-blue-700 dark:text-blue-300',
-  document: 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
-  warranty: 'bg-violet-500/15 text-violet-700 dark:text-violet-300',
-  maintenance: 'bg-orange-500/15 text-orange-700 dark:text-orange-300',
-  birthday: 'bg-pink-500/15 text-pink-700 dark:text-pink-300',
-  rent: 'bg-rose-500/15 text-rose-700 dark:text-rose-300',
-  income: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
-  expense: 'bg-red-500/15 text-red-700 dark:text-red-300',
-}
-
-const tone = (kind: string) => KIND_TONE[kind as Kind] ?? KIND_TONE.renewal
 
 const VIEW_KEY = 'hq-calendar-view'
 
+// A month grid on a 375px screen is a wall of coloured dots with no room for
+// the words, so a phone starts on the list unless it has been told otherwise.
 function readView(): 'grid' | 'list' {
   try {
-    return localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'grid'
+    const stored = localStorage.getItem(VIEW_KEY)
+    if (stored === 'list' || stored === 'grid') return stored
   } catch {
-    return 'grid'
+    // Remembering the view is a nicety, not a requirement.
   }
+  return window.matchMedia('(max-width: 639px)').matches ? 'list' : 'grid'
 }
 
 /** Local YYYY-MM-DD; toISOString would shift the day in +07:00. */
@@ -185,44 +150,6 @@ export default function Calendar() {
   )
 }
 
-function EntryRow({ entry }: { entry: CalendarEntry }) {
-  const { t } = useT()
-  const Icon = KIND_ICON[entry.kind as Kind] ?? Globe
-  const days = daysUntil(entry.date)
-  const late = days !== null && days < 0
-  const soon = days !== null && days >= 0 && days <= 14
-
-  return (
-    <Link
-      to={entry.url}
-      className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent"
-    >
-      <span className={cn('grid size-6 shrink-0 place-items-center rounded', tone(entry.kind))}>
-        <Icon className="size-3.5" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="truncate font-medium">{entry.label}</div>
-        <div className="truncate text-xs text-muted-foreground">{entry.detail}</div>
-      </div>
-      <Badge variant="outline" className={cn('shrink-0 border-transparent text-[11px]', tone(entry.kind))}>
-        {t(`cal.kind.${entry.kind}`)}
-      </Badge>
-      <div className="w-28 shrink-0 text-right text-xs">
-        <div>{formatDate(entry.date)}</div>
-        {days !== null && (
-          <div className={cn(late ? 'text-destructive' : soon ? 'text-warning' : 'text-muted-foreground')}>
-            {late
-              ? t('cal.late', { n: Math.abs(days) })
-              : days === 0
-                ? t('cal.today')
-                : t('cal.inDays', { n: days })}
-          </div>
-        )}
-      </div>
-    </Link>
-  )
-}
-
 function MonthGrid({
   cursor,
   setCursor,
@@ -236,7 +163,21 @@ function MonthGrid({
   monthLabel: string
   weekdayFormat: Intl.DateTimeFormat
 }) {
-  const { t } = useT()
+  const { t, lang } = useT()
+
+  // Which day a phone tapped open. Never set on desktop, where the labels are
+  // already in the cells.
+  const [picked, setPicked] = useState<string | null>(null)
+
+  const dayFormat = useMemo(
+    () =>
+      new Intl.DateTimeFormat(lang === 'en' ? 'en-GB' : 'id-ID', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+      }),
+    [lang],
+  )
 
   // Weeks start on Monday, which is how a working calendar reads here.
   const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1)
@@ -309,21 +250,46 @@ function MonthGrid({
             return (
               <div
                 key={dayKey}
+                // A phone cell is too narrow to read a label in, so tapping it
+                // opens the day. From sm up the labels are already there and a
+                // tap would only be a surprise.
+                onClick={items.length ? () => setPicked(dayKey) : undefined}
                 className={cn(
-                  'min-h-[5.5rem] border-b border-r p-1.5 last:border-r-0',
+                  'min-h-14 border-b border-r p-1 last:border-r-0 sm:min-h-[5.5rem] sm:p-1.5',
                   outside && 'bg-muted/30 text-muted-foreground',
+                  items.length > 0 && 'cursor-pointer active:bg-accent sm:cursor-default',
                 )}
               >
                 <div
                   className={cn(
-                    'mb-1 flex size-5 items-center justify-center rounded-full text-[11px]',
+                    'mb-1 flex size-4 items-center justify-center rounded-full text-[10px] sm:size-5 sm:text-[11px]',
                     isToday && 'bg-primary font-semibold text-primary-foreground',
                   )}
                 >
                   {day.getDate()}
                 </div>
 
-                <div className="space-y-0.5">
+                {/* A label does not fit a 55px cell, but its icon does, and an
+                    icon says which kind without having to remember a colour. */}
+                <div className="flex flex-wrap gap-0.5 sm:hidden">
+                  {items.slice(0, 6).map((entry, index) => {
+                    const Mark = KIND_ICON[entry.kind as Kind] ?? Globe
+                    return (
+                      <span
+                        key={`${entry.url}-${index}`}
+                        title={`${entry.label} · ${entry.detail}`}
+                        className={cn(
+                          'grid size-3.5 place-items-center rounded-[3px]',
+                          tone(entry.kind),
+                        )}
+                      >
+                        <Mark className="size-2.5" />
+                      </span>
+                    )
+                  })}
+                </div>
+
+                <div className="hidden space-y-0.5 sm:block">
                   {items.slice(0, 3).map((entry, index) => {
                     const Icon = KIND_ICON[entry.kind as Kind] ?? Globe
                     const days = daysUntil(entry.date)
@@ -355,6 +321,25 @@ function MonthGrid({
           })}
         </div>
       </Card>
+
+      {/* What the dots stand for. Same rows the list view uses, so an entry
+          reads and behaves the same wherever it is opened from. */}
+      <Sheet open={picked !== null} onOpenChange={(open) => !open && setPicked(null)}>
+        <SheetContent side="bottom" className="p-0">
+          <SheetTitle className="border-b px-4 py-4 lowercase">
+            {picked && dayFormat.format(new Date(`${picked}T00:00:00`))}
+          </SheetTitle>
+          <div className="divide-y overflow-y-auto">
+            {(picked ? (byDay.get(picked) ?? []) : []).map((entry, index) => (
+              <EntryRow
+                key={`${entry.kind}-${entry.url}-${index}`}
+                entry={entry}
+                onPick={() => setPicked(null)}
+              />
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
     </>
   )
 }

@@ -98,3 +98,30 @@ func (s *Store) Calendar(ctx context.Context, from, to time.Time) ([]CalendarEnt
 	}
 	return out, rows.Err()
 }
+
+// DueWithin is the same calendar, narrowed to what needs attention now:
+// anything overdue, plus everything falling due in the next `days`. It is what
+// the daily reminder reads.
+func (s *Store) DueWithin(ctx context.Context, days int) ([]CalendarEntry, error) {
+	now := time.Now()
+	// A month back so something already missed keeps nagging, rather than
+	// disappearing on the day it was due.
+	from := now.AddDate(0, 0, -30)
+	to := now.AddDate(0, 0, days)
+
+	all, err := s.Calendar(ctx, from, to)
+	if err != nil {
+		return nil, err
+	}
+
+	// Birthdays repeat every year, so the calendar returns them for a window
+	// wider than we want here; the date filter above already handles the rest.
+	out := make([]CalendarEntry, 0, len(all))
+	for _, entry := range all {
+		if entry.Date.Before(from) || entry.Date.After(to) {
+			continue
+		}
+		out = append(out, entry)
+	}
+	return out, nil
+}

@@ -39,19 +39,27 @@ function SheetContent({
   children,
   side = 'right',
   ...props
-}: React.ComponentProps<typeof SheetPrimitive.Content> & { side?: 'left' | 'right' }) {
+}: React.ComponentProps<typeof SheetPrimitive.Content> & {
+  side?: 'left' | 'right' | 'bottom'
+}) {
   return (
     <SheetPrimitive.Portal>
       <SheetOverlay />
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(
-          'fixed inset-y-0 z-50 flex w-72 max-w-[85vw] flex-col bg-card shadow-lg transition ease-in-out',
+          'fixed z-50 flex flex-col bg-card shadow-lg transition ease-in-out',
           'data-[state=open]:animate-in data-[state=open]:duration-200',
           'data-[state=closed]:animate-out data-[state=closed]:duration-150',
-          side === 'right'
-            ? 'right-0 border-l data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right'
-            : 'left-0 border-r data-[state=open]:slide-in-from-left data-[state=closed]:slide-out-to-left',
+          side !== 'bottom' && 'inset-y-0 w-72 max-w-[85vw]',
+          side === 'right' &&
+            'right-0 border-l data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right',
+          side === 'left' &&
+            'left-0 border-r data-[state=open]:slide-in-from-left data-[state=closed]:slide-out-to-left',
+          // Bottom is the phone shape: a day's detail rises from where the
+          // thumb already is, and stops short of covering the whole screen.
+          side === 'bottom' &&
+            'inset-x-0 bottom-0 max-h-[75vh] rounded-t-xl border-t pb-[env(safe-area-inset-bottom)] data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom',
           className,
         )}
         {...props}
