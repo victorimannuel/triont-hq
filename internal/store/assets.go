@@ -69,12 +69,13 @@ func (s *Store) ListAssets(ctx context.Context, f AssetFilter) ([]Asset, error) 
 		        select 1 from project_assets pa
 		          join projects p on p.id = pa.project_id
 		         where pa.asset_id = a.id and p.slug = $4))
-		-- Kind first, in the order the form offers it rather than alphabetically:
-		-- that keeps the things there are most of at the top and "lainnya" at the
-		-- bottom. An unknown kind sorts last, which is what a null does by default.
+		-- The one list not sorted by name alone. Kind comes first, in the order
+		-- the form offers it rather than alphabetically, so the things there are
+		-- most of stay at the top and "lainnya" at the bottom. An unknown kind
+		-- sorts last, which is what a null does by default.
 		order by array_position(
 		           array['vps','hosting','domain','ssl','saas','license','other'], a.kind),
-		         a.kind, a.renews_on nulls last, a.name`,
+		         a.kind, lower(a.name)`,
 		f.Kind, f.Status, strings.TrimSpace(f.Query), f.Project)
 	if err != nil {
 		return nil, err
@@ -185,7 +186,7 @@ func (s *Store) AssetsForProject(ctx context.Context, projectID int64) ([]AssetU
 		from project_assets pa
 		join assets a on a.id = pa.asset_id and a.deleted_at is null
 		where pa.project_id = $1
-		order by a.kind, a.name`, projectID)
+		order by a.kind, lower(a.name)`, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +210,7 @@ func (s *Store) ProjectsForAsset(ctx context.Context, assetID int64) ([]AssetUsa
 		from project_assets pa
 		join projects p on p.id = pa.project_id and p.deleted_at is null
 		where pa.asset_id = $1
-		order by p.name`, assetID)
+		order by lower(p.name)`, assetID)
 	if err != nil {
 		return nil, err
 	}

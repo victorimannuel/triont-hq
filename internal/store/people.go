@@ -54,7 +54,7 @@ func (s *Store) ListPeople(ctx context.Context, f PersonFilter) ([]Person, error
 		  and ($2 = ''
 		       or ($2 = 'personal' and c.client_id is null)
 		       or ($2 = 'client' and c.client_id is not null))
-		order by c.name`, strings.TrimSpace(f.Query), f.Scope)
+		order by lower(c.name)`, strings.TrimSpace(f.Query), f.Scope)
 	if err != nil {
 		return nil, err
 	}

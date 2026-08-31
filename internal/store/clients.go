@@ -57,7 +57,7 @@ func (s *Store) ListClients(ctx context.Context, f ClientFilter) ([]Client, erro
 		  and ($1 = '' or c.status = $1)
 		  and ($2 = '' or c.name ilike '%' || $2 || '%'
 		                or c.company ilike '%' || $2 || '%')
-		order by c.name`, f.Status, strings.TrimSpace(f.Query))
+		order by lower(c.name)`, f.Status, strings.TrimSpace(f.Query))
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +142,7 @@ func (s *Store) RestoreClient(ctx context.Context, id int64, actor string) error
 func (s *Store) ContactsByClient(ctx context.Context, clientID int64) ([]Contact, error) {
 	rows, err := s.pool.Query(ctx, `
 		select `+contactColumns+` from contacts where client_id = $1 and deleted_at is null
-		order by is_primary desc, name`, clientID)
+		order by is_primary desc, lower(name)`, clientID)
 	if err != nil {
 		return nil, err
 	}

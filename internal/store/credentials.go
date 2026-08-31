@@ -24,7 +24,12 @@ func (s *Store) ListCredentials(ctx context.Context, projectID *int64, kind stri
 		where c.deleted_at is null
 		  and ($1::bigint is null or c.project_id = $1)
 		  and ($2 = '' or c.kind = $2)
-		order by c.label`, projectID, kind)
+		  and ($3 = '' or c.label ilike '%' || $3 || '%'
+		                or c.username ilike '%' || $3 || '%'
+		                or c.host ilike '%' || $3 || '%'
+		                or c.url ilike '%' || $3 || '%'
+		                or c.notes ilike '%' || $3 || '%')
+		order by lower(c.label)`, f.ProjectID, f.Kind, strings.TrimSpace(f.Query))
 	if err != nil {
 		return nil, err
 	}

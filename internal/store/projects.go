@@ -56,7 +56,6 @@ func (s *Store) uniqueSlug(ctx context.Context, name string, excludeID int64) (s
 }
 
 func (s *Store) ListProjects(ctx context.Context, f ProjectFilter) ([]Project, error) {
-	// Status drives the default order so live work sits at the top.
 	rows, err := s.pool.Query(ctx, `select `+projectCols+`
 		, (select count(*) from project_links l where l.project_id = p.id)
 		, (select count(*) from credentials cr where cr.project_id = p.id)`+
@@ -73,10 +72,10 @@ func (s *Store) ListProjects(ctx context.Context, f ProjectFilter) ([]Project, e
 		                or p.summary ilike '%' || $4 || '%'
 		                or p.local_path ilike '%' || $4 || '%'
 		                or p.deploy_target ilike '%' || $4 || '%')
-		order by case p.status
-		           when 'active' then 0 when 'paused' then 1
-		           when 'done' then 2 else 3 end,
-		         p.name`,
+		-- Sorted by name so a thing is always where you last saw it. Status
+		-- and dates are filters and badges; they do not get to move the rows
+		-- around underneath you.
+		order by lower(p.name)`,
 		f.Status, f.Kind, f.Client, strings.TrimSpace(f.Query), f.Tag)
 	if err != nil {
 		return nil, err

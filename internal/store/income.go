@@ -80,8 +80,10 @@ func (st *Store) ListIncome(ctx context.Context, f IncomeFilter) ([]IncomeStream
 		  and ($4 = '' or i.name ilike '%' || $4 || '%'
 		                or c.name ilike '%' || $4 || '%'
 		                or p.name ilike '%' || $4 || '%')
-		order by case i.status when 'active' then 0 when 'paused' then 1 else 2 end,
-		         i.next_due_on nulls last, i.name`,
+		-- Sorted by name so a thing is always where you last saw it. Status
+		-- and dates are filters and badges; they do not get to move the rows
+		-- around underneath you.
+		order by lower(i.name)`,
 		f.Status, f.Client, f.Project, strings.TrimSpace(f.Query))
 	if err != nil {
 		return nil, err
@@ -175,7 +177,7 @@ func (st *Store) RestoreIncome(ctx context.Context, id int64, actor string) erro
 func (st *Store) IncomeForProject(ctx context.Context, projectID int64) ([]IncomeStream, error) {
 	rows, err := st.pool.Query(ctx, `select `+incomeCols+incomeFrom+`
 		where i.deleted_at is null and i.project_id = $1
-		order by i.name`, projectID)
+		order by lower(i.name)`, projectID)
 	if err != nil {
 		return nil, err
 	}

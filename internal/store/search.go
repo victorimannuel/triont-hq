@@ -142,7 +142,7 @@ select entity, id, title, subtitle, detail, url
      else 4
    end,
    length(title),
-   title
+   lower(title)
  limit $3`
 
 // Search looks through everything at once. Every word has to appear somewhere

@@ -116,7 +116,10 @@ func (s *Store) ListBelongings(ctx context.Context, f BelongingFilter) ([]Belong
 		                or b.model ilike '%' || $3 || '%'
 		                or b.identifier ilike '%' || $3 || '%'
 		                or b.location ilike '%' || $3 || '%')
-		order by b.kind, b.name`, f.Kind, f.Status, strings.TrimSpace(f.Query))
+		-- Sorted by name so a thing is always where you last saw it. Status
+		-- and dates are filters and badges; they do not get to move the rows
+		-- around underneath you.
+		order by lower(b.name)`, f.Kind, f.Status, strings.TrimSpace(f.Query))
 	if err != nil {
 		return nil, err
 	}

@@ -39,7 +39,7 @@ func (s *Store) ListTags(ctx context.Context) ([]Tag, error) {
 		select t.id, t.slug, t.name, t.color, t.created_by, t.created_at,
 		       (select count(*) from taggings g where g.tag_id = t.id)
 		from tags t
-		order by t.name`)
+		order by lower(t.name)`)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +62,7 @@ func (s *Store) TagsFor(ctx context.Context, entity string, id int64) ([]Tag, er
 		select t.id, t.slug, t.name, t.color, t.created_by, t.created_at
 		from taggings g join tags t on t.id = g.tag_id
 		where g.entity = $1 and g.entity_id = $2
-		order by t.name`, entity, id)
+		order by lower(t.name)`, entity, id)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func (s *Store) TagsForMany(ctx context.Context, entity string, ids []int64) (ma
 		select g.entity_id, t.id, t.slug, t.name, t.color, t.created_by, t.created_at
 		from taggings g join tags t on t.id = g.tag_id
 		where g.entity = $1 and g.entity_id = any($2)
-		order by t.name`, entity, ids)
+		order by lower(t.name)`, entity, ids)
 	if err != nil {
 		return nil, err
 	}

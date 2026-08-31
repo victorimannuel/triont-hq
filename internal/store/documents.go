@@ -67,7 +67,10 @@ func (s *Store) ListDocuments(ctx context.Context, f DocumentFilter) ([]Document
 		                or holder ilike '%' || $3 || '%'
 		                or issuer ilike '%' || $3 || '%'
 		                or location ilike '%' || $3 || '%')
-		order by expires_on nulls last, name`,
+		-- Sorted by name so a thing is always where you last saw it. Status
+		-- and dates are filters and badges; they do not get to move the rows
+		-- around underneath you.
+		order by lower(name)`,
 		f.Kind, f.Holder, strings.TrimSpace(f.Query))
 	if err != nil {
 		return nil, err
@@ -204,8 +207,9 @@ func (s *Store) CountDocuments(ctx context.Context) (int, error) {
 
 func (s *Store) DocumentHolders(ctx context.Context) ([]string, error) {
 	rows, err := s.pool.Query(ctx,
-		`select distinct holder from documents
-		  where deleted_at is null and holder <> '' order by holder`)
+		`select holder from documents
+		  where deleted_at is null and holder <> ''
+		  group by holder order by lower(holder)`)
 	if err != nil {
 		return nil, err
 	}

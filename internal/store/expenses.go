@@ -94,7 +94,7 @@ func (st *Store) AssetExpenses(ctx context.Context, f ExpenseFilter) ([]ExpenseS
 		         select 1 from expense_streams e
 		          where e.asset_id = a.id and e.deleted_at is null)
 		   and ($1 = '' or a.name ilike '%' || $1 || '%')
-		 order by a.renews_on nulls last, a.name`, strings.TrimSpace(f.Query))
+		 order by lower(a.name)`, strings.TrimSpace(f.Query))
 	if err != nil {
 		return nil, err
 	}
@@ -126,8 +126,10 @@ func (st *Store) ListExpenses(ctx context.Context, f ExpenseFilter) ([]ExpenseSt
 		  and ($1 = '' or e.status = $1)
 		  and ($2 = '' or e.category = $2)
 		  and ($3 = '' or e.name ilike '%' || $3 || '%' or p.name ilike '%' || $3 || '%')
-		order by case e.status when 'active' then 0 when 'paused' then 1 else 2 end,
-		         e.next_due_on nulls last, e.name`,
+		-- Sorted by name so a thing is always where you last saw it. Status
+		-- and dates are filters and badges; they do not get to move the rows
+		-- around underneath you.
+		order by lower(e.name)`,
 		f.Status, f.Category, strings.TrimSpace(f.Query))
 	if err != nil {
 		return nil, err

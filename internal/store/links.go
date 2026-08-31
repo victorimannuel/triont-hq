@@ -16,7 +16,7 @@ func (s *Store) LinksByProject(ctx context.Context, projectID int64) ([]Link, er
 	rows, err := s.pool.Query(ctx, `
 		select `+linkColumns+`
 		from project_links where project_id = $1
-		order by category, label`, projectID)
+		order by category, lower(label)`, projectID)
 	if err != nil {
 		return nil, err
 	}
