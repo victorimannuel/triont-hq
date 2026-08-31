@@ -7,6 +7,39 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 
+/** Two or three mutually exclusive choices, small enough to sit beside a
+ *  heading. Labels are given, not translated: "30d" reads the same either way. */
+export function Segmented<T extends string>({
+  value,
+  onChange,
+  options,
+}: {
+  value: T
+  onChange: (value: T) => void
+  options: readonly { value: T; label: string }[]
+}) {
+  return (
+    <div className="inline-flex shrink-0 rounded-md border p-0.5">
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          onClick={() => onChange(option.value)}
+          aria-pressed={value === option.value}
+          className={cn(
+            'rounded px-2 py-0.5 text-xs font-medium transition-colors',
+            value === option.value
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export function PageHeader({
   title,
   description,
@@ -94,14 +127,6 @@ export function formatMoney(amount: number, currency: string) {
   } catch {
     return `${currency} ${amount}`
   }
-}
-
-/** "Rp 750.000 + US$1.200" — one figure per currency, never a fake total. */
-export function perMonth(byCurrency: Record<string, number>) {
-  const parts = Object.entries(byCurrency)
-    .filter(([, amount]) => amount > 0)
-    .map(([currency, amount]) => formatMoney(amount, currency))
-  return parts.length ? parts.join(' + ') : '—'
 }
 
 // Whole days from today, negative once the date has passed.

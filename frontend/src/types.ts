@@ -520,7 +520,6 @@ export type CalendarEntry = {
 
 export type Overview = {
   total_projects: number
-  total_links: number
   total_credentials: number
   total_assets: number
   total_clients: number

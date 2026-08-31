@@ -65,6 +65,10 @@ export default defineConfig({
   build: {
     outDir: '../internal/web/dist',
     emptyOutDir: true,
+    // Not the default 'assets': the app has its own /assets route, and a
+    // bundle directory of that name shadows every /assets/* URL on a reload.
+    // internal/web/web.go has to agree with whatever this says.
+    assetsDir: 'static',
   },
   server: {
     port: 5173,
