@@ -25,6 +25,8 @@ import type {
   MaintenanceInput,
   MaintenanceLog,
   Passkey,
+  Check,
+  MonitorSource,
   Attachment,
   Person,
   PersonInput,
@@ -122,6 +124,9 @@ export const api = {
   meta: () => request<Meta>('/meta'),
 
   overview: () => request<Overview>('/overview'),
+
+  monitor: () =>
+    request<{ checks: Check[]; monitors: MonitorSource[] }>('/monitor'),
 
   search: (q: string) =>
     request<{ query: string; hits: Hit[] }>(`/search?q=${encodeURIComponent(q)}`),

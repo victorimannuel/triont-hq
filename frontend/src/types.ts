@@ -84,6 +84,16 @@ export type Check = {
   checked_at: string
 }
 
+export type MonitorSource = {
+  source: string
+  last_seen_at: string
+  silent_after_minutes: number
+  /** It has stopped reporting, which is a problem in itself. */
+  stale: boolean
+  problems: number
+  total: number
+}
+
 export type Attachment = {
   id: number
   entity: string

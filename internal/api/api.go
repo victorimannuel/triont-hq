@@ -85,6 +85,14 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("POST /api/auth/passkeys/link", s.requireAuth(s.handleCreateEnrolLink))
 	mux.HandleFunc("POST /api/auth/enrol/begin", s.handleEnrolBegin)
 	mux.HandleFunc("POST /api/auth/enrol/finish", s.handleEnrolFinish)
+
+	// Token-authenticated, not session-authenticated: the caller is a cron
+	// job on another machine.
+	mux.HandleFunc("POST /api/monitor/report", s.handleReport)
+	mux.Handle("GET /api/monitor", s.requireAuth(s.handleMonitor))
+
+	// One table for every module, the way tags work: entity plus id.
+	// A literal last segment, so it beats {entity}/{id} and cannot collide
 	// with {id}/download the way /files/counts/{entity} did.
 	mux.Handle("GET /api/files/{entity}/counts", s.requireAuth(s.handleAttachmentCounts))
 	mux.Handle("GET /api/files/{entity}/{id}", s.requireAuth(s.handleListAttachments))

@@ -436,6 +436,41 @@ create table if not exists supply_purchases (
 
 create index if not exists supply_purchases_idx on supply_purchases (supply_id, bought_on desc);
 
+-- Things watched by something outside HQ. Monitors report in; HQ never goes
+-- looking, because a checker holds credentials this app should not.
+create table if not exists monitors (
+    source               text primary key,
+    last_seen_at         timestamptz not null default now(),
+    -- How long it may stay quiet before the silence is itself the problem.
+    silent_after_minutes int not null default 60,
+    created_at           timestamptz not null default now()
+);
+
+create table if not exists monitor_checks (
+    id         bigserial primary key,
+    source     text not null,
+    key        text not null,
+    name       text not null default '',
+    status     text not null default 'ok',
+    detail     text not null default '',
+    url        text not null default '',
+    -- When this state began, not when it was last confirmed: a three-day
+    -- outage should read as three days old.
+    since_at   timestamptz not null default now(),
+    checked_at timestamptz not null default now(),
+    unique (source, key)
+);
+
+create index if not exists monitor_trouble_idx on monitor_checks (status) where status <> 'ok';
+
+-- Whether this monitor's silence has already been announced. Without it a
+-- monitor that stays dead would push every time the loop noticed.
+alter table monitors add column if not exists stale_notified boolean not null default false;
+
+-- Files belonging to a record. In the database rather than on disk so the
+-- nightly dump covers them without a second backup path, and encrypted with
+-- the same key as credential secrets: the scan of a document is more sensitive
+-- than the number printed on it.
 create table if not exists attachments (
     id         bigserial primary key,
     entity     text not null,

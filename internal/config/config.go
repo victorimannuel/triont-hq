@@ -23,6 +23,9 @@ type Config struct {
 	// WebAuthn is bound to exactly one host; the browser refuses anything else.
 	RPID   string
 	Origin string
+	// Bearer token external monitors use to report in. The only door into
+	// HQ that a session cookie does not open.
+	MonitorToken string
 }
 
 func Load() (Config, error) {
@@ -37,6 +40,9 @@ func Load() (Config, error) {
 		// WebAuthn refuses to work against any origin but the one named here.
 		RPID:   env("HQ_RP_ID", "localhost"),
 		Origin: env("HQ_ORIGIN", "http://localhost:8080"),
+		// Empty disables the monitor ingest endpoint outright rather than
+		// leaving it open with a guessable secret.
+		MonitorToken: os.Getenv("HQ_MONITOR_TOKEN"),
 	}
 
 	if cfg.DatabaseURL == "" {
