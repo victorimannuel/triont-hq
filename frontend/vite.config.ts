@@ -45,15 +45,14 @@ export default defineConfig({
           },
         ],
       },
-      workbox: {
-        // Only the build output is precached. Nothing under /api ever touches
-        // the cache — this app holds secrets, and a stale or cached credential
-        // response is exactly what must not happen.
+      // The worker is written by hand (src/sw.ts) rather than generated: a
+      // generated one has nowhere to put the push and notificationclick
+      // handlers. Precaching and the navigation fallback live in there too.
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
+      injectManifest: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
-        navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//],
-        runtimeCaching: [],
-        cleanupOutdatedCaches: true,
       },
       devOptions: { enabled: false },
     }),

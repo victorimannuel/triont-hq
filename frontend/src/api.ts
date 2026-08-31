@@ -34,6 +34,7 @@ import type {
   Supply,
   SupplyInput,
   SupplyPurchase,
+  PushDevice,
   Project,
   ProjectInput,
   Tag,
@@ -91,6 +92,19 @@ export const api = {
       `/auth/passkeys/finish?name=${encodeURIComponent(name)}&device=${encodeURIComponent(device)}`,
       credential,
     ),
+  pushKey: () => request<{ key: string; enabled: boolean }>('/push/key'),
+  pushDevices: () =>
+    request<{ subscriptions: PushDevice[] }>('/push/subscriptions'),
+  pushSubscribe: (body: {
+    endpoint: string
+    keys: { p256dh: string; auth: string }
+    device: string
+  }) => send<{ status: string }>('POST', '/push/subscribe', body),
+  pushUnsubscribe: (id: number) => send<void>('DELETE', `/push/subscriptions/${id}`),
+  pushUnsubscribeHere: (endpoint: string) =>
+    send<{ status: string }>('POST', '/push/unsubscribe', { endpoint }),
+  pushTest: () => send<{ sent: number; devices: number }>('POST', '/push/test'),
+
   renamePasskey: (id: number, name: string) =>
     send<Passkey>('PUT', `/auth/passkeys/${id}`, { name }),
   deletePasskey: (id: number) => send<void>('DELETE', `/auth/passkeys/${id}`),

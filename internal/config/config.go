@@ -23,6 +23,13 @@ type Config struct {
 	// WebAuthn is bound to exactly one host; the browser refuses anything else.
 	RPID   string
 	Origin string
+	// Web push. Without a key pair the notification endpoints simply report
+	// themselves as unavailable rather than failing; everything else runs.
+	VAPIDPublic  string
+	VAPIDPrivate string
+	VAPIDSubject string
+	// Hour of the day, local time, the reminder goes out.
+	ReminderHour int
 	// Bearer token external monitors use to report in. The only door into
 	// HQ that a session cookie does not open.
 	MonitorToken string
@@ -40,6 +47,12 @@ func Load() (Config, error) {
 		// WebAuthn refuses to work against any origin but the one named here.
 		RPID:   env("HQ_RP_ID", "localhost"),
 		Origin: env("HQ_ORIGIN", "http://localhost:8080"),
+		// No key pair means notifications are simply unavailable; nothing else
+		// is affected, which is why these are not required.
+		VAPIDPublic:  os.Getenv("HQ_VAPID_PUBLIC"),
+		VAPIDPrivate: os.Getenv("HQ_VAPID_PRIVATE"),
+		VAPIDSubject: env("HQ_VAPID_SUBJECT", "mailto:admin@localhost"),
+		ReminderHour: envInt("HQ_REMINDER_HOUR", 7),
 		// Empty disables the monitor ingest endpoint outright rather than
 		// leaving it open with a guessable secret.
 		MonitorToken: os.Getenv("HQ_MONITOR_TOKEN"),

@@ -1,5 +1,13 @@
 export type Option = { value: string; label: string }
 
+export type PushDevice = {
+  id: number
+  device: string
+  created_at: string
+  last_sent_at: string | null
+  failures: number
+}
+
 export type Passkey = {
   id: number
   name: string

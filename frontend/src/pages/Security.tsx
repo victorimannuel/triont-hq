@@ -27,7 +27,16 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useConfirm } from '@/components/confirm'
-import { ErrorNote, Field, formatDate, Loading, PageHeader, Spinner } from '@/components/bits'
+import { PushSection } from '@/components/PushSection'
+import {
+  ErrorNote,
+  Field,
+  formatDate,
+  Loading,
+  PageHeader,
+  SectionTitle,
+  Spinner,
+} from '@/components/bits'
 
 export default function Security() {
   const { t } = useT()
@@ -158,6 +167,8 @@ export default function Security() {
 
       {error && <ErrorNote>{error}</ErrorNote>}
 
+      <SectionTitle>{t('security.devices')}</SectionTitle>
+
       <Card className="mb-6">
         <CardContent className="space-y-4">
           <div className="flex items-start gap-3">
@@ -286,7 +297,9 @@ export default function Security() {
         </div>
       )}
 
-      <p className="mt-6 text-xs text-muted-foreground">{t('security.lockoutNote')}</p>
+      <p className="mb-8 mt-6 text-xs text-muted-foreground">{t('security.lockoutNote')}</p>
+
+      <PushSection />
     </div>
   )
 }

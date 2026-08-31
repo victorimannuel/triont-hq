@@ -397,6 +397,31 @@ alter table webauthn_credentials add column if not exists last_used_location tex
 alter table assets add column if not exists credential_id bigint references credentials (id) on delete set null;
 create index if not exists assets_credential_idx on assets (credential_id);
 
+-- Browsers that agreed to be notified. The endpoint is the browser's own push
+-- service URL and identifies the device, so re-subscribing updates in place
+-- rather than piling up a row per visit.
+create table if not exists push_subscriptions (
+    id           bigserial primary key,
+    user_id      bigint not null references users (id) on delete cascade,
+    endpoint     text not null unique,
+    p256dh       text not null,
+    auth         text not null,
+    device       text not null default '',
+    failures     int not null default 0,
+    last_sent_at timestamptz,
+    created_at   timestamptz not null default now()
+);
+
+-- One row per day the digest went out. A restart in the afternoon must not
+-- send the morning's reminder a second time.
+create table if not exists push_digests (
+    sent_on date primary key,
+    sent_at timestamptz not null default now()
+);
+
+-- Things that get used up rather than owned: tissue, cotton buds, cooking oil.
+-- Separate from belongings on purpose — nothing here has a warranty or a
+-- service history, and the only question asked of it is whether to buy more.
 create table if not exists supplies (
     id                bigserial primary key,
     name              text not null,

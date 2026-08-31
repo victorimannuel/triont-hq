@@ -109,6 +109,12 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("DELETE /api/purchases/{id}", s.requireAuth(s.handleDeletePurchase))
 	mux.Handle("DELETE /api/supplies/{id}", s.requireAuth(s.handleDeleteSupply))
 
+	mux.Handle("GET /api/push/key", s.requireAuth(s.handlePushKey))
+	mux.Handle("GET /api/push/subscriptions", s.requireAuth(s.handleListSubscriptions))
+	mux.Handle("POST /api/push/subscribe", s.requireAuth(s.handleSubscribe))
+	mux.Handle("DELETE /api/push/subscriptions/{id}", s.requireAuth(s.handleUnsubscribe))
+	mux.Handle("POST /api/push/unsubscribe", s.requireAuth(s.handleUnsubscribeEndpoint))
+	mux.Handle("POST /api/push/test", s.requireAuth(s.handleTestPush))
 
 	mux.Handle("GET /api/search", s.requireAuth(s.handleSearch))
 

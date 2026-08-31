@@ -3,6 +3,7 @@ module github.com/victorimannuel/triont-hq
 go 1.25.0
 
 require (
+	github.com/SherClockHolmes/webpush-go v1.4.0
 	github.com/go-webauthn/webauthn v0.18.0
 	github.com/jackc/pgx/v5 v5.10.0
 	golang.org/x/crypto v0.55.0

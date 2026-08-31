@@ -13,7 +13,11 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	// The image carries no zoneinfo, so TZ would silently mean UTC and the
+	// morning reminder would arrive in the afternoon. This embeds the database.
+	_ "time/tzdata"
 
+	webpush "github.com/SherClockHolmes/webpush-go"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/victorimannuel/triont-hq/internal/api"
@@ -34,6 +38,14 @@ func main() {
 				die(log, err)
 			}
 			fmt.Println(base64.StdEncoding.EncodeToString(key))
+			return
+		case "vapid":
+			private, public, err := webpush.GenerateVAPIDKeys()
+			if err != nil {
+				die(log, err)
+			}
+			fmt.Println("HQ_VAPID_PUBLIC=" + public)
+			fmt.Println("HQ_VAPID_PRIVATE=" + private)
 			return
 		case "passkeys-reset":
 			if len(os.Args) != 3 {
@@ -97,6 +109,10 @@ func run(log *slog.Logger) error {
 		return fmt.Errorf("webauthn: %w", err)
 	}
 	mux.Handle("/api/", server.Routes())
+
+	// The reminder loop lives with the server: one process, one schedule, and
+	// it stops when the server does.
+	go server.RunReminders(ctx, cfg.ReminderHour)
 
 	if ui, err := web.Handler(); err != nil {
 		log.Warn("front-end bundle missing, serving API only", "err", err)

@@ -20,13 +20,32 @@ function svg({ size, padding, background }) {
   const inner = s - p * 2
   // Same flag-on-a-pole mark as the app, scaled into the icon box.
   const x = (v) => p + (v / 32) * inner
+  // A badge is read for its alpha channel alone and painted white by Android,
+  // so a filled background would arrive as a solid white square. `background:
+  // null` leaves it transparent and lets the mark itself be the shape.
+  const plate = background
+    ? `<rect width="${s}" height="${s}" fill="${background}"/>`
+    : ''
   return Buffer.from(`
 <svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 ${s} ${s}">
-  <rect width="${s}" height="${s}" fill="${background}"/>
+  ${plate}
   <path d="M${x(10.75)} ${x(7.5)} V${x(24.5)}" stroke="${INK}" stroke-width="${(2.4 / 32) * inner}"
         stroke-linecap="round" opacity="0.95"/>
   <path d="M${x(12.6)} ${x(8.6)} H${x(23.4)} l${(-3.1 / 32) * inner} ${(3.6 / 32) * inner}
            ${(3.1 / 32) * inner} ${(3.6 / 32) * inner} H${x(12.6)} Z" fill="${INK}"/>
+</svg>`)
+}
+
+// The mark's own bounds inside the 32-unit box: the pole runs 6.3..25.7 with
+// its round caps, the flag reaches x 23.4. Framing a square on that centre is
+// what makes the badge fill the status bar rather than float in it.
+function badgeSvg(size) {
+  const view = { x: 6.275, y: 5.8, side: 20.4 }
+  return Buffer.from(`
+<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"
+     viewBox="${view.x} ${view.y} ${view.side} ${view.side}">
+  <path d="M10.75 7.5 V24.5" stroke="${INK}" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M12.6 8.6 H23.4 l-3.1 3.6 3.1 3.6 H12.6 Z" fill="${INK}"/>
 </svg>`)
 }
 
@@ -53,6 +72,14 @@ for (const target of targets) {
   const png = await sharp(svg(target)).png({ compressionLevel: 9 }).toBuffer()
   await writeFile(resolve(publicDir, target.file), png)
   console.log(`${target.file.padEnd(24)} ${target.size}x${target.size}  ${png.length} B`)
+}
+
+// The status-bar badge: mark only, no plate, framed tight so Android has
+// something to show at 24dp.
+{
+  const png = await sharp(badgeSvg(96)).png({ compressionLevel: 9 }).toBuffer()
+  await writeFile(resolve(publicDir, 'badge-96.png'), png)
+  console.log(`${'badge-96.png'.padEnd(24)} 96x96  ${png.length} B`)
 }
 
 await writeFile(
