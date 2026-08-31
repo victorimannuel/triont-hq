@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import {
   Link,
   NavLink,
@@ -15,17 +15,19 @@ import {
   House,
   KeyRound,
   Languages,
+  Activity,
   Loader2,
   LogOut,
   Menu,
   Search,
-  Monitor,
+  Monitor as MonitorIcon,
   Moon,
   Package,
   Receipt,
   Server,
   Sun,
   ShieldCheck,
+  ShoppingBasket,
   Trash2,
   UserRound,
   Users,
@@ -63,29 +65,35 @@ import { cn } from '@/lib/utils'
 
 import Login from '@/pages/Login'
 import Overview from '@/pages/Overview'
-import Projects from '@/pages/Projects'
-import ProjectDetail from '@/pages/ProjectDetail'
-import ProjectForm from '@/pages/ProjectForm'
-import Credentials from '@/pages/Credentials'
-import CredentialForm from '@/pages/CredentialForm'
-import Assets from '@/pages/Assets'
-import AssetForm from '@/pages/AssetForm'
-import Clients from '@/pages/Clients'
-import ClientForm from '@/pages/ClientForm'
-import Documents from '@/pages/Documents'
-import DocumentForm from '@/pages/DocumentForm'
-import Belongings from '@/pages/Belongings'
-import BelongingForm from '@/pages/BelongingForm'
-import People from '@/pages/People'
-import PersonForm from '@/pages/PersonForm'
-import Calendar from '@/pages/Calendar'
-import Income from '@/pages/Income'
-import IncomeForm from '@/pages/IncomeForm'
-import Expenses from '@/pages/Expenses'
-import ExpenseForm from '@/pages/ExpenseForm'
-import Trash from '@/pages/Trash'
-import Security from '@/pages/Security'
 import Enrol from '@/pages/Enrol'
+
+// Every page below is fetched the first time it is opened. The whole app in
+// one file meant paying for the belongings form to read the home page.
+const Projects = lazy(() => import('@/pages/Projects'))
+const ProjectDetail = lazy(() => import('@/pages/ProjectDetail'))
+const ProjectForm = lazy(() => import('@/pages/ProjectForm'))
+const Credentials = lazy(() => import('@/pages/Credentials'))
+const CredentialForm = lazy(() => import('@/pages/CredentialForm'))
+const Assets = lazy(() => import('@/pages/Assets'))
+const AssetForm = lazy(() => import('@/pages/AssetForm'))
+const Clients = lazy(() => import('@/pages/Clients'))
+const ClientForm = lazy(() => import('@/pages/ClientForm'))
+const Documents = lazy(() => import('@/pages/Documents'))
+const DocumentForm = lazy(() => import('@/pages/DocumentForm'))
+const Belongings = lazy(() => import('@/pages/Belongings'))
+const BelongingForm = lazy(() => import('@/pages/BelongingForm'))
+const People = lazy(() => import('@/pages/People'))
+const PersonForm = lazy(() => import('@/pages/PersonForm'))
+const Calendar = lazy(() => import('@/pages/Calendar'))
+const Income = lazy(() => import('@/pages/Income'))
+const IncomeForm = lazy(() => import('@/pages/IncomeForm'))
+const Expenses = lazy(() => import('@/pages/Expenses'))
+const ExpenseForm = lazy(() => import('@/pages/ExpenseForm'))
+const Trash = lazy(() => import('@/pages/Trash'))
+const Supplies = lazy(() => import('@/pages/Supplies'))
+const SupplyForm = lazy(() => import('@/pages/SupplyForm'))
+const Monitor = lazy(() => import('@/pages/Monitor'))
+const Security = lazy(() => import('@/pages/Security'))
 
 const emptyMeta: Meta = {
   statuses: [],
@@ -106,12 +114,14 @@ const emptyMeta: Meta = {
   belonging_kinds: [],
   belonging_statuses: [],
   maintenance_kinds: [],
+  supply_categories: [],
+  supply_units: [],
 }
 
 const MetaContext = createContext<Meta>(emptyMeta)
 export const useMeta = () => useContext(MetaContext)
 
-const THEME_ICONS = { system: Monitor, light: Sun, dark: Moon } as const
+const THEME_ICONS = { system: MonitorIcon, light: Sun, dark: Moon } as const
 
 type Session = { email: string } | null
 
@@ -181,6 +191,16 @@ export default function App() {
       {toaster}
       </ConfirmProvider>
     </I18nContext.Provider>
+  )
+}
+
+// Shown while a page chunk loads. Deliberately quiet: on a warm cache it is
+// never seen, and on a cold one a spinner beats a blank panel.
+function PageLoading() {
+  return (
+    <div className="flex justify-center py-20 text-muted-foreground">
+      <Loader2 className="size-5 animate-spin" />
+    </div>
   )
 }
 
@@ -254,6 +274,7 @@ const NAV_GROUPS = [
       { to: '/credentials', key: 'credentials', icon: KeyRound, end: false },
       { to: '/income', key: 'income', icon: Wallet, end: false },
       { to: '/expenses', key: 'expenses', icon: Receipt, end: false },
+      { to: '/monitor', key: 'monitor', icon: Activity, end: false },
     ],
   },
   {
@@ -261,6 +282,7 @@ const NAV_GROUPS = [
     items: [
       { to: '/documents', key: 'documents', icon: FileText, end: false },
       { to: '/belongings', key: 'belongings', icon: Package, end: false },
+      { to: '/supplies', key: 'supplies', icon: ShoppingBasket, end: false },
       { to: '/people', key: 'people', icon: UserRound, end: false },
     ],
   },
@@ -412,41 +434,49 @@ function Shell({
       {/* pb leaves room for the bottom tab bar plus the phone's home indicator. */}
       <main className="pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-8 md:pb-16 md:pl-56">
         <div className="mx-auto max-w-5xl px-4 md:px-8">
-          <Routes>
-            <Route path="/" element={<Overview />} />
-            <Route path="/projects" element={<Projects />} />
-            <Route path="/projects/new" element={<ProjectForm />} />
-            {/* No separate edit route: the project page is editable in place. */}
-            <Route path="/projects/:slug" element={<ProjectDetail />} />
-            <Route path="/clients" element={<Clients />} />
-            <Route path="/clients/new" element={<ClientForm />} />
-            <Route path="/clients/:slug" element={<ClientForm />} />
-            <Route path="/assets" element={<Assets />} />
-            <Route path="/assets/new" element={<AssetForm />} />
-            <Route path="/assets/:id" element={<AssetForm />} />
-            <Route path="/credentials" element={<Credentials />} />
-            <Route path="/credentials/new" element={<CredentialForm />} />
-            <Route path="/credentials/:id" element={<CredentialForm />} />
-            <Route path="/documents" element={<Documents />} />
-            <Route path="/documents/new" element={<DocumentForm />} />
-            <Route path="/documents/:id" element={<DocumentForm />} />
-            <Route path="/calendar" element={<Calendar />} />
-            <Route path="/belongings" element={<Belongings />} />
-            <Route path="/belongings/new" element={<BelongingForm />} />
-            <Route path="/belongings/:id" element={<BelongingForm />} />
-            <Route path="/people" element={<People />} />
-            <Route path="/people/new" element={<PersonForm />} />
-            <Route path="/people/:id" element={<PersonForm />} />
-            <Route path="/income" element={<Income />} />
-            <Route path="/income/new" element={<IncomeForm />} />
-            <Route path="/income/:id" element={<IncomeForm />} />
-            <Route path="/expenses" element={<Expenses />} />
-            <Route path="/expenses/new" element={<ExpenseForm />} />
-            <Route path="/expenses/:id" element={<ExpenseForm />} />
+          {/* One boundary for every route: the spinner shows only while a page
+              chunk is in flight, which is the first visit and never again. */}
+          <Suspense fallback={<PageLoading />}>
+              <Routes>
+              <Route path="/" element={<Overview />} />
+              <Route path="/projects" element={<Projects />} />
+              <Route path="/projects/new" element={<ProjectForm />} />
+              {/* No separate edit route: the project page is editable in place. */}
+              <Route path="/projects/:slug" element={<ProjectDetail />} />
+              <Route path="/clients" element={<Clients />} />
+              <Route path="/clients/new" element={<ClientForm />} />
+              <Route path="/clients/:slug" element={<ClientForm />} />
+              <Route path="/assets" element={<Assets />} />
+              <Route path="/assets/new" element={<AssetForm />} />
+              <Route path="/assets/:id" element={<AssetForm />} />
+              <Route path="/credentials" element={<Credentials />} />
+              <Route path="/credentials/new" element={<CredentialForm />} />
+              <Route path="/credentials/:id" element={<CredentialForm />} />
+              <Route path="/documents" element={<Documents />} />
+              <Route path="/documents/new" element={<DocumentForm />} />
+              <Route path="/documents/:id" element={<DocumentForm />} />
+              <Route path="/calendar" element={<Calendar />} />
+              <Route path="/belongings" element={<Belongings />} />
+              <Route path="/belongings/new" element={<BelongingForm />} />
+              <Route path="/belongings/:id" element={<BelongingForm />} />
+              <Route path="/people" element={<People />} />
+              <Route path="/people/new" element={<PersonForm />} />
+              <Route path="/people/:id" element={<PersonForm />} />
+              <Route path="/income" element={<Income />} />
+              <Route path="/income/new" element={<IncomeForm />} />
+              <Route path="/income/:id" element={<IncomeForm />} />
+              <Route path="/expenses" element={<Expenses />} />
+              <Route path="/expenses/new" element={<ExpenseForm />} />
+              <Route path="/expenses/:id" element={<ExpenseForm />} />
+              <Route path="/supplies" element={<Supplies />} />
+            <Route path="/supplies/new" element={<SupplyForm />} />
+            <Route path="/supplies/:id" element={<SupplyForm />} />
+            <Route path="/monitor" element={<Monitor />} />
             <Route path="/security" element={<Security />} />
-            <Route path="/trash" element={<Trash />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+              <Route path="/trash" element={<Trash />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
         </div>
       </main>
 
