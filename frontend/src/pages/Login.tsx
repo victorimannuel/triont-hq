@@ -5,7 +5,13 @@ import { api } from '@/api'
 import { useT } from '@/i18n'
 import { deviceLabel, friendlyError, getCredential } from '@/webauthn'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Logo } from '@/components/Logo'
 import { ErrorNote, Field, Spinner } from '@/components/bits'
