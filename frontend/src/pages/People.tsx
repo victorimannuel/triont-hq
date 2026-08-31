@@ -1,15 +1,15 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Check, Mail, Phone, Plus, Search, X } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Check, Mail, Phone, Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { api } from '@/api'
+import { ALL, useList } from '@/lib/useList'
+import { useFileCounts } from '@/lib/useFileCounts'
 import { useT } from '@/i18n'
 import type { Person } from '@/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
@@ -26,47 +26,22 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { ErrorNote, formatDate, PageHeader } from '@/components/bits'
+import { FileCount } from '@/components/Files'
+import { SearchInput } from '@/components/filters'
 import { CardList, Responsive } from '@/components/cards'
-
-const ALL = '__all__'
 
 export default function People() {
   const { t } = useT()
   const navigate = useNavigate()
-  const [params, setParams] = useSearchParams()
-  const [people, setPeople] = useState<Person[]>([])
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(true)
-
-  const query = { q: params.get('q') ?? '', scope: params.get('scope') ?? '' }
-  const filtered = Boolean(query.q || query.scope)
-
-  const load = useCallback(() => {
-    setLoading(true)
-    api
-      .people(query)
-      .then((data) => {
-        setPeople(data.people)
-        setError('')
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false))
-    // params is the source of truth for the filters.
-  }, [params])
-
-  useEffect(load, [load])
-
-  function update(key: string, value: string) {
-    const next = new URLSearchParams(params)
-    if (value && value !== ALL) next.set(key, value)
-    else next.delete(key)
-    setParams(next)
-  }
+  const list = useList(['q', 'scope'], api.people, { people: [] as Person[] })
+  const { loading, error, query, filtered, update, clear, reload } = list
+  const fileCounts = useFileCounts('person')
+  const people = list.data.people
 
   async function touch(person: Person) {
     await api.touchPerson(person.id).catch(() => undefined)
     toast.success(t('people.touched', { name: person.nickname || person.name }))
-    load()
+    reload()
   }
 
   const due = people.filter((p) => p.due_to_reach).length
@@ -91,15 +66,11 @@ export default function People() {
       {error && <ErrorNote>{error}</ErrorNote>}
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[14rem] flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="pl-9"
-            placeholder={t('people.searchPlaceholder')}
-            value={query.q}
-            onChange={(e) => update('q', e.target.value)}
-          />
-        </div>
+        <SearchInput
+          value={query.q}
+          onChange={(v) => update('q', v)}
+          placeholder={t('people.searchPlaceholder')}
+        />
         <Select value={query.scope || ALL} onValueChange={(v) => update('scope', v)}>
           <SelectTrigger className="w-[12rem]">
             <SelectValue placeholder={t('common.all')} />
@@ -111,7 +82,7 @@ export default function People() {
           </SelectContent>
         </Select>
         {filtered && (
-          <Button variant="ghost" size="sm" onClick={() => setParams(new URLSearchParams())}>
+          <Button variant="ghost" size="sm" onClick={clear}>
             <X className="size-4" />
             {t('common.reset')}
           </Button>
@@ -141,6 +112,7 @@ export default function People() {
                     <TableCell>
                       <div className="flex items-center gap-2 font-medium">
                         {person.nickname || person.name}
+                        <FileCount n={fileCounts[person.id]} />
                         {person.due_to_reach && (
                           <Badge
                             variant="outline"
@@ -273,6 +245,7 @@ export default function People() {
                   <span>
                     {p.last_contacted_on ? formatDate(p.last_contacted_on) : t('people.never')}
                   </span>
+                  <FileCount n={fileCounts[p.id]} />
                 </>
               ),
               footer:

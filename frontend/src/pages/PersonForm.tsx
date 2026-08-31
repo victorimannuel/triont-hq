@@ -18,7 +18,15 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useConfirm } from '@/components/confirm'
-import { AuditInfo, ErrorNote, Field, PageHeader, Spinner } from '@/components/bits'
+import {
+  AuditInfo,
+  ErrorNote,
+  Field,
+  NameInput,
+  PageHeader,
+  Spinner,
+} from '@/components/bits'
+import { Files } from '@/components/Files'
 
 const NONE = '__none__'
 
@@ -126,25 +134,25 @@ export default function PersonForm() {
           <form className="space-y-5" onSubmit={submit}>
             <div className="grid gap-5 sm:grid-cols-2">
               <Field label={t('common.name')} htmlFor="name">
-                <Input
+                <NameInput
                   id="name"
-                  value={form.name}
-                  onChange={(e) => set('name', e.target.value)}
                   required
+                  value={form.name}
+                  onValue={(v) => set('name', v)}
                 />
               </Field>
               <Field label={t('people.nickname')} htmlFor="nickname" hint={t('people.nicknameHint')}>
-                <Input
+                <NameInput
                   id="nickname"
                   value={form.nickname}
-                  onChange={(e) => set('nickname', e.target.value)}
+                  onValue={(v) => set('nickname', v)}
                 />
               </Field>
               <Field label={t('people.role')} htmlFor="role">
-                <Input
+                <NameInput
                   id="role"
                   value={form.role}
-                  onChange={(e) => set('role', e.target.value)}
+                  onValue={(v) => set('role', v)}
                 />
               </Field>
             </div>
@@ -257,6 +265,8 @@ export default function PersonForm() {
           )}
         </CardContent>
       </Card>
+
+      {id && <Files entity="person" id={Number(id)} />}
     </div>
   )
 }

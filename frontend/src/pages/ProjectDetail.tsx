@@ -6,7 +6,14 @@ import { toast } from 'sonner'
 import { api } from '@/api'
 import { useT } from '@/i18n'
 import { useMeta } from '@/App'
-import type { Asset, Client, Link as LinkRow, LinkInput, Project, ProjectInput } from '@/types'
+import type {
+  Asset,
+  Client,
+  Link as LinkRow,
+  LinkInput,
+  Project,
+  ProjectInput,
+} from '@/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -28,7 +35,16 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useConfirm } from '@/components/confirm'
-import { AuditInfo, ErrorNote, Field, Loading, Spinner, StatusBadge } from '@/components/bits'
+import {
+  AuditInfo,
+  ErrorNote,
+  Field,
+  Loading,
+  NameInput,
+  Spinner,
+  StatusBadge,
+} from '@/components/bits'
+import { Files } from '@/components/Files'
 
 const NONE = '__none__'
 
@@ -295,7 +311,11 @@ export default function ProjectDetail() {
       <Card>
         <CardContent className="space-y-5">
           <Field label="Nama" htmlFor="name">
-            <Input id="name" value={form.name} onChange={(e) => set('name', e.target.value)} />
+            <NameInput
+              id="name"
+              value={form.name}
+              onValue={(v) => set('name', v)}
+            />
           </Field>
 
           <div className="grid gap-5 sm:grid-cols-2">
@@ -673,6 +693,7 @@ export default function ProjectDetail() {
         </Button>
       </div>
 
+      <Files entity="project" id={project.id} />
     </>
   )
 }

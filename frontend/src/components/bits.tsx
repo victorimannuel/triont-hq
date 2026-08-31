@@ -1,8 +1,9 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ComponentProps, type ReactNode } from 'react'
 import { Loader2 } from 'lucide-react'
 
 import { useT } from '@/i18n'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 
@@ -205,15 +206,13 @@ export function Field({
  * one holds the raw text and only reports the parsed number upwards.
  */
 export function MoneyInput({
-  id,
   value,
   onValue,
   className,
-}: {
-  id?: string
+  ...rest
+}: Omit<ComponentProps<typeof Input>, 'value' | 'onChange' | 'type'> & {
   value: number
   onValue: (amount: number) => void
-  className?: string
 }) {
   const [text, setText] = useState(value ? String(value) : '')
 
@@ -225,7 +224,6 @@ export function MoneyInput({
 
   return (
     <Input
-      id={id}
       type="number"
       inputMode="decimal"
       min={0}
@@ -236,8 +234,64 @@ export function MoneyInput({
         setText(event.target.value)
         onValue(event.target.value === '' ? 0 : Number(event.target.value))
       }}
+      {...rest}
     />
   )
+}
+
+/**
+ * A name field with one button that flips the whole value between Title Case
+ * and all lowercase. Names arrive from a phone keyboard, from a paste and from
+ * autocapitalise, so a list ends up with "Tisu Basah" next to "tisu basah"
+ * unless settling it costs one tap.
+ *
+ * The button shows what it is about to do, and only ever acts on demand:
+ * typing is never rewritten under the cursor, which would fight anyone
+ * entering a name that is deliberately odd.
+ */
+export function NameInput({
+  value,
+  onValue,
+  ...rest
+}: Omit<ComponentProps<typeof Input>, 'value' | 'onChange'> & {
+  value: string
+  onValue: (value: string) => void
+}) {
+  const { t } = useT()
+
+  // Already all lowercase means the next tap should capitalise; anything else
+  // gets flattened. One button, and its label says which way it goes.
+  const willCapitalise = value === value.toLocaleLowerCase()
+
+  return (
+    <div className="flex gap-1">
+      <Input value={value} onChange={(event) => onValue(event.target.value)} {...rest} />
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        className="shrink-0"
+        title={willCapitalise ? t('common.titleCase') : t('common.lowerCase')}
+        aria-label={willCapitalise ? t('common.titleCase') : t('common.lowerCase')}
+        onClick={() =>
+          onValue(willCapitalise ? titleCase(value) : value.toLocaleLowerCase())
+        }
+      >
+        <span className="text-xs font-semibold">{willCapitalise ? 'Aa' : 'aa'}</span>
+      </Button>
+    </div>
+  )
+}
+
+// Every word gets a capital and the rest goes lower, which is what "capitalise"
+// means to everyone who is not a typographer. Anything after a space, hyphen,
+// slash or bracket starts a new word, so "e-commerce" and "tisu/napkin" behave.
+function titleCase(value: string): string {
+  return value
+    .toLocaleLowerCase()
+    .replace(/(^|[\s\-/(])(\p{L})/gu, (_, before: string, letter: string) =>
+      before + letter.toLocaleUpperCase(),
+    )
 }
 
 export function SectionTitle({ children, hint }: { children: ReactNode; hint?: ReactNode }) {

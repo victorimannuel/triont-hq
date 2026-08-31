@@ -125,7 +125,7 @@ func (s *Store) ProjectBySlug(ctx context.Context, slug string) (Project, error)
 	if p.Links, err = s.LinksByProject(ctx, p.ID); err != nil {
 		return p, err
 	}
-	if p.Credentials, err = s.ListCredentials(ctx, &p.ID, ""); err != nil {
+	if p.Credentials, err = s.ListCredentials(ctx, CredentialFilter{ProjectID: &p.ID}); err != nil {
 		return p, err
 	}
 	if p.Assets, err = s.AssetsForProject(ctx, p.ID); err != nil {

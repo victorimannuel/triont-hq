@@ -1,21 +1,15 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Search, X } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Plus, X } from 'lucide-react'
 
 import { api } from '@/api'
+import { useList } from '@/lib/useList'
+import { useFileCounts } from '@/lib/useFileCounts'
 import { useMeta } from '@/App'
 import { useT } from '@/i18n'
 import type { Client, Project, Tag } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -25,51 +19,28 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { ErrorNote, PageHeader, StatusBadge } from '@/components/bits'
+import { FileCount } from '@/components/Files'
+import { SearchInput, FilterSelect } from '@/components/filters'
 import { CardList, Responsive } from '@/components/cards'
-
-const ALL = '__all__'
 
 export default function Projects() {
   const meta = useMeta()
   const { t, tOpt } = useT()
   const navigate = useNavigate()
-  const [params, setParams] = useSearchParams()
-  const [projects, setProjects] = useState<Project[]>([])
-  const [clients, setClients] = useState<Client[]>([])
+  const list = useList(['q', 'status', 'kind', 'client', 'tag'], api.projects, {
+    projects: [] as Project[],
+    clients: [] as Client[],
+  })
+  const { loading, error, query, filtered, update, clear } = list
+  const fileCounts = useFileCounts('project')
+  const projects = list.data.projects
+  const clients = list.data.clients
+
+  // The tag list is the same whatever the filters are, so it is fetched once.
   const [tags, setTags] = useState<Tag[]>([])
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(true)
-
-  const query = {
-    q: params.get('q') ?? '',
-    status: params.get('status') ?? '',
-    kind: params.get('kind') ?? '',
-    client: params.get('client') ?? '',
-    tag: params.get('tag') ?? '',
-  }
-  const filtered = Boolean(query.q || query.status || query.kind || query.client || query.tag)
-
   useEffect(() => {
-    setLoading(true)
-    api
-      .projects(query)
-      .then((data) => {
-        setProjects(data.projects)
-        setClients(data.clients)
-        setError('')
-      })
-      .then(() => api.tags().then((data) => setTags(data.tags)))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false))
-    // The URL is the single source of truth for filter state.
-  }, [params])
-
-  function update(key: string, value: string) {
-    const next = new URLSearchParams(params)
-    if (value && value !== ALL) next.set(key, value)
-    else next.delete(key)
-    setParams(next)
-  }
+    api.tags().then((data) => setTags(data.tags)).catch(() => undefined)
+  }, [])
 
   return (
     <>
@@ -89,43 +60,43 @@ export default function Projects() {
       {error && <ErrorNote>{error}</ErrorNote>}
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[14rem] flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="pl-9"
-            placeholder={t('project.searchPlaceholder')}
-            value={query.q}
-            onChange={(e) => update('q', e.target.value)}
-          />
-        </div>
+        <SearchInput
+          value={query.q}
+          onChange={(v) => update('q', v)}
+          placeholder={t('project.searchPlaceholder')}
+        />
 
         <FilterSelect
+          className="min-w-[8.5rem] flex-1 sm:max-w-[9.5rem]"
           value={query.status}
           onChange={(v) => update('status', v)}
-          placeholder={t('common.status')}
+          label={t('common.status')}
           options={meta.statuses.map((s) => ({ value: s.value, label: tOpt('status', s.value, s.label) }))}
         />
         <FilterSelect
+          className="min-w-[8.5rem] flex-1 sm:max-w-[9.5rem]"
           value={query.kind}
           onChange={(v) => update('kind', v)}
-          placeholder={t('common.kind')}
+          label={t('common.kind')}
           options={meta.kinds.map((k) => ({ value: k.value, label: tOpt('kind', k.value, k.label) }))}
         />
         <FilterSelect
+          className="min-w-[8.5rem] flex-1 sm:max-w-[9.5rem]"
           value={query.client}
           onChange={(v) => update('client', v)}
-          placeholder={t('project.client')}
+          label={t('project.client')}
           options={clients.map((c) => ({ value: c.slug, label: c.name }))}
         />
         <FilterSelect
+          className="min-w-[8.5rem] flex-1 sm:max-w-[9.5rem]"
           value={query.tag}
           onChange={(v) => update('tag', v)}
-          placeholder="tag"
+          label={"tag"}
           options={tags.map((tag) => ({ value: tag.slug, label: tag.name }))}
         />
 
         {filtered && (
-          <Button variant="ghost" size="sm" onClick={() => setParams(new URLSearchParams())}>
+          <Button variant="ghost" size="sm" onClick={clear}>
             <X className="size-4" />
             {t('common.reset')}
           </Button>
@@ -155,7 +126,10 @@ export default function Projects() {
                   >
                     <TableCell>
                       {/* No underline: the whole row is the link already. */}
-                      <div className="font-medium">{project.name}</div>
+                      <div className="flex items-center gap-2 font-medium">
+                        {project.name}
+                        <FileCount n={fileCounts[project.id]} />
+                      </div>
                       {project.local_path && (
                         <div className="mt-0.5 font-mono text-xs text-muted-foreground">
                           {project.local_path}
@@ -237,6 +211,7 @@ export default function Projects() {
                       {tag.name}
                     </span>
                   ))}
+                  <FileCount n={fileCounts[p.id]} />
                 </>
               ),
             })}
@@ -244,36 +219,5 @@ export default function Projects() {
         }
       />
     </>
-  )
-}
-
-function FilterSelect({
-  value,
-  onChange,
-  placeholder,
-  options,
-}: {
-  value: string
-  onChange: (value: string) => void
-  placeholder: string
-  options: { value: string; label: string }[]
-}) {
-  const { t } = useT()
-  return (
-    <Select value={value || ALL} onValueChange={onChange}>
-      <SelectTrigger className="w-[9.5rem]">
-        <SelectValue placeholder={placeholder} />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value={ALL}>
-          {t('common.all')} {placeholder.toLowerCase()}
-        </SelectItem>
-        {options.map((option) => (
-          <SelectItem key={option.value} value={option.value}>
-            {option.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
   )
 }

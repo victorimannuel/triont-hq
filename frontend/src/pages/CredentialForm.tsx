@@ -19,7 +19,14 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useConfirm } from '@/components/confirm'
-import { AuditInfo, ErrorNote, Field, PageHeader, Spinner } from '@/components/bits'
+import {
+  AuditInfo,
+  ErrorNote,
+  Field,
+  NameInput,
+  PageHeader,
+  Spinner,
+} from '@/components/bits'
 
 const NONE = '__none__'
 
@@ -136,11 +143,11 @@ export default function CredentialForm() {
           <form className="space-y-5" onSubmit={submit}>
             <div className="grid gap-5 sm:grid-cols-2">
               <Field label="Label" htmlFor="label">
-                <Input
+                <NameInput
                   id="label"
-                  value={form.label}
-                  onChange={(e) => set('label', e.target.value)}
                   required
+                  value={form.label}
+                  onValue={(v) => set('label', v)}
                 />
               </Field>
               <Field label="Jenis">

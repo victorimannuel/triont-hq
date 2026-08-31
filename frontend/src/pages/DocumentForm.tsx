@@ -19,7 +19,15 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useConfirm } from '@/components/confirm'
-import { AuditInfo, ErrorNote, Field, PageHeader, Spinner } from '@/components/bits'
+import {
+  AuditInfo,
+  ErrorNote,
+  Field,
+  NameInput,
+  PageHeader,
+  Spinner,
+} from '@/components/bits'
+import { Files } from '@/components/Files'
 
 const blank: DocumentInput = {
   name: '',
@@ -117,11 +125,11 @@ export default function DocumentForm() {
           <form className="space-y-5" onSubmit={submit}>
             <div className="grid gap-5 sm:grid-cols-2">
               <Field label="Nama" htmlFor="name" hint="— misal “Paspor saya”">
-                <Input
+                <NameInput
                   id="name"
-                  value={form.name}
-                  onChange={(e) => set('name', e.target.value)}
                   required
+                  value={form.name}
+                  onValue={(v) => set('name', v)}
                 />
               </Field>
               <Field label="Jenis">
@@ -142,10 +150,10 @@ export default function DocumentForm() {
 
             <div className="grid gap-5 sm:grid-cols-2">
               <Field label="Pemilik" htmlFor="holder" hint="— punya siapa">
-                <Input
+                <NameInput
                   id="holder"
                   value={form.holder}
-                  onChange={(e) => set('holder', e.target.value)}
+                  onValue={(v) => set('holder', v)}
                 />
               </Field>
               <Field label="Penerbit" htmlFor="issuer" hint="— Dukcapil, Imigrasi, …">
@@ -192,10 +200,10 @@ export default function DocumentForm() {
             </div>
 
             <Field label="Disimpan di" htmlFor="location" hint="— laci, brankas, map biru">
-              <Input
+              <NameInput
                 id="location"
                 value={form.location}
-                onChange={(e) => set('location', e.target.value)}
+                onValue={(v) => set('location', v)}
               />
             </Field>
 
@@ -240,6 +248,8 @@ export default function DocumentForm() {
           )}
         </CardContent>
       </Card>
+
+      {id && <Files entity="document" id={Number(id)} />}
     </div>
   )
 }

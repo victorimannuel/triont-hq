@@ -19,7 +19,11 @@ func (s *Server) handleListCredentials(w http.ResponseWriter, r *http.Request) {
 		projectID = &project.ID
 	}
 
-	credentials, err := s.store.ListCredentials(r.Context(), projectID, q.Get("kind"))
+	credentials, err := s.store.ListCredentials(r.Context(), store.CredentialFilter{
+		ProjectID: projectID,
+		Kind:      q.Get("kind"),
+		Query:     q.Get("q"),
+	})
 	if err != nil {
 		s.oops(w, err)
 		return

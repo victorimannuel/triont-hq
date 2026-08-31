@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Check, Mail, Pencil, Phone, Plus, RotateCcw, Star, Trash2, X } from 'lucide-react'
+import {
+  Check,
+  Mail,
+  Pencil,
+  Phone,
+  Plus,
+  RotateCcw,
+  Star,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { toast } from 'sonner'
 
 import { api } from '@/api'
@@ -28,7 +38,15 @@ import {
 } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { useConfirm } from '@/components/confirm'
-import { AuditInfo, ErrorNote, Field, Loading, Spinner, StatusBadge } from '@/components/bits'
+import {
+  AuditInfo,
+  ErrorNote,
+  Field,
+  Loading,
+  NameInput,
+  Spinner,
+  StatusBadge,
+} from '@/components/bits'
 
 const blankClient: ClientInput = {
   name: '',
@@ -247,11 +265,11 @@ export default function ClientForm() {
               label={form.kind === 'person' ? t('client.personName') : t('client.companyName')}
               htmlFor="name"
             >
-              <Input
+              <NameInput
                 id="name"
-                value={form.name}
-                onChange={(e) => set('name', e.target.value)}
                 required
+                value={form.name}
+                onValue={(v) => set('name', v)}
               />
             </Field>
 

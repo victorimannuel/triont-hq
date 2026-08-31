@@ -1,22 +1,15 @@
-import { useEffect, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Search, X } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Plus, X } from 'lucide-react'
 
 import { api } from '@/api'
+import { useList } from '@/lib/useList'
+import { useFileCounts } from '@/lib/useFileCounts'
 import { useT } from '@/i18n'
 import { useMeta } from '@/App'
 import type { Asset } from '@/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -26,44 +19,18 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { ErrorNote, formatMoney, PageHeader, RenewalBadge } from '@/components/bits'
+import { FileCount } from '@/components/Files'
+import { SearchInput, FilterSelect } from '@/components/filters'
 import { CardList, Responsive } from '@/components/cards'
-
-const ALL = '__all__'
 
 export default function Assets() {
   const meta = useMeta()
   const { t, tOpt } = useT()
   const navigate = useNavigate()
-  const [params, setParams] = useSearchParams()
-  const [assets, setAssets] = useState<Asset[]>([])
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(true)
-
-  const query = {
-    q: params.get('q') ?? '',
-    kind: params.get('kind') ?? '',
-    status: params.get('status') ?? '',
-  }
-  const filtered = Boolean(query.q || query.kind || query.status)
-
-  useEffect(() => {
-    setLoading(true)
-    api
-      .assets(query)
-      .then((data) => {
-        setAssets(data.assets)
-        setError('')
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false))
-  }, [params])
-
-  function update(key: string, value: string) {
-    const next = new URLSearchParams(params)
-    if (value && value !== ALL) next.set(key, value)
-    else next.delete(key)
-    setParams(next)
-  }
+  const list = useList(['q', 'kind', 'status'], api.assets, { assets: [] as Asset[] })
+  const { loading, error, query, filtered, update, clear } = list
+  const fileCounts = useFileCounts('asset')
+  const assets = list.data.assets
 
   // Only recurring, live assets belong in a monthly figure.
   const perMonth = assets
@@ -100,43 +67,31 @@ export default function Assets() {
       {error && <ErrorNote>{error}</ErrorNote>}
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[14rem] flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="pl-9"
-            placeholder={t('asset.searchPlaceholder')}
-            value={query.q}
-            onChange={(e) => update('q', e.target.value)}
-          />
-        </div>
-        <Select value={query.kind || ALL} onValueChange={(v) => update('kind', v)}>
-          <SelectTrigger className="w-[11rem]">
-            <SelectValue placeholder={t('common.kind')} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>{t('common.all')}</SelectItem>
-            {meta.asset_kinds.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {tOpt('assetkind', item.value, item.label)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={query.status || ALL} onValueChange={(v) => update('status', v)}>
-          <SelectTrigger className="w-[11rem]">
-            <SelectValue placeholder={t('common.status')} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>{t('common.all')}</SelectItem>
-            {meta.asset_statuses.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {tOpt('assetstatus', item.value, item.label)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SearchInput
+          value={query.q}
+          onChange={(v) => update('q', v)}
+          placeholder={t('asset.searchPlaceholder')}
+        />
+        <FilterSelect
+          label={t('common.kind')}
+          value={query.kind}
+          onChange={(v) => update('kind', v)}
+          options={meta.asset_kinds.map((item) => ({
+            value: item.value,
+            label: tOpt('assetkind', item.value, item.label),
+          }))}
+        />
+        <FilterSelect
+          label={t('common.status')}
+          value={query.status}
+          onChange={(v) => update('status', v)}
+          options={meta.asset_statuses.map((item) => ({
+            value: item.value,
+            label: tOpt('assetstatus', item.value, item.label),
+          }))}
+        />
         {filtered && (
-          <Button variant="ghost" size="sm" onClick={() => setParams(new URLSearchParams())}>
+          <Button variant="ghost" size="sm" onClick={clear}>
             <X className="size-4" />
             {t('common.reset')}
           </Button>
@@ -165,7 +120,10 @@ export default function Assets() {
                     className="cursor-pointer"
                   >
                     <TableCell>
-                      <div className="font-medium">{asset.name}</div>
+                      <div className="flex items-center gap-2 font-medium">
+                        {asset.name}
+                        <FileCount n={fileCounts[asset.id]} />
+                      </div>
                       {asset.identifier && (
                         <div className="mt-0.5 font-mono text-xs text-muted-foreground">
                           {asset.identifier}
@@ -241,6 +199,7 @@ export default function Assets() {
                   <span>
                     {a.project_count} {t('nav.projects')}
                   </span>
+                  <FileCount n={fileCounts[a.id]} />
                 </>
               ),
               trailing: (

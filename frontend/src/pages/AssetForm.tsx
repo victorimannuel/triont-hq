@@ -27,7 +27,16 @@ import {
 } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { useConfirm } from '@/components/confirm'
-import { AuditInfo, ErrorNote, Field, MoneyInput, PageHeader, Spinner } from '@/components/bits'
+import {
+  AuditInfo,
+  ErrorNote,
+  Field,
+  MoneyInput,
+  NameInput,
+  PageHeader,
+  Spinner,
+} from '@/components/bits'
+import { Files } from '@/components/Files'
 
 const NONE = '__none__'
 
@@ -174,11 +183,11 @@ export default function AssetForm() {
           <form className="space-y-5" onSubmit={submit}>
             <div className="grid gap-5 sm:grid-cols-2">
               <Field label="Nama" htmlFor="name">
-                <Input
+                <NameInput
                   id="name"
-                  value={form.name}
-                  onChange={(e) => set('name', e.target.value)}
                   required
+                  value={form.name}
+                  onValue={(v) => set('name', v)}
                 />
               </Field>
               <Field label="Jenis">
@@ -199,10 +208,10 @@ export default function AssetForm() {
 
             <div className="grid gap-5 sm:grid-cols-2">
               <Field label="Penyedia" htmlFor="provider" hint="— Biznet, Cloudflare, …">
-                <Input
+                <NameInput
                   id="provider"
                   value={form.provider}
-                  onChange={(e) => set('provider', e.target.value)}
+                  onValue={(v) => set('provider', v)}
                 />
               </Field>
               <Field label="Penanda" htmlFor="identifier" hint="— IP, nama domain, nomor akun">
@@ -435,6 +444,8 @@ export default function AssetForm() {
           </form>
         </>
       )}
+
+      {id && <Files entity="asset" id={Number(id)} />}
     </div>
   )
 }

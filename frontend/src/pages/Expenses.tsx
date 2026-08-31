@@ -1,22 +1,15 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Search, X } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Plus, X } from 'lucide-react'
 
 import { api } from '@/api'
+import { useList } from '@/lib/useList'
 import { useMeta } from '@/App'
 import { useT } from '@/i18n'
 import type { FxRate, ExpenseStream } from '@/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -26,45 +19,26 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { ErrorNote, formatMoney, PageHeader, RenewalBadge } from '@/components/bits'
+import { SearchInput, FilterSelect } from '@/components/filters'
 import { CardList, Responsive } from '@/components/cards'
 import { MonthlyTotal } from '@/components/Money'
-
-const ALL = '__all__'
 
 export default function Expenses() {
   const meta = useMeta()
   const { t, tOpt } = useT()
   const navigate = useNavigate()
-  const [params, setParams] = useSearchParams()
-  const [streams, setStreams] = useState<ExpenseStream[]>([])
-  const [monthly, setMonthly] = useState<Record<string, number>>({})
+  const list = useList(['q', 'status'], api.expenses, {
+    expenses: [] as ExpenseStream[],
+    monthly: {} as Record<string, number>,
+  })
+  const { loading, error, query, filtered, update, clear } = list
+  const streams = list.data.expenses
+  const monthly = list.data.monthly
+
   const [rates, setRates] = useState<FxRate[]>([])
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(true)
-
-  const query = { q: params.get('q') ?? '', status: params.get('status') ?? '' }
-  const filtered = Boolean(query.q || query.status)
-
   useEffect(() => {
-    setLoading(true)
-    api
-      .expenses(query)
-      .then((data) => {
-        setStreams(data.expenses)
-        setMonthly(data.monthly)
-        setError('')
-      })
-      .then(() => api.rates().then((data) => setRates(data.rates)))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false))
-  }, [params])
-
-  function update(key: string, value: string) {
-    const next = new URLSearchParams(params)
-    if (value && value !== ALL) next.set(key, value)
-    else next.delete(key)
-    setParams(next)
-  }
+    api.rates().then((data) => setRates(data.rates)).catch(() => undefined)
+  }, [])
 
   return (
     <>
@@ -93,30 +67,22 @@ export default function Expenses() {
       {error && <ErrorNote>{error}</ErrorNote>}
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[14rem] flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="pl-9"
-            placeholder={t('expense.searchPlaceholder')}
-            value={query.q}
-            onChange={(e) => update('q', e.target.value)}
-          />
-        </div>
-        <Select value={query.status || ALL} onValueChange={(v) => update('status', v)}>
-          <SelectTrigger className="w-[11rem]">
-            <SelectValue placeholder={t('common.status')} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>{t('common.all')}</SelectItem>
-            {meta.income_statuses.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {tOpt('incomestatus', item.value, item.label)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SearchInput
+          value={query.q}
+          onChange={(v) => update('q', v)}
+          placeholder={t('expense.searchPlaceholder')}
+        />
+        <FilterSelect
+          label={t('common.status')}
+          value={query.status}
+          onChange={(v) => update('status', v)}
+          options={meta.income_statuses.map((item) => ({
+            value: item.value,
+            label: tOpt('incomestatus', item.value, item.label),
+          }))}
+        />
         {filtered && (
-          <Button variant="ghost" size="sm" onClick={() => setParams(new URLSearchParams())}>
+          <Button variant="ghost" size="sm" onClick={clear}>
             <X className="size-4" />
             {t('common.reset')}
           </Button>
@@ -144,7 +110,7 @@ export default function Expenses() {
                     onClick={() =>
                       navigate(
                         stream.source === 'asset'
-                          ? `/assets/${stream.asset_id}`
+                          ? `/expenses/new?asset=${stream.asset_id}`
                           : `/expenses/${stream.id}`,
                       )
                     }
@@ -212,7 +178,11 @@ export default function Expenses() {
             items={streams}
             keyOf={(s) => `${s.source}-${s.id}`}
             onPick={(s) =>
-              navigate(s.source === 'asset' ? `/assets/${s.asset_id}` : `/expenses/${s.id}`)
+              navigate(
+                s.source === 'asset'
+                  ? `/expenses/new?asset=${s.asset_id}`
+                  : `/expenses/${s.id}`,
+              )
             }
             empty={loading ? null : t('expense.none')}
             render={(s) => ({

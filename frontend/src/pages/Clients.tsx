@@ -1,22 +1,14 @@
-import { useEffect, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Search, X } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Plus, X } from 'lucide-react'
 
 import { api } from '@/api'
+import { useList } from '@/lib/useList'
 import { useT } from '@/i18n'
 import { useMeta } from '@/App'
 import type { Client } from '@/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -26,40 +18,16 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { ErrorNote, PageHeader } from '@/components/bits'
+import { SearchInput, FilterSelect } from '@/components/filters'
 import { CardList, Responsive } from '@/components/cards'
-
-const ALL = '__all__'
 
 export default function Clients() {
   const meta = useMeta()
   const { t, tOpt } = useT()
   const navigate = useNavigate()
-  const [params, setParams] = useSearchParams()
-  const [clients, setClients] = useState<Client[]>([])
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(true)
-
-  const query = { q: params.get('q') ?? '', status: params.get('status') ?? '' }
-  const filtered = Boolean(query.q || query.status)
-
-  useEffect(() => {
-    setLoading(true)
-    api
-      .clients(query)
-      .then((data) => {
-        setClients(data.clients)
-        setError('')
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false))
-  }, [params])
-
-  function update(key: string, value: string) {
-    const next = new URLSearchParams(params)
-    if (value && value !== ALL) next.set(key, value)
-    else next.delete(key)
-    setParams(next)
-  }
+  const list = useList(['q', 'status'], api.clients, { clients: [] as Client[] })
+  const { loading, error, query, filtered, update, clear } = list
+  const clients = list.data.clients
 
   return (
     <>
@@ -79,30 +47,22 @@ export default function Clients() {
       {error && <ErrorNote>{error}</ErrorNote>}
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[14rem] flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="pl-9"
-            placeholder={t('client.searchPlaceholder')}
-            value={query.q}
-            onChange={(e) => update('q', e.target.value)}
-          />
-        </div>
-        <Select value={query.status || ALL} onValueChange={(v) => update('status', v)}>
-          <SelectTrigger className="w-[11rem]">
-            <SelectValue placeholder={t('common.status')} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>{t('common.all')}</SelectItem>
-            {meta.client_statuses.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {tOpt('clientstatus', item.value, item.label)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SearchInput
+          value={query.q}
+          onChange={(v) => update('q', v)}
+          placeholder={t('client.searchPlaceholder')}
+        />
+        <FilterSelect
+          label={t('common.status')}
+          value={query.status}
+          onChange={(v) => update('status', v)}
+          options={meta.client_statuses.map((item) => ({
+            value: item.value,
+            label: tOpt('clientstatus', item.value, item.label),
+          }))}
+        />
         {filtered && (
-          <Button variant="ghost" size="sm" onClick={() => setParams(new URLSearchParams())}>
+          <Button variant="ghost" size="sm" onClick={clear}>
             <X className="size-4" />
             {t('common.reset')}
           </Button>

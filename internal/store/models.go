@@ -233,6 +233,13 @@ type ProjectFilter struct {
 	Query string
 }
 
+type CredentialFilter struct {
+	// ProjectID is already resolved from the slug the URL carries.
+	ProjectID *int64
+	Kind      string
+	Query     string
+}
+
 type ClientFilter struct {
 	Status string
 	Query  string

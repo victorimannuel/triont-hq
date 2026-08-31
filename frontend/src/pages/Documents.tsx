@@ -1,22 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Copy, Eye, EyeOff, Plus, Search, X } from 'lucide-react'
-import { toast } from 'sonner'
+import { useCallback } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Copy, Eye, EyeOff, Plus, X } from 'lucide-react'
 
 import { api } from '@/api'
+import { useList } from '@/lib/useList'
+import { useFileCounts } from '@/lib/useFileCounts'
+import { useReveal } from '@/lib/useReveal'
 import { useT } from '@/i18n'
 import { useMeta } from '@/App'
 import type { Document } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -26,89 +20,29 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { ErrorNote, PageHeader, RenewalBadge } from '@/components/bits'
+import { FileCount } from '@/components/Files'
+import { SearchInput, FilterSelect } from '@/components/filters'
 import { CardList, Responsive } from '@/components/cards'
-
-const ALL = '__all__'
-const HIDE_AFTER_MS = 30_000
 
 export default function Documents() {
   const meta = useMeta()
   const { t, tOpt } = useT()
   const navigate = useNavigate()
-  const [params, setParams] = useSearchParams()
-  const [documents, setDocuments] = useState<Document[]>([])
-  const [holders, setHolders] = useState<string[]>([])
-  const [shown, setShown] = useState<Record<number, string>>({})
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(true)
+  const list = useList(['q', 'kind', 'holder'], api.documents, {
+    documents: [] as Document[],
+    holders: [] as string[],
+  })
+  const { loading, error, query, filtered, update, clear } = list
+  const fileCounts = useFileCounts('document')
+  const documents = list.data.documents
+  const holders = list.data.holders
 
-  const timers = useRef<Record<number, number>>({})
-
-  const query = {
-    q: params.get('q') ?? '',
-    kind: params.get('kind') ?? '',
-    holder: params.get('holder') ?? '',
-  }
-  const filtered = Boolean(query.q || query.kind || query.holder)
-
-  useEffect(() => {
-    setLoading(true)
-    api
-      .documents(query)
-      .then((data) => {
-        setDocuments(data.documents)
-        setHolders(data.holders)
-        setError('')
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false))
-  }, [params])
-
-  useEffect(() => {
-    const pending = timers.current
-    return () => Object.values(pending).forEach((id) => window.clearTimeout(id))
-  }, [])
-
-  const hide = useCallback((id: number) => {
-    window.clearTimeout(timers.current[id])
-    delete timers.current[id]
-    setShown((prev) => {
-      const next = { ...prev }
-      delete next[id]
-      return next
-    })
-  }, [])
-
-  async function reveal(id: number) {
-    if (shown[id] !== undefined) {
-      hide(id)
-      return
-    }
-    try {
-      const { number } = await api.revealDocument(id)
-      setShown((prev) => ({ ...prev, [id]: number }))
-      timers.current[id] = window.setTimeout(() => hide(id), HIDE_AFTER_MS)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('doc.revealFailed'))
-    }
-  }
-
-  async function copy(id: number) {
-    try {
-      const { number } = await api.revealDocument(id)
-      await navigator.clipboard.writeText(number)
-      toast.success(t('common.copied'))
-    } catch {
-      toast.error(t('common.copyFailed'))
-    }
-  }
-
-  function update(key: string, value: string) {
-    const next = new URLSearchParams(params)
-    if (value && value !== ALL) next.set(key, value)
-    else next.delete(key)
-    setParams(next)
-  }
+  const fetchNumber = useCallback(
+    async (id: number) => (await api.revealDocument(id)).number,
+    [],
+  )
+  const { shown, reveal, copy: copyValue } = useReveal(fetchNumber, t('doc.revealFailed'))
+  const copy = (id: number) => copyValue(id, t('common.copied'), t('common.copyFailed'))
 
   return (
     <>
@@ -130,43 +64,28 @@ export default function Documents() {
       {error && <ErrorNote>{error}</ErrorNote>}
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[14rem] flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="pl-9"
-            placeholder={t('doc.searchPlaceholder')}
-            value={query.q}
-            onChange={(e) => update('q', e.target.value)}
-          />
-        </div>
-        <Select value={query.kind || ALL} onValueChange={(v) => update('kind', v)}>
-          <SelectTrigger className="w-[11rem]">
-            <SelectValue placeholder={t('common.kind')} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>{t('common.all')}</SelectItem>
-            {meta.document_kinds.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {tOpt('dockind', item.value, item.label)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={query.holder || ALL} onValueChange={(v) => update('holder', v)}>
-          <SelectTrigger className="w-[11rem]">
-            <SelectValue placeholder={t('doc.holder')} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>{t('common.all')}</SelectItem>
-            {holders.map((h) => (
-              <SelectItem key={h} value={h}>
-                {h}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SearchInput
+          value={query.q}
+          onChange={(v) => update('q', v)}
+          placeholder={t('doc.searchPlaceholder')}
+        />
+        <FilterSelect
+          label={t('common.kind')}
+          value={query.kind}
+          onChange={(v) => update('kind', v)}
+          options={meta.document_kinds.map((item) => ({
+            value: item.value,
+            label: tOpt('dockind', item.value, item.label),
+          }))}
+        />
+        <FilterSelect
+          label={t('doc.holder')}
+          value={query.holder}
+          onChange={(v) => update('holder', v)}
+          options={holders.map((h) => ({ value: h, label: h }))}
+        />
         {filtered && (
-          <Button variant="ghost" size="sm" onClick={() => setParams(new URLSearchParams())}>
+          <Button variant="ghost" size="sm" onClick={clear}>
             <X className="size-4" />
             {t('common.reset')}
           </Button>
@@ -194,7 +113,10 @@ export default function Documents() {
                     className="cursor-pointer"
                   >
                     <TableCell>
-                      <div className="font-medium">{doc.name}</div>
+                      <div className="flex items-center gap-2 font-medium">
+                        {doc.name}
+                        <FileCount n={fileCounts[doc.id]} />
+                      </div>
                       {doc.location && (
                         <div className="mt-0.5 text-xs text-muted-foreground">
                           {t('doc.storedAt', { where: doc.location })}
@@ -270,6 +192,7 @@ export default function Documents() {
                 <>
                   <span>{tOpt('dockind', d.kind)}</span>
                   {d.location && <span>{t('doc.storedAt', { where: d.location })}</span>}
+                  <FileCount n={fileCounts[d.id]} />
                 </>
               ),
               footer: d.has_number ? (

@@ -19,7 +19,15 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useConfirm } from '@/components/confirm'
-import { AuditInfo, ErrorNote, Field, MoneyInput, PageHeader, Spinner } from '@/components/bits'
+import {
+  AuditInfo,
+  ErrorNote,
+  Field,
+  MoneyInput,
+  NameInput,
+  PageHeader,
+  Spinner,
+} from '@/components/bits'
 
 const NONE = '__none__'
 
@@ -62,6 +70,28 @@ export default function ExpenseForm() {
     if (!id) {
       const preset = params.get('project')
       if (preset) setForm((prev) => ({ ...prev, project_id: Number(preset) }))
+
+      // Opened from an asset row in the list: carry over what the asset
+      // already knows, so recording its bill is a confirmation rather than
+      // retyping something the app can see.
+      const fromAsset = params.get('asset')
+      if (fromAsset) {
+        api
+          .asset(Number(fromAsset))
+          .then((asset) =>
+            setForm((prev) => ({
+              ...prev,
+              name: asset.name,
+              category: 'subscription',
+              asset_id: asset.id,
+              amount: asset.cost_amount,
+              currency: asset.cost_currency,
+              cycle: asset.billing_cycle,
+              next_due_on: asset.renews_on ? asset.renews_on.slice(0, 10) : '',
+            })),
+          )
+          .catch(() => undefined)
+      }
       return
     }
     api
@@ -135,11 +165,11 @@ export default function ExpenseForm() {
         <CardContent>
           <form className="space-y-5" onSubmit={submit}>
             <Field label={t('common.name')} htmlFor="name">
-              <Input
+              <NameInput
                 id="name"
-                value={form.name}
-                onChange={(e) => set('name', e.target.value)}
                 required
+                value={form.name}
+                onValue={(v) => set('name', v)}
               />
             </Field>
 

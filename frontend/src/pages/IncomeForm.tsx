@@ -19,7 +19,15 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useConfirm } from '@/components/confirm'
-import { AuditInfo, ErrorNote, Field, MoneyInput, PageHeader, Spinner } from '@/components/bits'
+import {
+  AuditInfo,
+  ErrorNote,
+  Field,
+  MoneyInput,
+  NameInput,
+  PageHeader,
+  Spinner,
+} from '@/components/bits'
 
 const NONE = '__none__'
 
@@ -133,11 +141,11 @@ export default function IncomeForm() {
         <CardContent>
           <form className="space-y-5" onSubmit={submit}>
             <Field label={t('common.name')} htmlFor="name">
-              <Input
+              <NameInput
                 id="name"
-                value={form.name}
-                onChange={(e) => set('name', e.target.value)}
                 required
+                value={form.name}
+                onValue={(v) => set('name', v)}
               />
             </Field>
 

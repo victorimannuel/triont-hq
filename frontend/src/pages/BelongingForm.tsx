@@ -27,7 +27,19 @@ import {
 } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { useConfirm } from '@/components/confirm'
-import { AuditInfo, ErrorNote, Field, formatDate, formatMoney, MoneyInput, PageHeader, RenewalBadge, Spinner } from '@/components/bits'
+import {
+  AuditInfo,
+  ErrorNote,
+  Field,
+  formatDate,
+  formatMoney,
+  MoneyInput,
+  NameInput,
+  PageHeader,
+  RenewalBadge,
+  Spinner,
+} from '@/components/bits'
+import { Files } from '@/components/Files'
 
 const blank: BelongingInput = {
   name: '',
@@ -180,11 +192,11 @@ export default function BelongingForm() {
           <form className="space-y-5" onSubmit={submit}>
             <div className="grid gap-5 sm:grid-cols-2">
               <Field label="Nama" htmlFor="name">
-                <Input
+                <NameInput
                   id="name"
-                  value={form.name}
-                  onChange={(e) => set('name', e.target.value)}
                   required
+                  value={form.name}
+                  onValue={(v) => set('name', v)}
                 />
               </Field>
               <Field label="Jenis">
@@ -205,17 +217,17 @@ export default function BelongingForm() {
 
             <div className="grid gap-5 sm:grid-cols-3">
               <Field label="Merek" htmlFor="brand">
-                <Input
+                <NameInput
                   id="brand"
                   value={form.brand}
-                  onChange={(e) => set('brand', e.target.value)}
+                  onValue={(v) => set('brand', v)}
                 />
               </Field>
               <Field label="Model" htmlFor="model">
-                <Input
+                <NameInput
                   id="model"
                   value={form.model}
-                  onChange={(e) => set('model', e.target.value)}
+                  onValue={(v) => set('model', v)}
                 />
               </Field>
               <Field label="Tahun" htmlFor="year">
@@ -239,10 +251,10 @@ export default function BelongingForm() {
                 />
               </Field>
               <Field label="Lokasi" htmlFor="location">
-                <Input
+                <NameInput
                   id="location"
                   value={form.location}
-                  onChange={(e) => set('location', e.target.value)}
+                  onValue={(v) => set('location', v)}
                 />
               </Field>
             </div>
@@ -541,6 +553,8 @@ export default function BelongingForm() {
           </form>
         </>
       )}
+
+      {id && <Files entity="belonging" id={Number(id)} />}
     </div>
   )
 }

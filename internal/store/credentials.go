@@ -1,6 +1,9 @@
 package store
 
-import "context"
+import (
+	"context"
+	"strings"
+)
 
 const credentialSelect = `
 	select c.id, c.project_id, coalesce(p.name, ''), coalesce(p.slug, ''),
@@ -17,9 +20,9 @@ func scanCredential(row interface{ Scan(...any) error }) (Credential, error) {
 	return c, err
 }
 
-// ListCredentials filters by project when projectID is non-nil. Ciphertext is
+// ListCredentials filters by project when ProjectID is non-nil. Ciphertext is
 // deliberately left out of the projection.
-func (s *Store) ListCredentials(ctx context.Context, projectID *int64, kind string) ([]Credential, error) {
+func (s *Store) ListCredentials(ctx context.Context, f CredentialFilter) ([]Credential, error) {
 	rows, err := s.pool.Query(ctx, credentialSelect+`
 		where c.deleted_at is null
 		  and ($1::bigint is null or c.project_id = $1)
