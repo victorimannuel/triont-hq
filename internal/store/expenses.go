@@ -259,10 +259,3 @@ func (st *Store) MonthlyExpense(ctx context.Context) (map[string]float64, error)
 	}
 	return out, rows.Err()
 }
-
-func (st *Store) CountExpenses(ctx context.Context) (int, error) {
-	var n int
-	err := st.pool.QueryRow(ctx,
-		`select count(*) from expense_streams where deleted_at is null`).Scan(&n)
-	return n, err
-}

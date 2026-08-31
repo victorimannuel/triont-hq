@@ -295,10 +295,3 @@ func (s *Store) DeleteMaintenance(ctx context.Context, id int64) error {
 	}
 	return nil
 }
-
-func (s *Store) CountBelongings(ctx context.Context) (int, error) {
-	var n int
-	err := s.pool.QueryRow(ctx,
-		`select count(*) from belongings where deleted_at is null`).Scan(&n)
-	return n, err
-}

@@ -99,15 +99,3 @@ func (s *Store) DeleteCredential(ctx context.Context, id int64, actor string) er
 func (s *Store) RestoreCredential(ctx context.Context, id int64, actor string) error {
 	return s.restore(ctx, "credentials", id, actor)
 }
-
-func (s *Store) CountCredentials(ctx context.Context) (int, error) {
-	var n int
-	err := s.pool.QueryRow(ctx, `select count(*) from credentials where deleted_at is null`).Scan(&n)
-	return n, err
-}
-
-func (s *Store) CountLinks(ctx context.Context) (int, error) {
-	var n int
-	err := s.pool.QueryRow(ctx, `select count(*) from project_links`).Scan(&n)
-	return n, err
-}

@@ -174,37 +174,6 @@ func (s *Store) RestoreDocument(ctx context.Context, id int64, actor string) err
 	return s.restore(ctx, "documents", id, actor)
 }
 
-// DocumentsDue mirrors RenewalsDue: expiring soon, plus anything already past.
-func (s *Store) DocumentsDue(ctx context.Context, days int) ([]Document, error) {
-	rows, err := s.pool.Query(ctx, `select `+documentCols+`
-		from documents
-		where deleted_at is null
-		  and expires_on is not null
-		  and expires_on <= current_date + make_interval(days => $1)
-		order by expires_on`, days)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	out := []Document{}
-	for rows.Next() {
-		d, err := scanDocument(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, d)
-	}
-	return out, rows.Err()
-}
-
-func (s *Store) CountDocuments(ctx context.Context) (int, error) {
-	var n int
-	err := s.pool.QueryRow(ctx,
-		`select count(*) from documents where deleted_at is null`).Scan(&n)
-	return n, err
-}
-
 func (s *Store) DocumentHolders(ctx context.Context) ([]string, error) {
 	rows, err := s.pool.Query(ctx,
 		`select holder from documents

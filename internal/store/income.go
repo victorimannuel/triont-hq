@@ -237,10 +237,3 @@ func (st *Store) monthlyByCurrency(ctx context.Context, table string) (map[strin
 func (st *Store) MonthlyIncome(ctx context.Context) (map[string]float64, error) {
 	return st.monthlyByCurrency(ctx, "income_streams")
 }
-
-func (st *Store) CountIncome(ctx context.Context) (int, error) {
-	var n int
-	err := st.pool.QueryRow(ctx,
-		`select count(*) from income_streams where deleted_at is null`).Scan(&n)
-	return n, err
-}

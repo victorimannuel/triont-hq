@@ -186,9 +186,3 @@ func (s *Store) DeleteContact(ctx context.Context, id int64, actor string) error
 func (s *Store) RestoreContact(ctx context.Context, id int64, actor string) error {
 	return s.restore(ctx, "contacts", id, actor)
 }
-
-func (s *Store) CountClients(ctx context.Context) (int, error) {
-	var n int
-	err := s.pool.QueryRow(ctx, `select count(*) from clients where deleted_at is null`).Scan(&n)
-	return n, err
-}

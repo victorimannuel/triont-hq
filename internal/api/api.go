@@ -225,125 +225,12 @@ func (s *Server) handleMeta(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	counts, err := s.store.StatusCounts(ctx)
+	overview, err := s.store.Overview(r.Context())
 	if err != nil {
 		s.oops(w, err)
 		return
 	}
-	links, err := s.store.CountLinks(ctx)
-	if err != nil {
-		s.oops(w, err)
-		return
-	}
-	creds, err := s.store.CountCredentials(ctx)
-	if err != nil {
-		s.oops(w, err)
-		return
-	}
-	projects, err := s.store.ListProjects(ctx, store.ProjectFilter{})
-	if err != nil {
-		s.oops(w, err)
-		return
-	}
-	assets, err := s.store.CountAssets(ctx)
-	if err != nil {
-		s.oops(w, err)
-		return
-	}
-	clients, err := s.store.CountClients(ctx)
-	if err != nil {
-		s.oops(w, err)
-		return
-	}
-	// 60 days is far enough ahead to renew a domain without rushing, and
-	// anything already overdue comes back in the same list.
-	renewals, err := s.store.RenewalsDue(ctx, 60)
-	if err != nil {
-		s.oops(w, err)
-		return
-	}
-	documents, err := s.store.CountDocuments(ctx)
-	if err != nil {
-		s.oops(w, err)
-		return
-	}
-	// Papers are slower to replace than a domain, so they get a longer runway.
-	expiring, err := s.store.DocumentsDue(ctx, 120)
-	if err != nil {
-		s.oops(w, err)
-		return
-	}
-	belongings, err := s.store.CountBelongings(ctx)
-	if err != nil {
-		s.oops(w, err)
-		return
-	}
-	people, err := s.store.CountPeople(ctx)
-	if err != nil {
-		s.oops(w, err)
-		return
-	}
-	birthdays, err := s.store.Birthdays(ctx, 30)
-	if err != nil {
-		s.oops(w, err)
-		return
-	}
-	monthlyIncome, err := s.store.MonthlyIncome(ctx)
-	if err != nil {
-		s.oops(w, err)
-		return
-	}
-	incomeCount, err := s.store.CountIncome(ctx)
-	if err != nil {
-		s.oops(w, err)
-		return
-	}
-	monthlyExpense, err := s.store.MonthlyExpense(ctx)
-	if err != nil {
-		s.oops(w, err)
-		return
-	}
-	expenseCount, err := s.store.CountExpenses(ctx)
-	if err != nil {
-		s.oops(w, err)
-		return
-	}
-	rates, err := s.store.Rates(ctx)
-	if err != nil {
-		s.oops(w, err)
-		return
-	}
-
-	total := 0
-	for _, n := range counts {
-		total += n
-	}
-	recent := projects
-	if len(recent) > 8 {
-		recent = recent[:8]
-	}
-
-	writeJSON(w, http.StatusOK, map[string]any{
-		"status_counts":     counts,
-		"total_projects":    total,
-		"total_links":       links,
-		"total_credentials": creds,
-		"total_assets":      assets,
-		"total_clients":     clients,
-		"total_documents":   documents,
-		"total_belongings":  belongings,
-		"total_people":      people,
-		"birthdays":         birthdays,
-		"monthly_income":    monthlyIncome,
-		"total_income":      incomeCount,
-		"monthly_expense":   monthlyExpense,
-		"total_expenses":    expenseCount,
-		"rates":             rates,
-		"expiring":          expiring,
-		"recent":            recent,
-		"renewals":          renewals,
-	})
+	writeJSON(w, http.StatusOK, overview)
 }
 
 func writeJSON(w http.ResponseWriter, code int, body any) {

@@ -227,36 +227,3 @@ func (s *Store) ProjectsForAsset(ctx context.Context, assetID int64) ([]AssetUsa
 	}
 	return out, rows.Err()
 }
-
-// RenewalsDue lists live assets whose renewal falls inside the next `days`,
-// plus anything already overdue, so nothing silently slips past.
-func (s *Store) RenewalsDue(ctx context.Context, days int) ([]Asset, error) {
-	rows, err := s.pool.Query(ctx, `select `+assetCols+`,
-		       (select count(*) from project_assets pa where pa.asset_id = a.id)`+
-		assetFrom+`
-		where a.deleted_at is null
-		  and a.status = 'active'
-		  and a.renews_on is not null
-		  and a.renews_on <= current_date + make_interval(days => $1)
-		order by a.renews_on`, days)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	out := []Asset{}
-	for rows.Next() {
-		a, err := scanAssetCounted(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, a)
-	}
-	return out, rows.Err()
-}
-
-func (s *Store) CountAssets(ctx context.Context) (int, error) {
-	var n int
-	err := s.pool.QueryRow(ctx, `select count(*) from assets where deleted_at is null`).Scan(&n)
-	return n, err
-}

@@ -424,7 +424,6 @@ export type CalendarEntry = {
 }
 
 export type Overview = {
-  status_counts: Record<string, number>
   total_projects: number
   total_links: number
   total_credentials: number
