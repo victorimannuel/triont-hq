@@ -20,6 +20,70 @@ export type Hit = {
   subtitle: string
   detail: string
   url: string
+}
+
+export type Supply = Audit & {
+  id: number
+  name: string
+  category: string
+  location: string
+  unit: string
+  quantity: number
+  low_at: number
+  /** Computed by the server: quantity has reached the threshold. */
+  low: boolean
+  notes: string
+  last_restocked_on: string | null
+}
+
+export type SupplyPurchase = {
+  id: number
+  supply_id: number
+  bought_on: string
+  quantity: number
+  price: number
+  currency: string
+  vendor: string
+  notes: string
+  created_by: string
+  created_at: string
+  /** Days since the previous purchase; null for the first one. */
+  since_last: number | null
+}
+
+export type PurchaseInput = {
+  bought_on: string
+  quantity: number
+  price: number
+  currency: string
+  vendor: string
+  notes: string
+}
+
+export type SupplyInput = {
+  name: string
+  category: string
+  location: string
+  unit: string
+  quantity: number
+  low_at: number
+  notes: string
+  last_restocked_on: string
+}
+
+export type Check = {
+  id: number
+  source: string
+  key: string
+  name: string
+  status: 'ok' | 'warn' | 'down'
+  detail: string
+  url: string
+  /** When this state began, not when it was last confirmed. */
+  since_at: string
+  checked_at: string
+}
+
 export type Attachment = {
   id: number
   entity: string
@@ -155,6 +219,8 @@ export type Meta = {
   belonging_kinds: Option[]
   belonging_statuses: Option[]
   maintenance_kinds: Option[]
+  supply_categories: Option[]
+  supply_units: Option[]
 }
 
 export type Contact = Audit & {
@@ -449,9 +515,11 @@ export type Overview = {
   monthly_expense: Record<string, number>
   rates: FxRate[]
   recent: Project[]
-  renewals: Asset[]
-  expiring: Document[]
-  birthdays: Person[]
+  upcoming: CalendarEntry[]
+  total_supplies: number
+  low_supplies: Supply[]
+  trouble: Check[]
+  stale_monitors: MonitorSource[]
 }
 
 export type ProjectInput = {

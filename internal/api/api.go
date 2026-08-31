@@ -92,6 +92,15 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("GET /api/files/{id}/download", s.requireAuth(s.handleDownload))
 	mux.Handle("DELETE /api/files/{id}", s.requireAuth(s.handleDeleteAttachment))
 
+	mux.Handle("GET /api/supplies", s.requireAuth(s.handleListSupplies))
+	mux.Handle("POST /api/supplies", s.requireAuth(s.handleCreateSupply))
+	mux.Handle("GET /api/supplies/{id}", s.requireAuth(s.handleGetSupply))
+	mux.Handle("PUT /api/supplies/{id}", s.requireAuth(s.handleUpdateSupply))
+	mux.Handle("POST /api/supplies/{id}/adjust", s.requireAuth(s.handleAdjustSupply))
+	mux.Handle("POST /api/supplies/{id}/purchases", s.requireAuth(s.handleAddPurchase))
+	mux.Handle("DELETE /api/purchases/{id}", s.requireAuth(s.handleDeletePurchase))
+	mux.Handle("DELETE /api/supplies/{id}", s.requireAuth(s.handleDeleteSupply))
+
 
 	mux.Handle("GET /api/search", s.requireAuth(s.handleSearch))
 
@@ -228,6 +237,8 @@ func (s *Server) handleMeta(w http.ResponseWriter, _ *http.Request) {
 		"belonging_kinds":    belongingKinds,
 		"belonging_statuses": belongingStatuses,
 		"maintenance_kinds":  maintenanceKinds,
+		"supply_categories":  supplyCategories,
+		"supply_units":       supplyUnits,
 	})
 }
 

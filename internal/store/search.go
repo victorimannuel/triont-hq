@@ -126,6 +126,14 @@ with hits as (
    where e.deleted_at is null
 
   union all
+  select 'supply', s.id, s.name, s.location,
+         concat_ws(' ', 'sisa', trim_scale(s.quantity)::text, s.unit),
+         '/supplies/' || s.id,
+         concat_ws(' ', s.name, s.category, s.location, s.unit, s.notes)
+    from supplies s
+   where s.deleted_at is null
+
+  union all
   select 'tag', t.id, t.name, '', '', '/projects?tag=' || t.slug,
          concat_ws(' ', t.name, t.slug)
     from tags t

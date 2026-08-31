@@ -41,6 +41,8 @@ func (s *Server) handleRestore(w http.ResponseWriter, r *http.Request) {
 		err = s.store.RestoreIncome(r.Context(), id, who)
 	case "expense":
 		err = s.store.RestoreExpense(r.Context(), id, who)
+	case "supply":
+		err = s.store.RestoreSupply(r.Context(), id, who)
 	default:
 		fail(w, http.StatusBadRequest, "jenis nggak dikenal")
 		return

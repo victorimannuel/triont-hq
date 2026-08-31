@@ -22,7 +22,7 @@ type TrashItem struct {
 var softTables = map[string]bool{
 	"projects": true, "clients": true, "assets": true,
 	"credentials": true, "documents": true,
-	"belongings": true, "contacts": true,
+	"belongings": true, "contacts": true, "supplies": true,
 	"income_streams": true, "expense_streams": true,
 }
 
@@ -95,6 +95,10 @@ func (s *Store) ListTrash(ctx context.Context) ([]TrashItem, error) {
 		union all
 		select 'belonging', id, name, coalesce(brand, ''), deleted_by, deleted_at
 		  from belongings where deleted_at is not null
+
+		union all
+		select 'supply', id, name, coalesce(location, ''), deleted_by, deleted_at
+		  from supplies where deleted_at is not null
 		union all
 		select 'person', id, name, coalesce(role, ''), deleted_by, deleted_at
 		  from contacts where deleted_at is not null
@@ -129,6 +133,7 @@ func (s *Store) PurgeTrash(ctx context.Context, entity string, id int64) error {
 		"project": "projects", "client": "clients",
 		"asset": "assets", "credential": "credentials",
 		"document": "documents", "belonging": "belongings", "person": "contacts",
+		"supply": "supplies",
 		"income": "income_streams", "expense": "expense_streams",
 	}[entity]
 	if table == "" {

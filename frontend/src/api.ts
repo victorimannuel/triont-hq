@@ -28,6 +28,10 @@ import type {
   Attachment,
   Person,
   PersonInput,
+  PurchaseInput,
+  Supply,
+  SupplyInput,
+  SupplyPurchase,
   Project,
   ProjectInput,
   Tag,
@@ -273,6 +277,30 @@ export const api = {
   updateExpense: (id: number, input: ExpenseInput) =>
     send<ExpenseStream>('PUT', `/expenses/${id}`, input),
   deleteExpense: (id: number) => send<void>('DELETE', `/expenses/${id}`),
+
+  supplies: (query: Record<string, string> = {}) => {
+    const params = new URLSearchParams(
+      Object.entries(query).filter(([, value]) => value !== ''),
+    )
+    const suffix = params.toString() ? `?${params}` : ''
+    return request<{ supplies: Supply[]; low: number }>(`/supplies${suffix}`)
+  },
+  // Opening an item is exactly when "how long does this last" gets asked, so
+  // its history comes with it.
+  supply: (id: number) =>
+    request<{ supply: Supply; purchases: SupplyPurchase[]; typical_days: number | null }>(
+      `/supplies/${id}`,
+    ),
+  addPurchase: (id: number, input: PurchaseInput) =>
+    send<Supply>('POST', `/supplies/${id}/purchases`, input),
+  deletePurchase: (id: number) => send<Supply>('DELETE', `/purchases/${id}`),
+  createSupply: (input: SupplyInput) => send<Supply>('POST', '/supplies', input),
+  updateSupply: (id: number, input: SupplyInput) =>
+    send<Supply>('PUT', `/supplies/${id}`, input),
+  // delta nudges by a step; to fills back up and stamps the restock date.
+  adjustSupply: (id: number, body: { delta?: number; to?: number }) =>
+    send<Supply>('POST', `/supplies/${id}/adjust`, body),
+  deleteSupply: (id: number) => send<void>('DELETE', `/supplies/${id}`),
 
   attachmentCounts: (entity: string) =>
     request<{ counts: Record<string, number> }>(`/files/${entity}/counts`),

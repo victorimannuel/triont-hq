@@ -397,6 +397,45 @@ alter table webauthn_credentials add column if not exists last_used_location tex
 alter table assets add column if not exists credential_id bigint references credentials (id) on delete set null;
 create index if not exists assets_credential_idx on assets (credential_id);
 
+create table if not exists supplies (
+    id                bigserial primary key,
+    name              text not null,
+    category          text not null default 'other',
+    location          text not null default '',
+    unit              text not null default 'pcs',
+    quantity          numeric(10, 2) not null default 0,
+    -- At or below this, it counts as running out.
+    low_at            numeric(10, 2) not null default 1,
+    notes             text not null default '',
+    last_restocked_on date,
+    created_by        text not null default '',
+    updated_by        text not null default '',
+    deleted_at        timestamptz,
+    deleted_by        text not null default '',
+    created_at        timestamptz not null default now(),
+    updated_at        timestamptz not null default now()
+);
+
+create index if not exists supplies_live_idx on supplies (deleted_at);
+create index if not exists supplies_low_idx  on supplies ((quantity <= low_at));
+
+-- Every time something was bought. Two questions this answers that a running
+-- count cannot: how long a pack actually lasts, and what it used to cost.
+create table if not exists supply_purchases (
+    id         bigserial primary key,
+    supply_id  bigint not null references supplies (id) on delete cascade,
+    bought_on  date not null default current_date,
+    quantity   numeric(10, 2) not null default 1,
+    price      numeric(14, 2) not null default 0,
+    currency   text not null default 'IDR',
+    vendor     text not null default '',
+    notes      text not null default '',
+    created_by text not null default '',
+    created_at timestamptz not null default now()
+);
+
+create index if not exists supply_purchases_idx on supply_purchases (supply_id, bought_on desc);
+
 create table if not exists attachments (
     id         bigserial primary key,
     entity     text not null,
