@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
 import {
@@ -49,6 +49,7 @@ import {
   useDisplayCurrency,
 } from '@/components/Money'
 import { useRemembered } from '@/lib/useRemembered'
+import { cn } from '@/lib/utils'
 
 // How far ahead the upcoming list looks. The server sends a month; this is
 // only which slice of it the page draws.
@@ -71,14 +72,61 @@ function Tile({
   return (
     <Link
       to={to}
-      className="flex items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2 transition-colors hover:bg-accent"
+      className="card-surface flex items-center gap-2.5 rounded-lg border bg-card px-3 py-2.5 transition-colors hover:bg-accent"
     >
-      <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-        {Icon && <Icon className="size-3.5 shrink-0" />}
-        <span className="truncate">{label}</span>
-      </span>
-      <span className="text-base font-semibold tabular-nums">{value}</span>
+      {Icon && (
+        <span className="grid size-7 shrink-0 place-items-center rounded-md bg-foreground/[0.06] text-muted-foreground">
+          <Icon className="size-3.5" />
+        </span>
+      )}
+      <span className="min-w-0 truncate text-xs text-muted-foreground">{label}</span>
+      <span className="ml-auto text-lg font-semibold tabular-nums tracking-tight">{value}</span>
     </Link>
+  )
+}
+
+// Money in, money out, and what is left. Colour carries the meaning here —
+// green earns, red spends — so the label takes the tone and the figure stays
+// plain, which keeps a negative "sisa" readable rather than alarming.
+const MONEY_TONE = {
+  in: { wash: 'bg-success/[0.07]', label: 'text-success' },
+  out: { wash: 'bg-destructive/[0.07]', label: 'text-destructive' },
+  net: { wash: 'bg-primary/[0.07]', label: 'text-primary' },
+} as const
+
+function MoneyTile({
+  to,
+  tone,
+  icon: Icon,
+  label,
+  value,
+  className,
+}: {
+  to?: string
+  tone: keyof typeof MONEY_TONE
+  icon: LucideIcon
+  label: string
+  value: ReactNode
+  className?: string
+}) {
+  const skin = MONEY_TONE[tone]
+  const body = (
+    <>
+      <div className={cn('flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-wider', skin.label)}>
+        <Icon className="size-3.5" />
+        {label}
+      </div>
+      <div className="mt-1.5 text-xl font-semibold tabular-nums tracking-tight">{value}</div>
+    </>
+  )
+  const shell = cn('card-surface rounded-lg border px-3.5 py-3', skin.wash, className)
+
+  return to ? (
+    <Link to={to} className={cn(shell, 'transition-colors hover:bg-accent')}>
+      {body}
+    </Link>
+  ) : (
+    <div className={shell}>{body}</div>
   )
 }
 
@@ -165,9 +213,9 @@ export default function Overview() {
             <Link
               key={check.id}
               to="/monitor"
-              className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent"
+              className="flex items-center gap-3 border-l-2 border-l-destructive px-4 py-3 transition-colors hover:bg-accent"
             >
-              <span className="size-2 shrink-0 rounded-full bg-destructive" />
+              <span className="size-2 shrink-0 rounded-full bg-destructive ring-3 ring-destructive/20" />
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium">{check.name}</div>
                 {check.detail && (
@@ -199,35 +247,27 @@ export default function Overview() {
         )}
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
-        <Link
+        <MoneyTile
           to="/income"
-          className="rounded-lg border bg-card px-3 py-2.5 transition-colors hover:bg-accent"
-        >
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <TrendingUp className="size-3.5" />
-            {t('home.inPerMonth')}
-          </div>
-          <div className="mt-0.5 font-semibold tabular-nums">{converting ? money(income.total) : eachCurrency(data.monthly_income)}</div>
-        </Link>
-        <Link
+          tone="in"
+          icon={TrendingUp}
+          label={t('home.inPerMonth')}
+          value={converting ? money(income.total) : eachCurrency(data.monthly_income)}
+        />
+        <MoneyTile
           to="/expenses"
-          className="rounded-lg border bg-card px-3 py-2.5 transition-colors hover:bg-accent"
-        >
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <TrendingDown className="size-3.5" />
-            {t('home.outPerMonth')}
-          </div>
-          <div className="mt-0.5 font-semibold tabular-nums">{converting ? money(expense.total) : eachCurrency(data.monthly_expense)}</div>
-        </Link>
-        <div className="col-span-2 rounded-lg border bg-card px-3 py-2.5 sm:col-span-1">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Scale className="size-3.5" />
-            {t('home.net')}
-          </div>
-          <div className="mt-0.5 font-semibold tabular-nums">
-            {converting ? money(income.total - expense.total) : eachCurrency(net)}
-          </div>
-        </div>
+          tone="out"
+          icon={TrendingDown}
+          label={t('home.outPerMonth')}
+          value={converting ? money(expense.total) : eachCurrency(data.monthly_expense)}
+        />
+        <MoneyTile
+          tone="net"
+          icon={Scale}
+          label={t('home.net')}
+          value={converting ? money(income.total - expense.total) : eachCurrency(net)}
+          className="col-span-2 sm:col-span-1"
+        />
       </div>
       {converting && (income.missing || expense.missing) && (
         <p className="mt-2 text-xs text-muted-foreground">{t('fx.missing')}</p>

@@ -60,7 +60,12 @@ export function EntryRow({ entry, onPick }: { entry: CalendarEntry; onPick?: () 
     <Link
       to={entry.url}
       onClick={onPick}
-      className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent"
+      // The stripe repeats what the date column already says, but it says it
+      // down the left edge where a list is scanned rather than read.
+      className={cn(
+        'flex items-center gap-3 border-l-2 px-4 py-3 transition-colors hover:bg-accent',
+        late ? 'border-l-destructive' : soon ? 'border-l-warning' : 'border-l-transparent',
+      )}
     >
       <span className={cn('grid size-6 shrink-0 place-items-center rounded', tone(entry.kind))}>
         <Icon className="size-3.5" />
