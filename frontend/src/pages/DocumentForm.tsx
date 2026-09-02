@@ -45,7 +45,7 @@ export default function DocumentForm() {
   const { id } = useParams()
   const meta = useMeta()
   const navigate = useNavigate()
-  const { t } = useT()
+  const { t, tOpt } = useT()
   const confirm = useConfirm()
 
   const [form, setForm] = useState<DocumentInput>(blank)
@@ -86,10 +86,10 @@ export default function DocumentForm() {
     try {
       if (id) await api.updateDocument(Number(id), form)
       else await api.createDocument(form)
-      toast.success('Dokumen disimpan')
+      toast.success(t('doc.saved'))
       navigate('/documents')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'gagal menyimpan')
+      setError(err instanceof Error ? err.message : t('common.saveFailed'))
       setBusy(false)
     }
   }
@@ -107,15 +107,15 @@ export default function DocumentForm() {
     })
     if (!ok) return
     await api.deleteDocument(Number(id))
-    toast.success('Dokumen dihapus')
+    toast.success(t('doc.deleted'))
     navigate('/documents')
   }
 
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader
-        title={id ? 'Ubah dokumen' : 'Dokumen baru'}
-        description="KTP, paspor, SIM, STNK, polis — apa pun yang punya masa berlaku. Nomornya disimpan ke-enkripsi."
+        title={id ? t('doc.edit') : t('doc.new')}
+        description={t('doc.subtitle')}
       />
 
       {error && <ErrorNote>{error}</ErrorNote>}
@@ -124,7 +124,7 @@ export default function DocumentForm() {
         <CardContent>
           <form className="space-y-5" onSubmit={submit}>
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Nama" htmlFor="name" hint="— misal “Paspor saya”">
+              <Field label={t('common.name')} htmlFor="name" hint={t('doc.nameHint')}>
                 <NameInput
                   id="name"
                   required
@@ -132,7 +132,7 @@ export default function DocumentForm() {
                   onValue={(v) => set('name', v)}
                 />
               </Field>
-              <Field label="Jenis">
+              <Field label={t('common.kind')}>
                 <Select value={form.kind} onValueChange={(v) => set('kind', v)}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
@@ -140,7 +140,7 @@ export default function DocumentForm() {
                   <SelectContent>
                     {meta.document_kinds.map((o) => (
                       <SelectItem key={o.value} value={o.value}>
-                        {o.label}
+                        {tOpt('dockind', o.value, o.label)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -149,14 +149,14 @@ export default function DocumentForm() {
             </div>
 
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Pemilik" htmlFor="holder" hint="— punya siapa">
+              <Field label={t('doc.holder')} htmlFor="holder" hint={t('doc.holderHint')}>
                 <NameInput
                   id="holder"
                   value={form.holder}
                   onValue={(v) => set('holder', v)}
                 />
               </Field>
-              <Field label="Penerbit" htmlFor="issuer" hint="— Dukcapil, Imigrasi, …">
+              <Field label={t('doc.issuer')} htmlFor="issuer" hint={t('doc.issuerHint')}>
                 <Input
                   id="issuer"
                   value={form.issuer}
@@ -166,9 +166,9 @@ export default function DocumentForm() {
             </div>
 
             <Field
-              label="Nomor"
+              label={t('doc.number')}
               htmlFor="number"
-              hint={record?.has_number ? '— sudah ada, isi cuma kalau mau ganti' : undefined}
+              hint={record?.has_number ? t('doc.numberKept') : undefined}
             >
               <Input
                 id="number"
@@ -181,7 +181,7 @@ export default function DocumentForm() {
             </Field>
 
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Terbit" htmlFor="issued">
+              <Field label={t('doc.issued')} htmlFor="issued">
                 <Input
                   id="issued"
                   type="date"
@@ -189,7 +189,7 @@ export default function DocumentForm() {
                   onChange={(e) => set('issued_on', e.target.value)}
                 />
               </Field>
-              <Field label="Berlaku sampai" htmlFor="expires">
+              <Field label={t('doc.expires')} htmlFor="expires">
                 <Input
                   id="expires"
                   type="date"
@@ -199,7 +199,7 @@ export default function DocumentForm() {
               </Field>
             </div>
 
-            <Field label="Disimpan di" htmlFor="location" hint="— laci, brankas, map biru">
+            <Field label={t('doc.location')} htmlFor="location" hint={t('doc.locationHint')}>
               <NameInput
                 id="location"
                 value={form.location}
@@ -207,7 +207,7 @@ export default function DocumentForm() {
               />
             </Field>
 
-            <Field label="Catatan" htmlFor="notes">
+            <Field label={t('common.notes')} htmlFor="notes">
               <Textarea
                 id="notes"
                 rows={4}
@@ -219,10 +219,10 @@ export default function DocumentForm() {
             <div className="flex items-center gap-2 pt-1">
               <Button type="submit" disabled={busy}>
                 {busy && <Spinner />}
-                Simpan
+                {t('common.save')}
               </Button>
               <Button variant="ghost" asChild>
-                <Link to="/documents">Batal</Link>
+                <Link to="/documents">{t('common.cancel')}</Link>
               </Button>
               {id && (
                 <Button
@@ -232,7 +232,7 @@ export default function DocumentForm() {
                   onClick={remove}
                 >
                   <Trash2 className="size-4" />
-                  Hapus
+                  {t('common.delete')}
                 </Button>
               )}
             </div>

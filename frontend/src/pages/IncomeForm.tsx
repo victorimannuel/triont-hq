@@ -159,7 +159,7 @@ export default function IncomeForm() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={NONE}>{t('income.noClient')}</SelectItem>
+                    <SelectItem value={NONE}>{t('common.noClient')}</SelectItem>
                     {clients.map((c) => (
                       <SelectItem key={c.id} value={String(c.id)}>
                         {c.name}
@@ -177,7 +177,7 @@ export default function IncomeForm() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={NONE}>{t('income.noProject')}</SelectItem>
+                    <SelectItem value={NONE}>{t('common.noProject')}</SelectItem>
                     {projects.map((p) => (
                       <SelectItem key={p.id} value={String(p.id)}>
                         {p.name}

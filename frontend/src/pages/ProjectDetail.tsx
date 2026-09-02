@@ -65,7 +65,7 @@ export default function ProjectDetail() {
   const { slug = '' } = useParams()
   const meta = useMeta()
   const navigate = useNavigate()
-  const { t } = useT()
+  const { t, tOpt } = useT()
   const confirm = useConfirm()
 
   const [project, setProject] = useState<Project | null>(null)
@@ -114,10 +114,10 @@ export default function ProjectDetail() {
     try {
       await api.attachAsset(slug, Number(attachDraft.assetId), attachDraft.role)
       setAttachDraft({ assetId: '', role: '' })
-      toast.success('Aset ditempelkan')
+      toast.success(t('project.assetAttached'))
       load()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'gagal menempelkan aset')
+      toast.error(err instanceof Error ? err.message : t('project.attachFailed'))
     }
   }
 
@@ -130,7 +130,7 @@ export default function ProjectDetail() {
       setTagDraft('')
       load()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'gagal nambah tag')
+      toast.error(err instanceof Error ? err.message : t('project.tagFailed'))
     }
   }
 
@@ -140,10 +140,10 @@ export default function ProjectDetail() {
   }
 
   async function detachAsset(assetId: number) {
-    if (!(await confirm({ title: t('confirm.detachTitle', { name: 'aset' }), body: t('confirm.detachBody') })))
-      return
+    const title = t('confirm.detachTitle', { name: t('common.asset') })
+    if (!(await confirm({ title, body: t('confirm.detachBody') }))) return
     await api.detachAsset(slug, assetId).catch(() => undefined)
-    toast.success('Aset dilepas')
+    toast.success(t('project.assetDetached'))
     load()
   }
 
@@ -165,12 +165,12 @@ export default function ProjectDetail() {
       const saved = await api.updateProject(slug, form)
       setProject(saved)
       setForm(toInput(saved))
-      toast.success('Project disimpan')
+      toast.success(t('project.saved'))
       // The slug follows the name, so keep the URL honest.
       if (saved.slug !== slug) navigate(`/projects/${saved.slug}`, { replace: true })
       else load()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'gagal menyimpan')
+      toast.error(err instanceof Error ? err.message : t('common.saveFailed'))
     } finally {
       setSaving(false)
     }
@@ -181,10 +181,10 @@ export default function ProjectDetail() {
     try {
       await api.createLink(slug, draft)
       setDraft({ label: '', url: '', category: draft.category, notes: '' })
-      toast.success('Link ditambahkan')
+      toast.success(t('link.added'))
       load()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'gagal nambah link')
+      toast.error(err instanceof Error ? err.message : t('link.addFailed'))
     }
   }
 
@@ -203,10 +203,10 @@ export default function ProjectDetail() {
     try {
       await api.updateLink(editingLink, linkDraft)
       setEditingLink(null)
-      toast.success('Link disimpan')
+      toast.success(t('link.saved'))
       load()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'gagal menyimpan link')
+      toast.error(err instanceof Error ? err.message : t('link.saveFailed'))
     }
   }
 
@@ -214,7 +214,7 @@ export default function ProjectDetail() {
     if (!(await confirm({ title: t('confirm.removeLinkTitle'), danger: true }))) return
     await api.deleteLink(id).catch(() => undefined)
     if (editingLink === id) setEditingLink(null)
-    toast.success('Link dihapus')
+    toast.success(t('link.deleted'))
     load()
   }
 
@@ -230,36 +230,38 @@ export default function ProjectDetail() {
     })
     if (!ok) return
     await api.deleteProject(slug)
-    toast.success('Project dihapus')
+    toast.success(t('project.deleted'))
     navigate('/projects')
   }
 
   if (error) return <ErrorNote>{error}</ErrorNote>
   if (!project || !form) return <Loading />
 
-  const statusLabel = meta.statuses.find((s) => s.value === form.status)?.label ?? form.status
-  const kindLabel = meta.kinds.find((k) => k.value === form.kind)?.label ?? form.kind
+  const statusLabel = tOpt('status', form.status)
+  const kindLabel = tOpt('kind', form.kind)
 
   return (
     <>
       {dirty && (
         <div className="sticky top-14 z-30 md:top-0 -mx-4 mb-6 flex items-center gap-3 border-b bg-popover/95 px-4 py-3 shadow-sm backdrop-blur">
-          <span className="text-sm text-muted-foreground">Ada perubahan yang belum disimpan.</span>
+          <span className="text-sm text-muted-foreground">{t('common.unsaved')}</span>
           <div className="ml-auto flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={() => setForm(toInput(project))}>
               <RotateCcw className="size-4" />
-              Batal
+              {t('common.cancel')}
             </Button>
             <Button size="sm" onClick={save} disabled={saving}>
               {saving && <Spinner />}
-              Simpan
+              {t('common.save')}
             </Button>
           </div>
         </div>
       )}
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-2">
-          <h1 className="text-2xl font-semibold tracking-tight">{form.name || 'Tanpa nama'}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {form.name || t('common.noName')}
+          </h1>
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={form.status} label={statusLabel} />
             <Badge variant="secondary">{kindLabel}</Badge>
@@ -285,7 +287,7 @@ export default function ProjectDetail() {
                   type="button"
                   onClick={() => removeTag(tag.id)}
                   className="rounded-full p-0.5 text-muted-foreground hover:text-destructive"
-                  aria-label={`Lepas tag ${tag.name}`}
+                  aria-label={t('project.removeTag', { name: tag.name })}
                 >
                   <X className="size-3" />
                 </button>
@@ -294,7 +296,7 @@ export default function ProjectDetail() {
             <form onSubmit={addTag}>
               <Input
                 className="h-7 w-32 rounded-full px-3 text-xs"
-                placeholder="+ tag"
+                placeholder={t('project.addTag')}
                 value={tagDraft}
                 onChange={(e) => setTagDraft(e.target.value)}
               />
@@ -304,13 +306,13 @@ export default function ProjectDetail() {
 
         <Button variant="ghost" className="text-destructive" onClick={removeProject}>
           <Trash2 className="size-4" />
-          Hapus
+          {t('common.delete')}
         </Button>
       </div>
 
       <Card>
         <CardContent className="space-y-5">
-          <Field label="Nama" htmlFor="name">
+          <Field label={t('common.name')} htmlFor="name">
             <NameInput
               id="name"
               value={form.name}
@@ -319,7 +321,7 @@ export default function ProjectDetail() {
           </Field>
 
           <div className="grid gap-5 sm:grid-cols-2">
-            <Field label="Klien">
+            <Field label={t('project.client')}>
               <Select
                 value={form.client_id ? String(form.client_id) : NONE}
                 onValueChange={(v) => set('client_id', v === NONE ? null : Number(v))}
@@ -328,7 +330,7 @@ export default function ProjectDetail() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={NONE}>(tanpa klien)</SelectItem>
+                  <SelectItem value={NONE}>{t('common.noClient')}</SelectItem>
                   {clientOptions.map((c) => (
                     <SelectItem key={c.id} value={String(c.id)}>
                       {c.name}
@@ -337,7 +339,7 @@ export default function ProjectDetail() {
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Jenis">
+            <Field label={t('common.kind')}>
               <Select value={form.kind} onValueChange={(v) => set('kind', v)}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
@@ -345,7 +347,7 @@ export default function ProjectDetail() {
                 <SelectContent>
                   {meta.kinds.map((o) => (
                     <SelectItem key={o.value} value={o.value}>
-                      {o.label}
+                      {tOpt('kind', o.value, o.label)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -354,7 +356,7 @@ export default function ProjectDetail() {
           </div>
 
           <div className="grid gap-5 sm:grid-cols-2">
-            <Field label="Status">
+            <Field label={t('common.status')}>
               <Select value={form.status} onValueChange={(v) => set('status', v)}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
@@ -362,13 +364,13 @@ export default function ProjectDetail() {
                 <SelectContent>
                   {meta.statuses.map((o) => (
                     <SelectItem key={o.value} value={o.value}>
-                      {o.label}
+                      {tOpt('status', o.value, o.label)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Deploy" htmlFor="deploy" hint="— container, role ansible, server">
+            <Field label={t('project.deploy')} htmlFor="deploy" hint={t('project.deployHint')}>
               <Input
                 id="deploy"
                 className="font-mono text-xs"
@@ -378,7 +380,7 @@ export default function ProjectDetail() {
             </Field>
           </div>
 
-          <Field label="Folder lokal" htmlFor="path">
+          <Field label={t('project.localPath')} htmlFor="path">
             <Input
               id="path"
               className="font-mono text-xs"
@@ -387,7 +389,7 @@ export default function ProjectDetail() {
             />
           </Field>
 
-          <Field label="Catatan" htmlFor="notes">
+          <Field label={t('common.notes')} htmlFor="notes">
             <Textarea
               id="notes"
               rows={5}
@@ -405,16 +407,16 @@ export default function ProjectDetail() {
         </CardContent>
       </Card>
 
-      <h2 className="mt-10 mb-3 text-lg font-semibold tracking-tight">Ditumpangkan di</h2>
+      <h2 className="mt-10 mb-3 text-lg font-semibold tracking-tight">{t('project.hostedOn')}</h2>
 
       <Card className="py-0">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Aset</TableHead>
-              <TableHead>Jenis</TableHead>
-              <TableHead>Penanda</TableHead>
-              <TableHead>Peran</TableHead>
+              <TableHead>{t('common.asset')}</TableHead>
+              <TableHead>{t('common.kind')}</TableHead>
+              <TableHead>{t('asset.identifier')}</TableHead>
+              <TableHead>{t('project.role')}</TableHead>
               <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
@@ -430,8 +432,7 @@ export default function ProjectDetail() {
                   )}
                 </TableCell>
                 <TableCell className="text-muted-foreground">
-                  {meta.asset_kinds.find((k) => k.value === usage.asset_kind)?.label ??
-                    usage.asset_kind}
+                  {tOpt('assetkind', usage.asset_kind)}
                 </TableCell>
                 <TableCell className="font-mono text-xs">{usage.identifier || '—'}</TableCell>
                 <TableCell className="text-muted-foreground">{usage.role || '—'}</TableCell>
@@ -441,7 +442,7 @@ export default function ProjectDetail() {
                     size="icon"
                     className="text-muted-foreground hover:text-destructive"
                     onClick={() => detachAsset(usage.asset_id)}
-                    aria-label="Lepas aset"
+                    aria-label={t('project.detachAsset')}
                   >
                     <Trash2 className="size-4" />
                   </Button>
@@ -451,7 +452,7 @@ export default function ProjectDetail() {
             {(project.assets ?? []).length === 0 && (
               <TableRow>
                 <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                  Belum ditempel ke aset mana pun.
+                  {t('project.noAssets')}
                 </TableCell>
               </TableRow>
             )}
@@ -465,7 +466,7 @@ export default function ProjectDetail() {
           onValueChange={(v) => setAttachDraft({ ...attachDraft, assetId: v })}
         >
           <SelectTrigger className="w-64">
-            <SelectValue placeholder="Pilih aset" />
+            <SelectValue placeholder={t('project.pickAsset')} />
           </SelectTrigger>
           <SelectContent>
             {assetOptions.map((asset) => (
@@ -478,28 +479,28 @@ export default function ProjectDetail() {
         </Select>
         <Input
           className="w-48"
-          placeholder="Peran (web, db, domain…)"
+          placeholder={t('project.rolePlaceholder')}
           value={attachDraft.role}
           onChange={(e) => setAttachDraft({ ...attachDraft, role: e.target.value })}
         />
         <Button type="submit" disabled={!attachDraft.assetId}>
           <Plus className="size-4" />
-          Tempelkan
+          {t('project.attach')}
         </Button>
         <Button variant="ghost" asChild>
-          <Link to="/assets/new">Bikin aset baru</Link>
+          <Link to="/assets/new">{t('project.newAsset')}</Link>
         </Button>
       </form>
 
-      <h2 className="mt-10 mb-3 text-lg font-semibold tracking-tight">Link</h2>
+      <h2 className="mt-10 mb-3 text-lg font-semibold tracking-tight">{t('link.title')}</h2>
 
       <Card className="py-0">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Label</TableHead>
-              <TableHead>Kategori</TableHead>
-              <TableHead>URL</TableHead>
+              <TableHead>{t('common.label')}</TableHead>
+              <TableHead>{t('link.category')}</TableHead>
+              <TableHead>{t('common.url')}</TableHead>
               <TableHead className="w-24" />
             </TableRow>
           </TableHeader>
@@ -511,7 +512,7 @@ export default function ProjectDetail() {
                     <Input
                       value={linkDraft.label}
                       onChange={(e) => setLinkDraft({ ...linkDraft, label: e.target.value })}
-                      placeholder="Label"
+                      placeholder={t('common.label')}
                     />
                   </TableCell>
                   <TableCell>
@@ -525,7 +526,7 @@ export default function ProjectDetail() {
                       <SelectContent>
                         {meta.link_categories.map((o) => (
                           <SelectItem key={o.value} value={o.value}>
-                            {o.label}
+                            {tOpt('linkcat', o.value, o.label)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -541,7 +542,12 @@ export default function ProjectDetail() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="icon" onClick={saveLink} aria-label="Simpan">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={saveLink}
+                        aria-label={t('common.save')}
+                      >
                         <Check className="size-4" />
                       </Button>
                       <Button
@@ -549,7 +555,7 @@ export default function ProjectDetail() {
                         size="icon"
                         className="text-muted-foreground"
                         onClick={() => setEditingLink(null)}
-                        aria-label="Batal"
+                        aria-label={t('common.cancel')}
                       >
                         <X className="size-4" />
                       </Button>
@@ -560,8 +566,7 @@ export default function ProjectDetail() {
                 <TableRow key={link.id}>
                   <TableCell className="font-medium">{link.label}</TableCell>
                   <TableCell className="text-muted-foreground">
-                    {meta.link_categories.find((c) => c.value === link.category)?.label ??
-                      link.category}
+                    {tOpt('linkcat', link.category)}
                   </TableCell>
                   <TableCell>
                     <a
@@ -581,7 +586,7 @@ export default function ProjectDetail() {
                         size="icon"
                         className="text-muted-foreground"
                         onClick={() => startEditLink(link)}
-                        aria-label="Ubah link"
+                        aria-label={t('link.edit')}
                       >
                         <Pencil className="size-4" />
                       </Button>
@@ -590,7 +595,7 @@ export default function ProjectDetail() {
                         size="icon"
                         className="text-muted-foreground hover:text-destructive"
                         onClick={() => removeLink(link.id)}
-                        aria-label="Hapus link"
+                        aria-label={t('link.delete')}
                       >
                         <Trash2 className="size-4" />
                       </Button>
@@ -602,7 +607,7 @@ export default function ProjectDetail() {
             {(project.links ?? []).length === 0 && (
               <TableRow>
                 <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
-                  Belum ada link.
+                  {t('link.none')}
                 </TableCell>
               </TableRow>
             )}
@@ -613,7 +618,7 @@ export default function ProjectDetail() {
       <form className="mt-3 flex flex-wrap items-center gap-2" onSubmit={addLink}>
         <Input
           className="w-40"
-          placeholder="Label"
+          placeholder={t('common.label')}
           value={draft.label}
           onChange={(e) => setDraft({ ...draft, label: e.target.value })}
         />
@@ -627,7 +632,7 @@ export default function ProjectDetail() {
           <SelectContent>
             {meta.link_categories.map((o) => (
               <SelectItem key={o.value} value={o.value}>
-                {o.label}
+                {tOpt('linkcat', o.value, o.label)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -641,20 +646,20 @@ export default function ProjectDetail() {
         />
         <Button type="submit">
           <Plus className="size-4" />
-          Tambah
+          {t('common.add')}
         </Button>
       </form>
 
-      <h2 className="mt-10 mb-3 text-lg font-semibold tracking-tight">Credential</h2>
+      <h2 className="mt-10 mb-3 text-lg font-semibold tracking-tight">{t('credential.title')}</h2>
 
       <Card className="py-0">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Label</TableHead>
-              <TableHead>Jenis</TableHead>
-              <TableHead>User</TableHead>
-              <TableHead>Host</TableHead>
+              <TableHead>{t('common.label')}</TableHead>
+              <TableHead>{t('common.kind')}</TableHead>
+              <TableHead>{t('credential.user')}</TableHead>
+              <TableHead>{t('credential.host')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -666,8 +671,7 @@ export default function ProjectDetail() {
               >
                 <TableCell className="font-medium">{credential.label}</TableCell>
                 <TableCell className="text-muted-foreground">
-                  {meta.credential_kinds.find((k) => k.value === credential.kind)?.label ??
-                    credential.kind}
+                  {tOpt('credkind', credential.kind)}
                 </TableCell>
                 <TableCell className="font-mono text-xs">{credential.username || '—'}</TableCell>
                 <TableCell className="font-mono text-xs">{credential.host || '—'}</TableCell>
@@ -676,7 +680,7 @@ export default function ProjectDetail() {
             {(project.credentials ?? []).length === 0 && (
               <TableRow>
                 <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
-                  Belum ada credential.
+                  {t('credential.none')}
                 </TableCell>
               </TableRow>
             )}
@@ -688,7 +692,7 @@ export default function ProjectDetail() {
         <Button variant="outline" asChild>
           <Link to={`/credentials/new?project=${project.id}`}>
             <Plus className="size-4" />
-            Tambah credential
+            {t('credential.add')}
           </Link>
         </Button>
       </div>

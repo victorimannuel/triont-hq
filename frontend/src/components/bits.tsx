@@ -1,7 +1,7 @@
 import { useEffect, useState, type ComponentProps, type ReactNode } from 'react'
 import { Loader2 } from 'lucide-react'
 
-import { useT } from '@/i18n'
+import { currentLocale, useT } from '@/i18n'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -98,19 +98,34 @@ export function ErrorNote({ children }: { children: ReactNode }) {
   )
 }
 
-const stamp = new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
-const dayFormat = new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium' })
+// Built on demand and kept, because constructing an Intl formatter is the
+// expensive part and these are called once per table row. The language toggle
+// picks a different bucket rather than rebuilding the old one.
+const stamps = new Map<string, Intl.DateTimeFormat>()
+const days = new Map<string, Intl.DateTimeFormat>()
+
+function formatter(cache: Map<string, Intl.DateTimeFormat>, options: Intl.DateTimeFormatOptions) {
+  const locale = currentLocale()
+  let found = cache.get(locale)
+  if (!found) {
+    found = new Intl.DateTimeFormat(locale, options)
+    cache.set(locale, found)
+  }
+  return found
+}
 
 function when(value?: string) {
   if (!value) return '—'
   const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? '—' : stamp.format(date)
+  if (Number.isNaN(date.getTime())) return '—'
+  return formatter(stamps, { dateStyle: 'medium', timeStyle: 'short' }).format(date)
 }
 
 export function formatDate(value?: string | null) {
   if (!value) return '—'
   const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? '—' : dayFormat.format(date)
+  if (Number.isNaN(date.getTime())) return '—'
+  return formatter(days, { dateStyle: 'medium' }).format(date)
 }
 
 // An amount that carries decimals shows them, whatever the currency; a round
@@ -118,7 +133,7 @@ export function formatDate(value?: string | null) {
 export function formatMoney(amount: number, currency: string) {
   if (!amount) return '—'
   try {
-    return new Intl.NumberFormat('id-ID', {
+    return new Intl.NumberFormat(currentLocale(), {
       style: 'currency',
       currency,
       minimumFractionDigits: Number.isInteger(amount) && currency === 'IDR' ? 0 : 2,

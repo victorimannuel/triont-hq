@@ -511,3 +511,8 @@ create table if not exists attachments (
 );
 
 create index if not exists attachments_owner_idx on attachments (entity, entity_id);
+
+-- The morning digest is written on the server, so each device records the
+-- language it was subscribed from. Rows that predate the column keep the
+-- Indonesian the digest already spoke.
+alter table push_subscriptions add column if not exists lang text not null default 'id';

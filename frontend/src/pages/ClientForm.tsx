@@ -115,16 +115,16 @@ export default function ClientForm() {
     try {
       if (slug) {
         const saved = await api.updateClient(slug, form)
-        toast.success('Klien disimpan')
+        toast.success(t('client.saved'))
         if (saved.slug !== slug) navigate(`/clients/${saved.slug}`, { replace: true })
         else load()
       } else {
         await api.createClient(form)
-        toast.success('Klien dibuat')
+        toast.success(t('client.created'))
         navigate('/clients')
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'gagal menyimpan')
+      setError(err instanceof Error ? err.message : t('common.saveFailed'))
     } finally {
       setBusy(false)
     }
@@ -143,7 +143,7 @@ export default function ClientForm() {
     })
     if (!ok) return
     await api.deleteClient(slug)
-    toast.success('Klien dihapus')
+    toast.success(t('client.deleted'))
     navigate('/clients')
   }
 
@@ -153,10 +153,10 @@ export default function ClientForm() {
     try {
       await api.createContact(slug, draft)
       setDraft(blankContact)
-      toast.success('Kontak ditambahkan')
+      toast.success(t('client.contactAdded'))
       load()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'gagal nambah kontak')
+      toast.error(err instanceof Error ? err.message : t('client.contactAddFailed'))
     }
   }
 
@@ -177,19 +177,19 @@ export default function ClientForm() {
     try {
       await api.updateContact(editingContact, contactDraft)
       setEditingContact(null)
-      toast.success('Kontak disimpan')
+      toast.success(t('client.contactSaved'))
       load()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'gagal menyimpan kontak')
+      toast.error(err instanceof Error ? err.message : t('client.contactSaveFailed'))
     }
   }
 
-  async function removeContact(id: number) {
-    if (!(await confirm({ title: t('confirm.removeContactTitle', { name: '' }), danger: true })))
-      return
-    await api.deleteContact(id).catch(() => undefined)
-    if (editingContact === id) setEditingContact(null)
-    toast.success('Kontak dihapus')
+  async function removeContact(contact: Contact) {
+    const title = t('confirm.removeContactTitle', { name: contact.name })
+    if (!(await confirm({ title, danger: true }))) return
+    await api.deleteContact(contact.id).catch(() => undefined)
+    if (editingContact === contact.id) setEditingContact(null)
+    toast.success(t('client.contactDeleted'))
     load()
   }
 
@@ -199,7 +199,7 @@ export default function ClientForm() {
     <div className="mx-auto max-w-3xl">
       {slug && dirty && (
         <div className="sticky top-14 z-30 md:top-0 -mx-4 mb-6 flex items-center gap-3 border-b bg-popover/95 px-4 py-3 shadow-sm backdrop-blur">
-          <span className="text-sm text-muted-foreground">Ada perubahan yang belum disimpan.</span>
+          <span className="text-sm text-muted-foreground">{t('common.unsaved')}</span>
           <div className="ml-auto flex items-center gap-2">
             <Button
               variant="ghost"
@@ -207,11 +207,11 @@ export default function ClientForm() {
               onClick={() => record && setForm(toInput(record))}
             >
               <RotateCcw className="size-4" />
-              Batal
+              {t('common.cancel')}
             </Button>
             <Button size="sm" onClick={() => save()} disabled={busy}>
               {busy && <Spinner />}
-              Simpan
+              {t('common.save')}
             </Button>
           </div>
         </div>
@@ -219,13 +219,11 @@ export default function ClientForm() {
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-2">
           <h1 className="text-2xl font-semibold tracking-tight">
-            {slug ? form.name || 'Tanpa nama' : 'Klien baru'}
+            {slug ? form.name || t('common.noName') : t('client.new')}
           </h1>
           {slug && (
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline">
-                {meta.client_statuses.find((s) => s.value === form.status)?.label ?? form.status}
-              </Badge>
+              <Badge variant="outline">{tOpt('clientstatus', form.status)}</Badge>
               <Badge variant="secondary">{tOpt('clientkind', form.kind)}</Badge>
             </div>
           )}
@@ -233,7 +231,7 @@ export default function ClientForm() {
         {slug && (
           <Button variant="ghost" className="text-destructive" onClick={removeClient}>
             <Trash2 className="size-4" />
-            Hapus
+            {t('common.delete')}
           </Button>
         )}
       </div>
@@ -273,7 +271,7 @@ export default function ClientForm() {
               />
             </Field>
 
-            <Field label="Status">
+            <Field label={t('common.status')}>
               <Select value={form.status} onValueChange={(v) => set('status', v)}>
                 <SelectTrigger className="w-full sm:w-1/2">
                   <SelectValue />
@@ -281,14 +279,14 @@ export default function ClientForm() {
                 <SelectContent>
                   {meta.client_statuses.map((o) => (
                     <SelectItem key={o.value} value={o.value}>
-                      {o.label}
+                      {tOpt('clientstatus', o.value, o.label)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </Field>
 
-            <Field label="Catatan" htmlFor="notes">
+            <Field label={t('common.notes')} htmlFor="notes">
               <Textarea
                 id="notes"
                 rows={4}
@@ -301,10 +299,10 @@ export default function ClientForm() {
               <div className="flex items-center gap-2 pt-1">
                 <Button type="submit" disabled={busy}>
                   {busy && <Spinner />}
-                  Simpan
+                  {t('common.save')}
                 </Button>
                 <Button variant="ghost" asChild>
-                  <Link to="/clients">Batal</Link>
+                  <Link to="/clients">{t('common.cancel')}</Link>
                 </Button>
               </div>
             )}
@@ -323,16 +321,18 @@ export default function ClientForm() {
 
       {record && (
         <>
-          <h2 className="mt-10 mb-3 text-lg font-semibold tracking-tight">Kontak</h2>
+          <h2 className="mt-10 mb-3 text-lg font-semibold tracking-tight">
+            {t('client.contacts')}
+          </h2>
 
           <Card className="py-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nama</TableHead>
-                  <TableHead>Jabatan</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Telepon</TableHead>
+                  <TableHead>{t('common.name')}</TableHead>
+                  <TableHead>{t('client.role')}</TableHead>
+                  <TableHead>{t('client.email')}</TableHead>
+                  <TableHead>{t('client.phone')}</TableHead>
                   <TableHead className="w-24" />
                 </TableRow>
               </TableHeader>
@@ -384,8 +384,8 @@ export default function ClientForm() {
                                 is_primary: !contactDraft.is_primary,
                               })
                             }
-                            aria-label="Kontak utama"
-                            title="Kontak utama"
+                            aria-label={t('client.primary')}
+                            title={t('client.primary')}
                           >
                             <Star
                               className={
@@ -399,7 +399,7 @@ export default function ClientForm() {
                             variant="ghost"
                             size="icon"
                             onClick={saveContact}
-                            aria-label="Simpan"
+                            aria-label={t('common.save')}
                           >
                             <Check className="size-4" />
                           </Button>
@@ -408,7 +408,7 @@ export default function ClientForm() {
                             size="icon"
                             className="text-muted-foreground"
                             onClick={() => setEditingContact(null)}
-                            aria-label="Batal"
+                            aria-label={t('common.cancel')}
                           >
                             <X className="size-4" />
                           </Button>
@@ -461,7 +461,7 @@ export default function ClientForm() {
                             size="icon"
                             className="text-muted-foreground"
                             onClick={() => startEditContact(contact)}
-                            aria-label="Ubah kontak"
+                            aria-label={t('client.editContact')}
                           >
                             <Pencil className="size-4" />
                           </Button>
@@ -469,8 +469,8 @@ export default function ClientForm() {
                             variant="ghost"
                             size="icon"
                             className="text-muted-foreground hover:text-destructive"
-                            onClick={() => removeContact(contact.id)}
-                            aria-label="Hapus kontak"
+                            onClick={() => removeContact(contact)}
+                            aria-label={t('client.deleteContact')}
                           >
                             <Trash2 className="size-4" />
                           </Button>
@@ -482,7 +482,7 @@ export default function ClientForm() {
                 {(record.contacts ?? []).length === 0 && (
                   <TableRow>
                     <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                      Belum ada kontak.
+                      {t('client.noContacts')}
                     </TableCell>
                   </TableRow>
                 )}
@@ -493,44 +493,46 @@ export default function ClientForm() {
           <form className="mt-3 flex flex-wrap items-center gap-2" onSubmit={addContact}>
             <Input
               className="w-40"
-              placeholder="Nama"
+              placeholder={t('common.name')}
               value={draft.name}
               onChange={(e) => setDraft({ ...draft, name: e.target.value })}
               required
             />
             <Input
               className="w-36"
-              placeholder="Jabatan"
+              placeholder={t('client.role')}
               value={draft.role}
               onChange={(e) => setDraft({ ...draft, role: e.target.value })}
             />
             <Input
               className="w-52"
               type="email"
-              placeholder="Email"
+              placeholder={t('client.email')}
               value={draft.email}
               onChange={(e) => setDraft({ ...draft, email: e.target.value })}
             />
             <Input
               className="w-40"
-              placeholder="Telepon"
+              placeholder={t('client.phone')}
               value={draft.phone}
               onChange={(e) => setDraft({ ...draft, phone: e.target.value })}
             />
             <Button type="submit">
               <Plus className="size-4" />
-              Tambah
+              {t('common.add')}
             </Button>
           </form>
 
-          <h2 className="mt-10 mb-3 text-lg font-semibold tracking-tight">Project</h2>
+          <h2 className="mt-10 mb-3 text-lg font-semibold tracking-tight">
+            {t('client.projects')}
+          </h2>
           <Card className="py-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nama</TableHead>
-                  <TableHead>Jenis</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>{t('common.name')}</TableHead>
+                  <TableHead>{t('common.kind')}</TableHead>
+                  <TableHead>{t('common.status')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -542,23 +544,17 @@ export default function ClientForm() {
                       </Link>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {meta.kinds.find((k) => k.value === project.kind)?.label ?? project.kind}
+                      {tOpt('kind', project.kind)}
                     </TableCell>
                     <TableCell>
-                      <StatusBadge
-                        status={project.status}
-                        label={
-                          meta.statuses.find((s) => s.value === project.status)?.label ??
-                          project.status
-                        }
-                      />
+                      <StatusBadge status={project.status} label={tOpt('status', project.status)} />
                     </TableCell>
                   </TableRow>
                 ))}
                 {(record.projects ?? []).length === 0 && (
                   <TableRow>
                     <TableCell colSpan={3} className="py-8 text-center text-muted-foreground">
-                      Belum ada project buat klien ini.
+                      {t('client.noProjects')}
                     </TableCell>
                   </TableRow>
                 )}

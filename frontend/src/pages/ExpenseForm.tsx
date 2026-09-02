@@ -197,7 +197,7 @@ export default function ExpenseForm() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={NONE}>{t('expense.noProject')}</SelectItem>
+                    <SelectItem value={NONE}>{t('common.noProject')}</SelectItem>
                     {projects.map((p) => (
                       <SelectItem key={p.id} value={String(p.id)}>
                         {p.name}

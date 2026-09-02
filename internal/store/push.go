@@ -3,14 +3,19 @@ package store
 import (
 	"context"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // PushSubscription is one browser that agreed to receive notifications. The
 // endpoint is the browser's own push service URL and is what identifies it, so
 // re-subscribing from the same device updates rather than duplicates.
 type PushSubscription struct {
-	ID         int64      `json:"id"`
-	Device     string     `json:"device"`
+	ID     int64  `json:"id"`
+	Device string `json:"device"`
+	// Which language the digest for this device is written in, taken from the
+	// app's toggle at the moment it subscribed.
+	Lang       string     `json:"lang"`
 	Endpoint   string     `json:"-"`
 	P256dh     string     `json:"-"`
 	Auth       string     `json:"-"`
@@ -19,61 +24,55 @@ type PushSubscription struct {
 	Failures   int        `json:"failures"`
 }
 
+const subscriptionColumns = `id, device, lang, endpoint, p256dh, auth, created_at, last_sent_at, failures`
+
 func (s *Store) Subscribe(ctx context.Context, userID int64, sub PushSubscription) error {
 	_, err := s.pool.Exec(ctx, `
-		insert into push_subscriptions (user_id, endpoint, p256dh, auth, device)
-		values ($1, $2, $3, $4, $5)
+		insert into push_subscriptions (user_id, endpoint, p256dh, auth, device, lang)
+		values ($1, $2, $3, $4, $5, $6)
 		on conflict (endpoint) do update
 		   set p256dh = excluded.p256dh,
 		       auth = excluded.auth,
 		       device = excluded.device,
+		       lang = excluded.lang,
 		       failures = 0`,
-		userID, sub.Endpoint, sub.P256dh, sub.Auth, sub.Device)
+		userID, sub.Endpoint, sub.P256dh, sub.Auth, sub.Device, sub.Lang)
 	return err
 }
 
-func (s *Store) Subscriptions(ctx context.Context, userID int64) ([]PushSubscription, error) {
-	rows, err := s.pool.Query(ctx, `
-		select id, device, endpoint, p256dh, auth, created_at, last_sent_at, failures
-		  from push_subscriptions where user_id = $1 order by created_at`, userID)
-	if err != nil {
-		return nil, err
-	}
+func scanSubscriptions(rows pgx.Rows) ([]PushSubscription, error) {
 	defer rows.Close()
 
 	out := []PushSubscription{}
 	for rows.Next() {
 		var p PushSubscription
-		if err := rows.Scan(&p.ID, &p.Device, &p.Endpoint, &p.P256dh, &p.Auth,
+		if err := rows.Scan(&p.ID, &p.Device, &p.Lang, &p.Endpoint, &p.P256dh, &p.Auth,
 			&p.CreatedAt, &p.LastSentAt, &p.Failures); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
 	}
 	return out, rows.Err()
+}
+
+func (s *Store) Subscriptions(ctx context.Context, userID int64) ([]PushSubscription, error) {
+	rows, err := s.pool.Query(ctx, `select `+subscriptionColumns+`
+		  from push_subscriptions where user_id = $1 order by created_at`, userID)
+	if err != nil {
+		return nil, err
+	}
+	return scanSubscriptions(rows)
 }
 
 // AllSubscriptions is what the daily reminder sends to. It ignores the user,
 // because there is only ever one.
 func (s *Store) AllSubscriptions(ctx context.Context) ([]PushSubscription, error) {
-	rows, err := s.pool.Query(ctx, `
-		select id, device, endpoint, p256dh, auth, created_at, last_sent_at, failures
+	rows, err := s.pool.Query(ctx, `select `+subscriptionColumns+`
 		  from push_subscriptions order by created_at`)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	out := []PushSubscription{}
-	for rows.Next() {
-		var p PushSubscription
-		if err := rows.Scan(&p.ID, &p.Device, &p.Endpoint, &p.P256dh, &p.Auth,
-			&p.CreatedAt, &p.LastSentAt, &p.Failures); err != nil {
-			return nil, err
-		}
-		out = append(out, p)
-	}
-	return out, rows.Err()
+	return scanSubscriptions(rows)
 }
 
 func (s *Store) Unsubscribe(ctx context.Context, userID, id int64) error {

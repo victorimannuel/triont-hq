@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
+import { translate } from '@/i18n'
+
 /** The value a filter dropdown uses for "no filter". */
 export const ALL = '__all__'
 
@@ -63,7 +65,7 @@ export function useList<T>(
         setError('')
       })
       .catch((err) => {
-        if (live) setError(err instanceof Error ? err.message : 'permintaan gagal')
+        if (live) setError(err instanceof Error ? err.message : translate('common.requestFailed'))
       })
       .finally(() => {
         if (live) setLoading(false)

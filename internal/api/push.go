@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -50,6 +49,7 @@ type subscribeRequest struct {
 		Auth   string `json:"auth"`
 	} `json:"keys"`
 	Device string `json:"device"`
+	Lang   string `json:"lang"`
 }
 
 func (s *Server) handleSubscribe(w http.ResponseWriter, r *http.Request) {
@@ -70,6 +70,7 @@ func (s *Server) handleSubscribe(w http.ResponseWriter, r *http.Request) {
 		P256dh:   in.Keys.P256dh,
 		Auth:     in.Keys.Auth,
 		Device:   strings.TrimSpace(in.Device),
+		Lang:     known(in.Lang),
 	})
 	if err != nil {
 		s.oops(w, err)
@@ -123,6 +124,14 @@ func (s *Server) handleUnsubscribeEndpoint(w http.ResponseWriter, r *http.Reques
 // handleTestPush proves the whole path works without waiting for tomorrow.
 func (s *Server) handleTestPush(w http.ResponseWriter, r *http.Request) {
 	user, _ := r.Context().Value(userKey).(store.User)
+
+	// The language the tester is reading right now, only so the preview it
+	// gets back matches the page it is standing on. An absent body is fine.
+	var in struct {
+		Lang string `json:"lang"`
+	}
+	_ = readJSON(r, &in)
+
 	subs, err := s.store.Subscriptions(r.Context(), user.ID)
 	if err != nil {
 		s.oops(w, err)
@@ -135,24 +144,50 @@ func (s *Server) handleTestPush(w http.ResponseWriter, r *http.Request) {
 
 	// Send the real digest rather than a canned line: a test that shows
 	// something other than the thing being tested proves less than it looks.
-	body := payload{
-		Title: "HQ",
-		Body:  "notifikasi jalan. nggak ada tenggat minggu ini.",
-		URL:   "/calendar",
-		Tag:   "hq-test",
-	}
 	due, _ := s.store.DueWithin(r.Context(), digestWindowDays)
 	low, _ := s.store.LowSupplies(r.Context())
 	trouble, _ := s.store.Trouble(r.Context())
-	if len(due) > 0 || len(low) > 0 || len(trouble) > 0 {
-		body.Title = digestTitle(due, low, trouble)
-		body.Body = digestBody(due, low, trouble)
+
+	build := func(lang string) payload {
+		body := payload{
+			Title: "HQ",
+			Body:  textNothingDue(lang),
+			URL:   "/calendar",
+			Tag:   "hq-test",
+		}
+		if len(due) > 0 || len(low) > 0 || len(trouble) > 0 {
+			body.Title = digestTitle(lang, due, low, trouble)
+			body.Body = digestBody(lang, due, low, trouble)
+		}
+		return body
 	}
 
-	sent := s.push(r.Context(), subs, body)
+	sent := s.pushEach(r.Context(), subs, build)
 	writeJSON(w, http.StatusOK, map[string]any{
-		"sent": sent, "devices": len(subs), "preview": body.Body,
+		// The preview is the wording this browser would get, whatever the
+		// other devices are subscribed in.
+		"sent": sent, "devices": len(subs), "preview": build(known(in.Lang)).Body,
 	})
+}
+
+// pushEach sends each device the wording of the language it subscribed in.
+// build is called once per language present, not once per device.
+func (s *Server) pushEach(
+	ctx context.Context,
+	subs []store.PushSubscription,
+	build func(lang string) payload,
+) int {
+	groups := map[string][]store.PushSubscription{}
+	for _, sub := range subs {
+		lang := known(sub.Lang)
+		groups[lang] = append(groups[lang], sub)
+	}
+
+	sent := 0
+	for lang, group := range groups {
+		sent += s.push(ctx, group, build(lang))
+	}
+	return sent
 }
 
 // push delivers to every subscription and returns how many were accepted. A
@@ -267,27 +302,28 @@ func (s *Server) announceSilence(ctx context.Context) {
 
 	for _, m := range gone {
 		s.log.Error("monitor went quiet", "source", m.Source, "last", m.LastSeenAt)
-		s.push(ctx, subs, payload{
-			Title: m.Source + " berhenti lapor",
-			Body: fmt.Sprintf("terakhir %s lalu, batasnya %d menit",
-				since(m.LastSeenAt), m.SilentAfter),
-			URL: "/monitor",
-			Tag: "hq-silent-" + m.Source,
+		s.pushEach(ctx, subs, func(lang string) payload {
+			return payload{
+				Title: textSilentTitle(lang, m.Source),
+				Body:  textSilentBody(lang, since(lang, m.LastSeenAt), m.SilentAfter),
+				URL:   "/monitor",
+				Tag:   "hq-silent-" + m.Source,
+			}
 		})
 	}
 }
 
 // since is the rough age of something, for a notification that has room for
 // "3 jam" and not for a timestamp.
-func since(at time.Time) string {
+func since(lang string, at time.Time) string {
 	mins := int(time.Since(at).Minutes())
 	switch {
 	case mins < 60:
-		return fmt.Sprintf("%d menit", mins)
+		return textMinutes(lang, mins)
 	case mins < 48*60:
-		return fmt.Sprintf("%d jam", mins/60)
+		return textHours(lang, mins/60)
 	default:
-		return fmt.Sprintf("%d hari", mins/(60*24))
+		return textDays(lang, mins/(60*24))
 	}
 }
 
@@ -320,13 +356,15 @@ func (s *Server) sendDigest(ctx context.Context) {
 		return
 	}
 
-	body := digestBody(due, low, trouble)
-	sent := s.push(ctx, subs, payload{
-		Title: digestTitle(due, low, trouble),
-		Body:  body,
-		URL:   "/calendar",
-		// One tag per day, so a second send would replace rather than stack.
-		Tag: "hq-digest-" + time.Now().Format("2006-01-02"),
+	// One tag per day, so a second send would replace rather than stack.
+	tag := "hq-digest-" + time.Now().Format("2006-01-02")
+	sent := s.pushEach(ctx, subs, func(lang string) payload {
+		return payload{
+			Title: digestTitle(lang, due, low, trouble),
+			Body:  digestBody(lang, due, low, trouble),
+			URL:   "/calendar",
+			Tag:   tag,
+		}
 	})
 	s.log.Info("digest sent", "entries", len(due), "low", len(low),
 		"trouble", len(trouble), "devices", sent)
@@ -336,53 +374,62 @@ func (s *Server) sendDigest(ctx context.Context) {
 // halves of it — what falls due, and what has run out — get named as far as
 // that allows, then counted.
 
-func digestTitle(due []store.CalendarEntry, low []store.Supply, trouble []store.Check) string {
+func digestTitle(
+	lang string,
+	due []store.CalendarEntry,
+	low []store.Supply,
+	trouble []store.Check,
+) string {
 	// Something broken outranks everything else the morning has to say.
 	if len(trouble) > 0 {
-		return fmt.Sprintf("%d hal bermasalah", len(trouble))
+		return textTroubleTitle(lang, len(trouble))
 	}
 	switch {
 	case len(due) > 0 && len(low) > 0:
-		return fmt.Sprintf("%d tenggat, %d stok menipis", len(due), len(low))
+		return textDueAndLowTitle(lang, len(due), len(low))
 	case len(due) > 0:
-		return fmt.Sprintf("%d tenggat minggu ini", len(due))
+		return textDueTitle(lang, len(due))
 	default:
-		return fmt.Sprintf("%d stok menipis", len(low))
+		return textLowTitle(lang, len(low))
 	}
 }
 
-func digestBody(due []store.CalendarEntry, low []store.Supply, trouble []store.Check) string {
+func digestBody(
+	lang string,
+	due []store.CalendarEntry,
+	low []store.Supply,
+	trouble []store.Check,
+) string {
 	parts := []string{}
 	if len(trouble) > 0 {
 		labels := make([]string, 0, len(trouble))
 		for _, check := range trouble {
 			labels = append(labels, check.Name)
 		}
-		parts = append(parts, listSome(labels, 3))
+		parts = append(parts, listSome(lang, labels, 3))
 	}
 	if len(due) > 0 {
 		labels := make([]string, 0, len(due))
 		for _, entry := range due {
 			labels = append(labels, entry.Label)
 		}
-		parts = append(parts, listSome(labels, 3))
+		parts = append(parts, listSome(lang, labels, 3))
 	}
 	if len(low) > 0 {
 		labels := make([]string, 0, len(low))
 		for _, item := range low {
 			labels = append(labels, item.Name)
 		}
-		parts = append(parts, "beli: "+listSome(labels, 3))
+		parts = append(parts, textBuyPrefix(lang)+listSome(lang, labels, 3))
 	}
 	return strings.Join(parts, " · ")
 }
 
 // listSome names the first few and counts whatever is left, because a
 // notification longer than two lines is truncated by the phone anyway.
-func listSome(labels []string, named int) string {
+func listSome(lang string, labels []string, named int) string {
 	if len(labels) <= named {
 		return strings.Join(labels, ", ")
 	}
-	return fmt.Sprintf("%s, dan %d lagi",
-		strings.Join(labels[:named], ", "), len(labels)-named)
+	return textAndMore(lang, strings.Join(labels[:named], ", "), len(labels)-named)
 }

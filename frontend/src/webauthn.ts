@@ -3,6 +3,8 @@
 // wants ArrayBuffers going in and hands ArrayBuffers back coming out, so this
 // file is mostly translation.
 
+import { translate } from '@/i18n'
+
 const toBytes = (value: string): Uint8Array => {
   const padded = value.replace(/-/g, '+').replace(/_/g, '/')
   const raw = atob(padded + '='.repeat((4 - (padded.length % 4)) % 4))
@@ -51,7 +53,7 @@ export async function createCredential(options: CreationOptions) {
   const credential = (await navigator.credentials.create({
     publicKey: pk as unknown as PublicKeyCredentialCreationOptions,
   })) as PublicKeyCredential | null
-  if (!credential) throw new Error('dibatalkan')
+  if (!credential) throw new Error(translate('common.cancelled'))
 
   const response = credential.response as AuthenticatorAttestationResponse
   return {
@@ -76,7 +78,7 @@ export async function getCredential(options: RequestOptions) {
   const credential = (await navigator.credentials.get({
     publicKey: pk as unknown as PublicKeyCredentialRequestOptions,
   })) as PublicKeyCredential | null
-  if (!credential) throw new Error('dibatalkan')
+  if (!credential) throw new Error(translate('common.cancelled'))
 
   const response = credential.response as AuthenticatorAssertionResponse
   return {
@@ -163,8 +165,8 @@ export async function deviceLabel(): Promise<string> {
 /** A cancelled or timed-out prompt is a normal outcome, not a server problem. */
 export function friendlyError(err: unknown, fallback: string): string {
   if (err instanceof DOMException) {
-    if (err.name === 'NotAllowedError') return 'dibatalin atau kelamaan nunggu'
-    if (err.name === 'InvalidStateError') return 'perangkat ini udah kedaftar'
+    if (err.name === 'NotAllowedError') return translate('security.cancelled')
+    if (err.name === 'InvalidStateError') return translate('security.alreadyEnrolled')
   }
   return err instanceof Error && err.message ? err.message : fallback
 }

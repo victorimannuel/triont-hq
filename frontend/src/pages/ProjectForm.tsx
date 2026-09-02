@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { api } from '@/api'
+import { useT } from '@/i18n'
 import { useMeta } from '@/App'
 import type { Client, ProjectInput } from '@/types'
 import { Button } from '@/components/ui/button'
@@ -35,6 +36,7 @@ const blank: ProjectInput = {
 export default function ProjectForm() {
   const meta = useMeta()
   const navigate = useNavigate()
+  const { t, tOpt } = useT()
 
   const [form, setForm] = useState<ProjectInput>(blank)
   const [clients, setClients] = useState<Client[]>([])
@@ -58,24 +60,24 @@ export default function ProjectForm() {
     setError('')
     try {
       await api.createProject(form)
-      toast.success('Project dibuat')
+      toast.success(t('project.created'))
       navigate('/projects')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'gagal menyimpan')
+      setError(err instanceof Error ? err.message : t('common.saveFailed'))
       setBusy(false)
     }
   }
 
   return (
     <div className="mx-auto max-w-2xl">
-      <PageHeader title="Project baru" description="Yang wajib cuma nama; sisanya bisa nyusul." />
+      <PageHeader title={t('project.new')} description={t('project.onlyNameRequired')} />
 
       {error && <ErrorNote>{error}</ErrorNote>}
 
       <Card>
         <CardContent>
           <form className="space-y-5" onSubmit={submit}>
-            <Field label="Nama" htmlFor="name">
+            <Field label={t('common.name')} htmlFor="name">
               <NameInput
                 id="name"
                 required
@@ -85,7 +87,7 @@ export default function ProjectForm() {
             </Field>
 
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Klien">
+              <Field label={t('project.client')}>
                 <Select
                   value={form.client_id ? String(form.client_id) : NONE}
                   onValueChange={(v) => set('client_id', v === NONE ? null : Number(v))}
@@ -94,7 +96,7 @@ export default function ProjectForm() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={NONE}>(tanpa klien)</SelectItem>
+                    <SelectItem value={NONE}>{t('common.noClient')}</SelectItem>
                     {clients.map((c) => (
                       <SelectItem key={c.id} value={String(c.id)}>
                         {c.name}
@@ -103,7 +105,7 @@ export default function ProjectForm() {
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Jenis">
+              <Field label={t('common.kind')}>
                 <Select value={form.kind} onValueChange={(v) => set('kind', v)}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
@@ -111,7 +113,7 @@ export default function ProjectForm() {
                   <SelectContent>
                     {meta.kinds.map((o) => (
                       <SelectItem key={o.value} value={o.value}>
-                        {o.label}
+                        {tOpt('kind', o.value, o.label)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -120,7 +122,7 @@ export default function ProjectForm() {
             </div>
 
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Status">
+              <Field label={t('common.status')}>
                 <Select value={form.status} onValueChange={(v) => set('status', v)}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
@@ -128,13 +130,13 @@ export default function ProjectForm() {
                   <SelectContent>
                     {meta.statuses.map((o) => (
                       <SelectItem key={o.value} value={o.value}>
-                        {o.label}
+                        {tOpt('status', o.value, o.label)}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Deploy" htmlFor="deploy" hint="— container, role ansible, server">
+              <Field label={t('project.deploy')} htmlFor="deploy" hint={t('project.deployHint')}>
                 <Input
                   id="deploy"
                   className="font-mono text-xs"
@@ -144,7 +146,7 @@ export default function ProjectForm() {
               </Field>
             </div>
 
-            <Field label="Folder lokal" htmlFor="path">
+            <Field label={t('project.localPath')} htmlFor="path">
               <Input
                 id="path"
                 className="font-mono text-xs"
@@ -153,7 +155,7 @@ export default function ProjectForm() {
               />
             </Field>
 
-            <Field label="Catatan" htmlFor="notes">
+            <Field label={t('common.notes')} htmlFor="notes">
               <Textarea
                 id="notes"
                 rows={5}
@@ -165,10 +167,10 @@ export default function ProjectForm() {
             <div className="flex items-center gap-2 pt-1">
               <Button type="submit" disabled={busy}>
                 {busy && <Spinner />}
-                Simpan
+                {t('common.save')}
               </Button>
               <Button variant="ghost" asChild>
-                <Link to="/projects">Batal</Link>
+                <Link to="/projects">{t('common.cancel')}</Link>
               </Button>
             </div>
           </form>

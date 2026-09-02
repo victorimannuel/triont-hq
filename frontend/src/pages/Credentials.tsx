@@ -105,7 +105,7 @@ export default function Credentials() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>{t('link.label')}</TableHead>
+                  <TableHead>{t('common.label')}</TableHead>
                   <TableHead>{t('nav.projects')}</TableHead>
                   <TableHead>{t('common.kind')}</TableHead>
                   <TableHead>{t('credential.user')}</TableHead>

@@ -42,6 +42,7 @@ import type {
   TrashItem,
 } from './types'
 import type { CreationOptions, RequestOptions } from './webauthn'
+import { currentLang, translate } from './i18n'
 
 export class ApiError extends Error {
   constructor(
@@ -68,7 +69,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   const body = await response.json().catch(() => ({}))
   if (!response.ok) {
-    throw new ApiError(body.error ?? 'permintaan gagal', response.status)
+    throw new ApiError(body.error ?? translate('common.requestFailed'), response.status)
   }
   return body as T
 }
@@ -99,11 +100,15 @@ export const api = {
     endpoint: string
     keys: { p256dh: string; auth: string }
     device: string
+    lang: string
   }) => send<{ status: string }>('POST', '/push/subscribe', body),
   pushUnsubscribe: (id: number) => send<void>('DELETE', `/push/subscriptions/${id}`),
   pushUnsubscribeHere: (endpoint: string) =>
     send<{ status: string }>('POST', '/push/unsubscribe', { endpoint }),
-  pushTest: () => send<{ sent: number; devices: number }>('POST', '/push/test'),
+  pushTest: () =>
+    send<{ sent: number; devices: number; preview: string }>('POST', '/push/test', {
+      lang: currentLang(),
+    }),
 
   renamePasskey: (id: number, name: string) =>
     send<Passkey>('PUT', `/auth/passkeys/${id}`, { name }),
@@ -336,7 +341,7 @@ export const api = {
     })
     if (!response.ok) {
       const body = await response.json().catch(() => ({}))
-      throw new ApiError(body.error ?? 'gagal unggah', response.status)
+      throw new ApiError(body.error ?? translate('file.uploadFailed'), response.status)
     }
     return (await response.json()) as Attachment
   },

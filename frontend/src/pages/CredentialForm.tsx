@@ -46,7 +46,7 @@ export default function CredentialForm() {
   const [params] = useSearchParams()
   const meta = useMeta()
   const navigate = useNavigate()
-  const { t } = useT()
+  const { t, tOpt } = useT()
   const confirm = useConfirm()
 
   const [form, setForm] = useState<CredentialInput>(blank)
@@ -74,7 +74,7 @@ export default function CredentialForm() {
       .then((data) => {
         const found = data.credentials.find((c) => c.id === Number(id))
         if (!found) {
-          setError('credential nggak ketemu')
+          setError(t('credential.notFound'))
           return
         }
         setRecord(found)
@@ -91,7 +91,7 @@ export default function CredentialForm() {
         })
       })
       .catch((err) => setError(err.message))
-  }, [id, params])
+  }, [id, params, t])
 
   function set<K extends keyof CredentialInput>(key: K, value: CredentialInput[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -104,10 +104,10 @@ export default function CredentialForm() {
     try {
       if (id) await api.updateCredential(Number(id), form)
       else await api.createCredential(form)
-      toast.success('Credential disimpan')
+      toast.success(t('credential.saved'))
       navigate('/credentials')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'gagal menyimpan')
+      setError(err instanceof Error ? err.message : t('common.saveFailed'))
       setBusy(false)
     }
   }
@@ -125,15 +125,15 @@ export default function CredentialForm() {
     })
     if (!ok) return
     await api.deleteCredential(Number(id))
-    toast.success('Credential dihapus')
+    toast.success(t('credential.deleted'))
     navigate('/credentials')
   }
 
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader
-        title={id ? 'Ubah credential' : 'Credential baru'}
-        description="Secret disimpan ke-enkripsi AES-256-GCM. Kosongkan kolomnya kalau nggak mau diganti."
+        title={id ? t('credential.edit') : t('credential.new')}
+        description={t('credential.secretNote')}
       />
 
       {error && <ErrorNote>{error}</ErrorNote>}
@@ -142,7 +142,7 @@ export default function CredentialForm() {
         <CardContent>
           <form className="space-y-5" onSubmit={submit}>
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Label" htmlFor="label">
+              <Field label={t('common.label')} htmlFor="label">
                 <NameInput
                   id="label"
                   required
@@ -150,7 +150,7 @@ export default function CredentialForm() {
                   onValue={(v) => set('label', v)}
                 />
               </Field>
-              <Field label="Jenis">
+              <Field label={t('common.kind')}>
                 <Select value={form.kind} onValueChange={(v) => set('kind', v)}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
@@ -158,7 +158,7 @@ export default function CredentialForm() {
                   <SelectContent>
                     {meta.credential_kinds.map((o) => (
                       <SelectItem key={o.value} value={o.value}>
-                        {o.label}
+                        {tOpt('credkind', o.value, o.label)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -166,7 +166,7 @@ export default function CredentialForm() {
               </Field>
             </div>
 
-            <Field label="Project">
+            <Field label={t('common.project')}>
               <Select
                 value={form.project_id ? String(form.project_id) : NONE}
                 onValueChange={(v) => set('project_id', v === NONE ? null : Number(v))}
@@ -175,7 +175,7 @@ export default function CredentialForm() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={NONE}>(tanpa project)</SelectItem>
+                  <SelectItem value={NONE}>{t('common.noProject')}</SelectItem>
                   {projects.map((p) => (
                     <SelectItem key={p.id} value={String(p.id)}>
                       {p.name}
@@ -186,7 +186,7 @@ export default function CredentialForm() {
             </Field>
 
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="User" htmlFor="username">
+              <Field label={t('credential.user')} htmlFor="username">
                 <Input
                   id="username"
                   className="font-mono text-xs"
@@ -195,7 +195,7 @@ export default function CredentialForm() {
                   onChange={(e) => set('username', e.target.value)}
                 />
               </Field>
-              <Field label="Host" htmlFor="host">
+              <Field label={t('credential.host')} htmlFor="host">
                 <Input
                   id="host"
                   className="font-mono text-xs"
@@ -205,7 +205,7 @@ export default function CredentialForm() {
               </Field>
             </div>
 
-            <Field label="URL" htmlFor="url">
+            <Field label={t('common.url')} htmlFor="url">
               <Input
                 id="url"
                 className="font-mono text-xs"
@@ -215,9 +215,9 @@ export default function CredentialForm() {
             </Field>
 
             <Field
-              label="Secret"
+              label={t('credential.secret')}
               htmlFor="secret"
-              hint={hasSecret ? '— sudah ada, isi cuma kalau mau ganti' : undefined}
+              hint={hasSecret ? t('credential.secretKept') : undefined}
             >
               <Input
                 id="secret"
@@ -228,7 +228,7 @@ export default function CredentialForm() {
               />
             </Field>
 
-            <Field label="Catatan" htmlFor="notes">
+            <Field label={t('common.notes')} htmlFor="notes">
               <Textarea
                 id="notes"
                 rows={4}
@@ -240,10 +240,10 @@ export default function CredentialForm() {
             <div className="flex items-center gap-2 pt-1">
               <Button type="submit" disabled={busy}>
                 {busy && <Spinner />}
-                Simpan
+                {t('common.save')}
               </Button>
               <Button variant="ghost" asChild>
-                <Link to="/credentials">Batal</Link>
+                <Link to="/credentials">{t('common.cancel')}</Link>
               </Button>
               {id && (
                 <Button
@@ -253,7 +253,7 @@ export default function CredentialForm() {
                   onClick={remove}
                 >
                   <Trash2 className="size-4" />
-                  Hapus
+                  {t('common.delete')}
                 </Button>
               )}
             </div>

@@ -2,7 +2,6 @@ package api
 
 import (
 	"crypto/subtle"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -108,39 +107,42 @@ func (s *Server) announce(changed []store.Check) {
 		return
 	}
 
-	title, body, url := "", "", "/monitor"
-	switch {
-	case len(broke) == 1 && len(fixed) == 0:
-		title = broke[0].Name
-		body = broke[0].Detail
-		if broke[0].URL != "" {
-			url = broke[0].URL
-		}
-	case len(broke) > 0:
-		title = fmt.Sprintf("%d hal bermasalah", len(broke))
-		body = names(broke)
-	case len(fixed) == 1:
-		title = fixed[0].Name + " normal lagi"
-	default:
-		title = fmt.Sprintf("%d hal normal lagi", len(fixed))
-		body = names(fixed)
+	url := "/monitor"
+	if len(broke) == 1 && len(fixed) == 0 && broke[0].URL != "" {
+		url = broke[0].URL
 	}
 
-	s.push(ctx, subs, payload{
-		Title: title,
-		Body:  body,
-		URL:   url,
-		// No shared tag: an outage should not quietly replace the last one.
-		Tag: "hq-monitor-" + changed[0].Key,
+	s.pushEach(ctx, subs, func(lang string) payload {
+		title, body := "", ""
+		switch {
+		case len(broke) == 1 && len(fixed) == 0:
+			title = broke[0].Name
+			body = broke[0].Detail
+		case len(broke) > 0:
+			title = textTroubleTitle(lang, len(broke))
+			body = names(lang, broke)
+		case len(fixed) == 1:
+			title = textFixedOneTitle(lang, fixed[0].Name)
+		default:
+			title = textFixedTitle(lang, len(fixed))
+			body = names(lang, fixed)
+		}
+		return payload{
+			Title: title,
+			Body:  body,
+			URL:   url,
+			// No shared tag: an outage should not quietly replace the last one.
+			Tag: "hq-monitor-" + changed[0].Key,
+		}
 	})
 }
 
-func names(checks []store.Check) string {
+func names(lang string, checks []store.Check) string {
 	out := make([]string, 0, len(checks))
 	for _, c := range checks {
 		out = append(out, c.Name)
 	}
-	return listSome(out, 3)
+	return listSome(lang, out, 3)
 }
 
 func (s *Server) handleMonitor(w http.ResponseWriter, r *http.Request) {

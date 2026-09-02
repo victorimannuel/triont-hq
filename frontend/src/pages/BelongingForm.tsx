@@ -128,16 +128,16 @@ export default function BelongingForm() {
     try {
       if (id) {
         await api.updateBelonging(Number(id), form)
-        toast.success('Barang disimpan')
+        toast.success(t('thing.saved'))
         load()
         setBusy(false)
       } else {
         await api.createBelonging(form)
-        toast.success('Barang dibuat')
+        toast.success(t('thing.created'))
         navigate('/belongings')
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'gagal menyimpan')
+      setError(err instanceof Error ? err.message : t('common.saveFailed'))
       setBusy(false)
     }
   }
@@ -155,7 +155,7 @@ export default function BelongingForm() {
     })
     if (!ok) return
     await api.deleteBelonging(Number(id))
-    toast.success('Barang dihapus')
+    toast.success(t('thing.deleted'))
     navigate('/belongings')
   }
 
@@ -165,10 +165,10 @@ export default function BelongingForm() {
     try {
       await api.addMaintenance(Number(id), log)
       setLog({ ...blankLog, kind: log.kind })
-      toast.success('Catatan perawatan ditambahkan')
+      toast.success(t('thing.logAdded'))
       load()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'gagal nambah catatan')
+      toast.error(err instanceof Error ? err.message : t('thing.logFailed'))
     }
   }
 
@@ -181,8 +181,8 @@ export default function BelongingForm() {
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader
-        title={id ? form.name || 'Barang' : 'Barang baru'}
-        description="Kendaraan, elektronik, perabot, properti — apa pun yang perlu diservis, dibayar pajaknya, atau ada garansinya."
+        title={id ? form.name || t('thing.title') : t('thing.new')}
+        description={t('thing.subtitle')}
       />
 
       {error && <ErrorNote>{error}</ErrorNote>}
@@ -191,7 +191,7 @@ export default function BelongingForm() {
         <CardContent>
           <form className="space-y-5" onSubmit={submit}>
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Nama" htmlFor="name">
+              <Field label={t('common.name')} htmlFor="name">
                 <NameInput
                   id="name"
                   required
@@ -199,7 +199,7 @@ export default function BelongingForm() {
                   onValue={(v) => set('name', v)}
                 />
               </Field>
-              <Field label="Jenis">
+              <Field label={t('common.kind')}>
                 <Select value={form.kind} onValueChange={(v) => set('kind', v)}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
@@ -207,7 +207,7 @@ export default function BelongingForm() {
                   <SelectContent>
                     {meta.belonging_kinds.map((o) => (
                       <SelectItem key={o.value} value={o.value}>
-                        {o.label}
+                        {tOpt('thingkind', o.value, o.label)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -216,21 +216,21 @@ export default function BelongingForm() {
             </div>
 
             <div className="grid gap-5 sm:grid-cols-3">
-              <Field label="Merek" htmlFor="brand">
+              <Field label={t('thing.brand')} htmlFor="brand">
                 <NameInput
                   id="brand"
                   value={form.brand}
                   onValue={(v) => set('brand', v)}
                 />
               </Field>
-              <Field label="Model" htmlFor="model">
+              <Field label={t('thing.model')} htmlFor="model">
                 <NameInput
                   id="model"
                   value={form.model}
                   onValue={(v) => set('model', v)}
                 />
               </Field>
-              <Field label="Tahun" htmlFor="year">
+              <Field label={t('thing.year')} htmlFor="year">
                 <Input
                   id="year"
                   type="number"
@@ -242,7 +242,11 @@ export default function BelongingForm() {
             </div>
 
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Penanda" htmlFor="identifier" hint="— plat nomor, nomor seri">
+              <Field
+                label={t('thing.identifier')}
+                htmlFor="identifier"
+                hint={t('thing.identifierHint')}
+              >
                 <Input
                   id="identifier"
                   className="font-mono text-xs"
@@ -250,7 +254,7 @@ export default function BelongingForm() {
                   onChange={(e) => set('identifier', e.target.value)}
                 />
               </Field>
-              <Field label="Lokasi" htmlFor="location">
+              <Field label={t('thing.location')} htmlFor="location">
                 <NameInput
                   id="location"
                   value={form.location}
@@ -368,7 +372,7 @@ export default function BelongingForm() {
             )}
 
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Dibeli" htmlFor="acquired">
+              <Field label={t('thing.bought')} htmlFor="acquired">
                 <Input
                   id="acquired"
                   type="date"
@@ -376,7 +380,7 @@ export default function BelongingForm() {
                   onChange={(e) => set('acquired_on', e.target.value)}
                 />
               </Field>
-              <Field label="Garansi sampai" htmlFor="warranty">
+              <Field label={t('thing.warrantyUntil')} htmlFor="warranty">
                 <Input
                   id="warranty"
                   type="date"
@@ -386,7 +390,7 @@ export default function BelongingForm() {
               </Field>
             </div>
 
-            <Field label="Catatan" htmlFor="notes">
+            <Field label={t('common.notes')} htmlFor="notes">
               <Textarea
                 id="notes"
                 rows={4}
@@ -398,10 +402,10 @@ export default function BelongingForm() {
             <div className="flex items-center gap-2 pt-1">
               <Button type="submit" disabled={busy}>
                 {busy && <Spinner />}
-                Simpan
+                {t('common.save')}
               </Button>
               <Button variant="ghost" asChild>
-                <Link to="/belongings">Batal</Link>
+                <Link to="/belongings">{t('common.cancel')}</Link>
               </Button>
               {id && (
                 <Button
@@ -411,7 +415,7 @@ export default function BelongingForm() {
                   onClick={remove}
                 >
                   <Trash2 className="size-4" />
-                  Hapus
+                  {t('common.delete')}
                 </Button>
               )}
             </div>
@@ -431,10 +435,10 @@ export default function BelongingForm() {
       {record && (
         <>
           <h2 className="mt-10 mb-3 text-lg font-semibold tracking-tight">
-            Riwayat perawatan
+            {t('thing.history')}
             {record.next_due && (
               <span className="ml-2 text-sm font-normal text-muted-foreground">
-                berikutnya {formatDate(record.next_due)}
+                {t('thing.nextIs', { date: formatDate(record.next_due) })}
               </span>
             )}
           </h2>
@@ -443,11 +447,11 @@ export default function BelongingForm() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Tanggal</TableHead>
-                  <TableHead>Jenis</TableHead>
-                  <TableHead>Keterangan</TableHead>
-                  <TableHead>Biaya</TableHead>
-                  <TableHead>Berikutnya</TableHead>
+                  <TableHead>{t('thing.date')}</TableHead>
+                  <TableHead>{t('common.kind')}</TableHead>
+                  <TableHead>{t('thing.description')}</TableHead>
+                  <TableHead>{t('asset.cost')}</TableHead>
+                  <TableHead>{t('thing.next')}</TableHead>
                   <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
@@ -456,8 +460,7 @@ export default function BelongingForm() {
                   <TableRow key={entry.id}>
                     <TableCell className="whitespace-nowrap">{formatDate(entry.done_on)}</TableCell>
                     <TableCell className="text-muted-foreground">
-                      {meta.maintenance_kinds.find((k) => k.value === entry.kind)?.label ??
-                        entry.kind}
+                      {tOpt('maintkind', entry.kind)}
                     </TableCell>
                     <TableCell>
                       {entry.description || '—'}
@@ -485,7 +488,7 @@ export default function BelongingForm() {
                         size="icon"
                         className="text-muted-foreground hover:text-destructive"
                         onClick={() => removeLog(entry.id)}
-                        aria-label="Hapus catatan"
+                        aria-label={t('thing.removeLog')}
                       >
                         <Trash2 className="size-4" />
                       </Button>
@@ -495,7 +498,7 @@ export default function BelongingForm() {
                 {(record.logs ?? []).length === 0 && (
                   <TableRow>
                     <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
-                      Belum ada catatan perawatan.
+                      {t('thing.noLogs')}
                     </TableCell>
                   </TableRow>
                 )}
@@ -505,7 +508,7 @@ export default function BelongingForm() {
 
           <form className="mt-3 flex flex-wrap items-end gap-2" onSubmit={addLog}>
             <div className="w-36">
-              <label className="mb-1 block text-xs text-muted-foreground">Tanggal</label>
+              <label className="mb-1 block text-xs text-muted-foreground">{t('thing.date')}</label>
               <Input
                 type="date"
                 value={log.done_on}
@@ -513,7 +516,7 @@ export default function BelongingForm() {
               />
             </div>
             <div className="w-32">
-              <label className="mb-1 block text-xs text-muted-foreground">Jenis</label>
+              <label className="mb-1 block text-xs text-muted-foreground">{t('common.kind')}</label>
               <Select value={log.kind} onValueChange={(v) => setLog({ ...log, kind: v })}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
@@ -521,25 +524,27 @@ export default function BelongingForm() {
                 <SelectContent>
                   {meta.maintenance_kinds.map((o) => (
                     <SelectItem key={o.value} value={o.value}>
-                      {o.label}
+                      {tOpt('maintkind', o.value, o.label)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="min-w-[12rem] flex-1">
-              <label className="mb-1 block text-xs text-muted-foreground">Keterangan</label>
+              <label className="mb-1 block text-xs text-muted-foreground">
+                {t('thing.description')}
+              </label>
               <Input
                 value={log.description}
                 onChange={(e) => setLog({ ...log, description: e.target.value })}
               />
             </div>
             <div className="w-28">
-              <label className="mb-1 block text-xs text-muted-foreground">Biaya</label>
+              <label className="mb-1 block text-xs text-muted-foreground">{t('asset.cost')}</label>
               <MoneyInput value={log.cost} onValue={(v) => setLog({ ...log, cost: v })} />
             </div>
             <div className="w-36">
-              <label className="mb-1 block text-xs text-muted-foreground">Berikutnya</label>
+              <label className="mb-1 block text-xs text-muted-foreground">{t('thing.next')}</label>
               <Input
                 type="date"
                 value={log.next_due}
@@ -548,7 +553,7 @@ export default function BelongingForm() {
             </div>
             <Button type="submit">
               <Plus className="size-4" />
-              Catat
+              {t('thing.log')}
             </Button>
           </form>
         </>

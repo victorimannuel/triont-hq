@@ -59,7 +59,7 @@ export default function AssetForm() {
   const { id } = useParams()
   const meta = useMeta()
   const navigate = useNavigate()
-  const { t } = useT()
+  const { t, tOpt } = useT()
   const confirm = useConfirm()
 
   const [form, setForm] = useState<AssetInput>(blank)
@@ -119,17 +119,17 @@ export default function AssetForm() {
     try {
       await api.attachAsset(attachDraft.slug, Number(id), attachDraft.role)
       setAttachDraft({ slug: '', role: '' })
-      toast.success('Project ditempelkan')
+      toast.success(t('asset.projectAttached'))
       load()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'gagal menempelkan project')
+      toast.error(err instanceof Error ? err.message : t('asset.attachFailed'))
     }
   }
 
   async function detachProject(slug: string) {
     if (!id) return
     await api.detachAsset(slug, Number(id)).catch(() => undefined)
-    toast.success('Project dilepas')
+    toast.success(t('asset.projectDetached'))
     load()
   }
 
@@ -144,10 +144,10 @@ export default function AssetForm() {
     try {
       if (id) await api.updateAsset(Number(id), form)
       else await api.createAsset(form)
-      toast.success('Aset disimpan')
+      toast.success(t('asset.saved'))
       navigate('/assets')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'gagal menyimpan')
+      setError(err instanceof Error ? err.message : t('common.saveFailed'))
       setBusy(false)
     }
   }
@@ -165,15 +165,15 @@ export default function AssetForm() {
     })
     if (!ok) return
     await api.deleteAsset(Number(id))
-    toast.success('Aset dihapus')
+    toast.success(t('asset.deleted'))
     navigate('/assets')
   }
 
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader
-        title={id ? 'Ubah aset' : 'Aset baru'}
-        description="VPS, domain, sertifikat, atau apa pun yang jalan terus dan ada tanggal perpanjangannya."
+        title={id ? t('asset.edit') : t('asset.new')}
+        description={t('asset.subtitle')}
       />
 
       {error && <ErrorNote>{error}</ErrorNote>}
@@ -182,7 +182,7 @@ export default function AssetForm() {
         <CardContent>
           <form className="space-y-5" onSubmit={submit}>
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Nama" htmlFor="name">
+              <Field label={t('common.name')} htmlFor="name">
                 <NameInput
                   id="name"
                   required
@@ -190,7 +190,7 @@ export default function AssetForm() {
                   onValue={(v) => set('name', v)}
                 />
               </Field>
-              <Field label="Jenis">
+              <Field label={t('common.kind')}>
                 <Select value={form.kind} onValueChange={(v) => set('kind', v)}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
@@ -198,7 +198,7 @@ export default function AssetForm() {
                   <SelectContent>
                     {meta.asset_kinds.map((o) => (
                       <SelectItem key={o.value} value={o.value}>
-                        {o.label}
+                        {tOpt('assetkind', o.value, o.label)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -207,14 +207,18 @@ export default function AssetForm() {
             </div>
 
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Penyedia" htmlFor="provider" hint="— Biznet, Cloudflare, …">
+              <Field label={t('asset.provider')} htmlFor="provider" hint={t('asset.providerHint')}>
                 <NameInput
                   id="provider"
                   value={form.provider}
                   onValue={(v) => set('provider', v)}
                 />
               </Field>
-              <Field label="Penanda" htmlFor="identifier" hint="— IP, nama domain, nomor akun">
+              <Field
+                label={t('asset.identifier')}
+                htmlFor="identifier"
+                hint={t('asset.identifierHint')}
+              >
                 <Input
                   id="identifier"
                   className="font-mono text-xs"
@@ -225,10 +229,7 @@ export default function AssetForm() {
             </div>
 
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field
-                label="Akun penyedia"
-                hint="— login yang dipakai daftar. Ambil dari credential biar nggak dobel."
-              >
+              <Field label={t('asset.account')} hint={t('asset.accountHint')}>
                 <Select
                   value={form.credential_id ? String(form.credential_id) : NONE}
                   onValueChange={(v) => set('credential_id', v === NONE ? null : Number(v))}
@@ -237,7 +238,7 @@ export default function AssetForm() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={NONE}>belum dicatat</SelectItem>
+                    <SelectItem value={NONE}>{t('asset.noAccount')}</SelectItem>
                     {credentials.map((c) => (
                       <SelectItem key={c.id} value={String(c.id)}>
                         {c.label}
@@ -250,14 +251,14 @@ export default function AssetForm() {
             </div>
 
             <div className="grid gap-5 sm:grid-cols-3">
-              <Field label="Biaya" htmlFor="cost">
+              <Field label={t('asset.cost')} htmlFor="cost">
                 <MoneyInput
                   id="cost"
                   value={form.cost_amount}
                   onValue={(v) => set('cost_amount', v)}
                 />
               </Field>
-              <Field label="Mata uang">
+              <Field label={t('asset.currency')}>
                 <Select value={form.cost_currency} onValueChange={(v) => set('cost_currency', v)}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
@@ -271,7 +272,7 @@ export default function AssetForm() {
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Siklus">
+              <Field label={t('asset.cycle')}>
                 <Select value={form.billing_cycle} onValueChange={(v) => set('billing_cycle', v)}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
@@ -279,7 +280,7 @@ export default function AssetForm() {
                   <SelectContent>
                     {meta.billing_cycles.map((o) => (
                       <SelectItem key={o.value} value={o.value}>
-                        {o.label}
+                        {tOpt('cycle', o.value, o.label)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -288,7 +289,7 @@ export default function AssetForm() {
             </div>
 
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Perpanjangan berikutnya" htmlFor="renews">
+              <Field label={t('asset.nextRenewal')} htmlFor="renews">
                 <Input
                   id="renews"
                   type="date"
@@ -296,7 +297,7 @@ export default function AssetForm() {
                   onChange={(e) => set('renews_on', e.target.value)}
                 />
               </Field>
-              <Field label="Status">
+              <Field label={t('common.status')}>
                 <Select value={form.status} onValueChange={(v) => set('status', v)}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
@@ -304,7 +305,7 @@ export default function AssetForm() {
                   <SelectContent>
                     {meta.asset_statuses.map((o) => (
                       <SelectItem key={o.value} value={o.value}>
-                        {o.label}
+                        {tOpt('assetstatus', o.value, o.label)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -319,10 +320,10 @@ export default function AssetForm() {
                 checked={form.auto_renew}
                 onChange={(e) => set('auto_renew', e.target.checked)}
               />
-              Perpanjang otomatis
+              {t('asset.autoRenew')}
             </label>
 
-            <Field label="Catatan" htmlFor="notes">
+            <Field label={t('common.notes')} htmlFor="notes">
               <Textarea
                 id="notes"
                 rows={4}
@@ -334,10 +335,10 @@ export default function AssetForm() {
             <div className="flex items-center gap-2 pt-1">
               <Button type="submit" disabled={busy}>
                 {busy && <Spinner />}
-                Simpan
+                {t('common.save')}
               </Button>
               <Button variant="ghost" asChild>
-                <Link to="/assets">Batal</Link>
+                <Link to="/assets">{t('common.cancel')}</Link>
               </Button>
               {id && (
                 <Button
@@ -347,7 +348,7 @@ export default function AssetForm() {
                   onClick={remove}
                 >
                   <Trash2 className="size-4" />
-                  Hapus
+                  {t('common.delete')}
                 </Button>
               )}
             </div>
@@ -366,14 +367,14 @@ export default function AssetForm() {
 
       {record && (
         <>
-          <h2 className="mt-10 mb-3 text-lg font-semibold tracking-tight">Dipakai project</h2>
+          <h2 className="mt-10 mb-3 text-lg font-semibold tracking-tight">{t('asset.usedBy')}</h2>
 
           <Card className="py-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Project</TableHead>
-                  <TableHead>Peran</TableHead>
+                  <TableHead>{t('common.project')}</TableHead>
+                  <TableHead>{t('project.role')}</TableHead>
                   <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
@@ -395,7 +396,7 @@ export default function AssetForm() {
                         size="icon"
                         className="text-muted-foreground hover:text-destructive"
                         onClick={() => detachProject(usage.project_slug)}
-                        aria-label="Lepas project"
+                        aria-label={t('asset.detachProject')}
                       >
                         <Trash2 className="size-4" />
                       </Button>
@@ -405,7 +406,7 @@ export default function AssetForm() {
                 {(record.projects ?? []).length === 0 && (
                   <TableRow>
                     <TableCell colSpan={3} className="py-8 text-center text-muted-foreground">
-                      Belum dipakai project mana pun.
+                      {t('asset.notUsed')}
                     </TableCell>
                   </TableRow>
                 )}
@@ -419,7 +420,7 @@ export default function AssetForm() {
               onValueChange={(v) => setAttachDraft({ ...attachDraft, slug: v })}
             >
               <SelectTrigger className="w-64">
-                <SelectValue placeholder="Pilih project" />
+                <SelectValue placeholder={t('asset.pickProject')} />
               </SelectTrigger>
               <SelectContent>
                 {projects
@@ -433,13 +434,13 @@ export default function AssetForm() {
             </Select>
             <Input
               className="w-48"
-              placeholder="Peran (web, db, domain…)"
+              placeholder={t('project.rolePlaceholder')}
               value={attachDraft.role}
               onChange={(e) => setAttachDraft({ ...attachDraft, role: e.target.value })}
             />
             <Button type="submit" disabled={!attachDraft.slug}>
               <Plus className="size-4" />
-              Tempelkan
+              {t('project.attach')}
             </Button>
           </form>
         </>

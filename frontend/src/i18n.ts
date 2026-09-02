@@ -5,6 +5,11 @@ export type Lang = 'id' | 'en'
 export const LANGS: Lang[] = ['id', 'en']
 export const LANG_LABELS: Record<Lang, string> = { id: 'indonesia', en: 'english' }
 
+// Dates, times and money are formatted by Intl rather than by the dictionary,
+// so the toggle has to reach it too. British English keeps day-month order,
+// which is what the Indonesian side does as well.
+export const LOCALES: Record<Lang, string> = { id: 'id-ID', en: 'en-GB' }
+
 const KEY = 'hq-lang'
 
 export function readLang(): Lang {
@@ -17,7 +22,17 @@ export function readLang(): Lang {
   return 'id'
 }
 
+// The chosen language, held outside React so that the parts of the app with no
+// component around them — the fetch wrapper, the push helpers, the formatters —
+// still speak it. makeTranslate keeps it in step during render, before any
+// child has had a chance to read it.
+let active: Lang = readLang()
+
+export const currentLang = (): Lang => active
+export const currentLocale = (): string => LOCALES[active]
+
 export function persistLang(lang: Lang) {
+  active = lang
   try {
     localStorage.setItem(KEY, lang)
   } catch {
@@ -27,6 +42,10 @@ export function persistLang(lang: Lang) {
 }
 
 // Casual on purpose, lowercase on purpose — that is the voice this app speaks.
+//
+// A key ending in ".one" is the wording for a count of exactly one and is
+// picked automatically when {n} is 1. English needs it everywhere a noun is
+// counted; Indonesian almost never does, so the id side rarely defines any.
 const dict: Record<Lang, Record<string, string>> = {
   id: {
     'nav.home': 'beranda',
@@ -122,7 +141,7 @@ const dict: Record<Lang, Record<string, string>> = {
     'search.entity.supply': 'stok',
     'home.supplies': 'stok',
     'home.lowSupplies': 'perlu dibeli',
-    'home.lowSuppliesHint': 'stok yang udah menipis', 
+    'home.lowSuppliesHint': 'stok yang udah menipis',
     'search.open': 'cari apa aja',
     'search.tab': 'cari',
     'search.title': 'pencarian',
@@ -159,6 +178,7 @@ const dict: Record<Lang, Record<string, string>> = {
     'common.add': 'tambah',
     'common.reset': 'reset',
     'common.back': 'balik',
+    'common.close': 'tutup',
     'common.titleCase': 'Title Case',
     'common.lowerCase': 'huruf kecil semua',
     'common.filter': 'saring',
@@ -180,12 +200,23 @@ const dict: Record<Lang, Record<string, string>> = {
     'common.status': 'status',
     'common.kind': 'jenis',
     'common.name': 'nama',
+    'common.label': 'label',
+    'common.project': 'project',
+    'common.asset': 'aset',
+    'common.url': 'url',
     'common.new': 'baru',
+    'common.noName': 'tanpa nama',
+    'common.noClient': '(tanpa klien)',
+    'common.noProject': '(tanpa project)',
     'common.unsaved': 'ada yang belum kesimpen',
     'common.created': 'dibuat',
     'common.updated': 'terakhir diubah',
     'common.required': 'wajib diisi',
     'common.failed': 'gagal',
+    'common.saveFailed': 'gagal nyimpen',
+    'common.deleteFailed': 'gagal hapus',
+    'common.requestFailed': 'permintaan gagal',
+    'common.cancelled': 'dibatalin',
     'common.copied': 'kesalin',
     'common.copyFailed': 'gagal nyalin',
     'common.show': 'lihat',
@@ -229,8 +260,6 @@ const dict: Record<Lang, Record<string, string>> = {
     'income.none': 'belum ada pemasukan.',
     'income.saved': 'pemasukan kesimpen',
     'income.deleted': 'pemasukan dihapus',
-    'income.noClient': '(tanpa klien)',
-    'income.noProject': '(tanpa project)',
     'income.subtitle': 'retainer, sewa yang kamu terima, langganan klien — apa pun yang masuk rutin.',
     'income.monthly': 'per bulan',
     'thing.ownership': 'status kepemilikan',
@@ -255,7 +284,6 @@ const dict: Record<Lang, Record<string, string>> = {
     'expense.none': 'belum ada pengeluaran.',
     'expense.saved': 'pengeluaran kesimpen',
     'expense.deleted': 'pengeluaran dihapus',
-    'expense.noProject': '(tanpa project)',
     'expense.title2': 'pengeluaran',
     'expense.subtitle': 'gaji, langganan, cicilan, listrik — yang keluar rutin dan bukan aset.',
     'cal.kind.expense': 'pengeluaran',
@@ -303,11 +331,16 @@ const dict: Record<Lang, Record<string, string>> = {
     'security.enrolOther': 'daftarin hp (qr)',
     'security.linkButton': 'bikin link sekali pakai',
     'security.devices': 'perangkat masuk',
+    'security.cancelled': 'dibatalin atau kelamaan nunggu',
+    'security.alreadyEnrolled': 'perangkat ini udah kedaftar',
     'push.title': 'notifikasi',
     'push.on': 'notifikasi nyala di perangkat ini. tiap pagi kamu dapat ringkasan tenggat minggu ini.',
     'push.off': 'notifikasi mati di perangkat ini.',
     'push.unsupported': 'browser ini nggak dukung notifikasi. di hp, buka HQ dari ikon yang udah diinstall.',
     'push.blocked': 'notifikasi diblokir buat situs ini. buka setelan situs di browser buat ngizinin lagi.',
+    'push.notConfigured': 'server belum disetel buat kirim notifikasi.',
+    'push.notGranted': 'izin notifikasi belum dikasih.',
+    'push.badSubscription': 'browser ngasih langganan yang nggak lengkap.',
     'push.enable': 'nyalain di perangkat ini',
     'push.disable': 'matiin',
     'push.test': 'kirim tes',
@@ -376,34 +409,41 @@ const dict: Record<Lang, Record<string, string>> = {
     'project.role': 'peran',
     'project.rolePlaceholder': 'peran (web, db, domain…)',
     'project.attach': 'tempelin',
+    'project.attachFailed': 'gagal nempelin aset',
+    'project.detachAsset': 'lepas aset',
     'project.newAsset': 'bikin aset baru',
     'project.assetAttached': 'aset ketempel',
     'project.assetDetached': 'aset dilepas',
     'project.addTag': '+ tag',
-    'project.noName': 'tanpa nama',
+    'project.removeTag': 'lepas tag {name}',
+    'project.tagFailed': 'gagal nambah tag',
 
     'link.title': 'link',
-    'link.label': 'label',
     'link.category': 'kategori',
-    'link.url': 'url',
     'link.none': 'belum ada link.',
     'link.added': 'link ketambah',
+    'link.addFailed': 'gagal nambah link',
     'link.saved': 'link kesimpen',
+    'link.saveFailed': 'gagal nyimpen link',
     'link.deleted': 'link dihapus',
+    'link.edit': 'ubah link',
+    'link.delete': 'hapus link',
 
     'credential.title': 'credential',
     'credential.new': 'credential baru',
-    'credential.count': '{n} kesimpen. isinya ke-enkripsi, baru kebuka kalau dipencet.',
+    'credential.edit': 'ubah credential',
+    'credential.add': 'tambah credential',
+    'credential.count': '{n} kesimpen. isinya terenkripsi, baru kebuka kalau dipencet.',
     'credential.none': 'belum ada credential.',
+    'credential.notFound': 'credential-nya nggak ketemu',
     'credential.secret': 'secret',
     'credential.secretKept': '— udah ada, isi cuma kalau mau ganti',
     'credential.secretNote':
-      'secret disimpen ke-enkripsi aes-256-gcm. kosongin kalau nggak mau diganti.',
+      'secret disimpen terenkripsi aes-256-gcm. kosongin kalau nggak mau diganti.',
     'credential.user': 'user',
     'credential.host': 'host',
     'credential.saved': 'credential kesimpen',
     'credential.deleted': 'credential dihapus',
-    'credential.noProject': '(tanpa project)',
     'credential.revealFailed': 'gagal buka secret',
 
     'client.title': 'klien',
@@ -430,18 +470,26 @@ const dict: Record<Lang, Record<string, string>> = {
     'client.confirmDelete':
       'hapus {name}? project-nya tetap ada. masih bisa dibalikin dari sampah.',
     'client.contactAdded': 'kontak ketambah',
+    'client.contactAddFailed': 'gagal nambah kontak',
     'client.contactSaved': 'kontak kesimpen',
+    'client.contactSaveFailed': 'gagal nyimpen kontak',
     'client.contactDeleted': 'kontak dihapus',
+    'client.editContact': 'ubah kontak',
+    'client.deleteContact': 'hapus kontak',
     'client.primary': 'kontak utama',
 
     'asset.title': 'aset & langganan',
     'asset.new': 'aset baru',
+    'asset.edit': 'ubah aset',
     'asset.count': '{n} aset · kira-kira {cost} per bulan',
     'asset.searchPlaceholder': 'cari nama, penyedia, ip, domain…',
     'asset.provider': 'penyedia',
-    'asset.identifier': 'penanda',
+    'asset.identifier': 'alamat atau nomor',
     'asset.identifierHint': '— ip, nama domain, nomor akun',
     'asset.providerHint': '— biznet, cloudflare, …',
+    'asset.account': 'akun penyedia',
+    'asset.accountHint': '— login yang dipakai daftar. ambil dari credential biar nggak dobel.',
+    'asset.noAccount': 'belum dicatat',
     'asset.cost': 'biaya',
     'asset.currency': 'mata uang',
     'asset.cycle': 'siklus',
@@ -456,15 +504,20 @@ const dict: Record<Lang, Record<string, string>> = {
     'asset.deleted': 'aset dihapus',
     'asset.projectAttached': 'project ketempel',
     'asset.projectDetached': 'project dilepas',
+    'asset.attachFailed': 'gagal nempelin project',
+    'asset.detachProject': 'lepas project',
     'asset.subtitle':
       'vps, domain, sertifikat, atau apa pun yang jalan terus dan ada tanggal perpanjangannya.',
 
     'doc.title': 'dokumen',
     'doc.new': 'dokumen baru',
-    'doc.count': '{n} dokumen. nomornya ke-enkripsi.',
+    'doc.edit': 'ubah dokumen',
+    'doc.count': '{n} dokumen. nomornya terenkripsi.',
     'doc.searchPlaceholder': 'cari nama, pemilik, penerbit…',
     'doc.holder': 'pemilik',
+    'doc.holderHint': '— punya siapa',
     'doc.issuer': 'penerbit',
+    'doc.issuerHint': '— dukcapil, imigrasi, …',
     'doc.number': 'nomor',
     'doc.numberKept': '— udah ada, isi cuma kalau mau ganti',
     'doc.issued': 'terbit',
@@ -478,7 +531,7 @@ const dict: Record<Lang, Record<string, string>> = {
     'doc.deleted': 'dokumen dihapus',
     'doc.nameHint': '— misal "paspor saya"',
     'doc.subtitle':
-      'ktp, paspor, sim, stnk, polis — apa pun yang punya masa berlaku. nomornya disimpen ke-enkripsi.',
+      'ktp, paspor, sim, stnk, polis — apa pun yang punya masa berlaku. nomornya disimpen terenkripsi.',
     'doc.revealFailed': 'gagal buka nomor',
 
     'thing.title': 'barang',
@@ -488,7 +541,7 @@ const dict: Record<Lang, Record<string, string>> = {
     'thing.brand': 'merek',
     'thing.model': 'model',
     'thing.year': 'tahun',
-    'thing.identifier': 'penanda',
+    'thing.identifier': 'nomor',
     'thing.identifierHint': '— plat nomor, nomor seri',
     'thing.location': 'lokasi',
     'thing.price': 'harga beli',
@@ -512,6 +565,8 @@ const dict: Record<Lang, Record<string, string>> = {
     'thing.log': 'catat',
     'thing.noLogs': 'belum ada catatan perawatan.',
     'thing.logAdded': 'catatan perawatan ketambah',
+    'thing.logFailed': 'gagal nambah catatan',
+    'thing.removeLog': 'hapus catatan',
 
     'people.title': 'orang',
     'people.new': 'orang baru',
@@ -601,20 +656,25 @@ const dict: Record<Lang, Record<string, string>> = {
     'monitor.empty': 'nothing watched yet.',
     'monitor.nothing': 'no monitor has reported in here yet.',
     'monitor.allFine': 'everything is fine.',
-    'monitor.troubleCount': '{n} things are wrong.',
-    'monitor.trouble': 'wrong right now',
+    'monitor.troubleCount': '{n} things are in trouble.',
+    'monitor.troubleCount.one': '{n} thing is in trouble.',
+    'monitor.trouble': 'in trouble',
     'monitor.fine': 'fine',
     'monitor.sources': 'reporters',
     'monitor.sourcesHint': 'monitors outside HQ that send their status here',
     'monitor.silent': 'has not reported for {for}',
     'monitor.reported': 'last reported {for} ago',
     'monitor.checksCount': '{n} checks',
+    'monitor.checksCount.one': '{n} check',
     'monitor.brokenFor': 'like this for {for}',
     'monitor.okFor': 'fine for {for}',
     'monitor.justNow': 'just now',
     'monitor.forMinutes': '{n} minutes',
+    'monitor.forMinutes.one': '{n} minute',
     'monitor.forHours': '{n} hours',
+    'monitor.forHours.one': '{n} hour',
     'monitor.forDays': '{n} days',
+    'monitor.forDays.one': '{n} day',
     'nav.supplies': 'supplies',
     'supply.title': 'supplies',
     'supply.new': 'new item',
@@ -631,14 +691,16 @@ const dict: Record<Lang, Record<string, string>> = {
     'supply.left': 'left',
     'supply.low': 'running low',
     'supply.onlyLow': 'to buy',
-    'supply.lowCount': '{n} to buy.',
+    'supply.lowCount': '{n} things to buy.',
+    'supply.lowCount.one': '{n} thing to buy.',
     'supply.allStocked': 'everything stocked.',
     'supply.none': 'nothing tracked yet.',
     'supply.noneLow': 'nothing to buy.',
     'supply.nameHint': '— tissue, eucalyptus oil, cotton buds',
     'supply.history': 'purchase history',
-    'supply.historyHint': 'log each purchase and how often it runs out becomes visible',
+    'supply.historyHint': 'log every purchase and you will see how fast it runs out',
     'supply.typical': 'bought about every {n} days',
+    'supply.typical.one': 'bought about every day',
     'supply.boughtOn': 'bought on',
     'supply.howMany': 'how many',
     'supply.price': 'price',
@@ -649,6 +711,7 @@ const dict: Record<Lang, Record<string, string>> = {
     'supply.buyFailed': 'could not log the purchase',
     'supply.noPurchases': 'no purchases logged yet.',
     'supply.afterDays': '{n} days after the one before',
+    'supply.afterDays.one': '{n} day after the one before',
     'supply.restocked': 'restocked',
     'supply.adjustFailed': 'could not change the count',
     'supply.hint': 'the − button saves straight away. the + button asks first: bought, or a miscount.',
@@ -667,7 +730,7 @@ const dict: Record<Lang, Record<string, string>> = {
     'search.entity.supply': 'supplies',
     'home.supplies': 'supplies',
     'home.lowSupplies': 'to buy',
-    'home.lowSuppliesHint': 'supplies that have run low', 
+    'home.lowSuppliesHint': 'supplies that have run low',
     'search.open': 'search anything',
     'search.tab': 'search',
     'search.title': 'search',
@@ -704,6 +767,7 @@ const dict: Record<Lang, Record<string, string>> = {
     'common.add': 'add',
     'common.reset': 'reset',
     'common.back': 'back',
+    'common.close': 'close',
     'common.titleCase': 'Title Case',
     'common.lowerCase': 'all lowercase',
     'common.filter': 'filter',
@@ -725,12 +789,23 @@ const dict: Record<Lang, Record<string, string>> = {
     'common.status': 'status',
     'common.kind': 'kind',
     'common.name': 'name',
+    'common.label': 'label',
+    'common.project': 'project',
+    'common.asset': 'asset',
+    'common.url': 'url',
     'common.new': 'new',
+    'common.noName': 'untitled',
+    'common.noClient': '(no client)',
+    'common.noProject': '(no project)',
     'common.unsaved': 'you have unsaved changes',
     'common.created': 'created',
     'common.updated': 'last edited',
     'common.required': 'required',
     'common.failed': 'failed',
+    'common.saveFailed': 'could not save it',
+    'common.deleteFailed': 'could not delete it',
+    'common.requestFailed': 'the request failed',
+    'common.cancelled': 'cancelled',
     'common.copied': 'copied',
     'common.copyFailed': 'could not copy',
     'common.show': 'show',
@@ -765,17 +840,17 @@ const dict: Record<Lang, Record<string, string>> = {
     'income.title': 'recurring income',
     'income.new': 'new income',
     'income.count': '{n} streams · roughly {cost} per month',
+    'income.count.one': '{n} stream · roughly {cost} per month',
     'income.countPrefix': '{n} streams · roughly',
+    'income.countPrefix.one': '{n} stream · roughly',
     'income.searchPlaceholder': 'search name, client, project…',
     'income.amount': 'amount',
     'income.nextDue': 'next payment',
     'income.startedOn': 'started',
     'income.endedOn': 'ended',
     'income.none': 'no income streams yet.',
-    'income.saved': 'saved',
-    'income.deleted': 'deleted',
-    'income.noClient': '(no client)',
-    'income.noProject': '(no project)',
+    'income.saved': 'income saved',
+    'income.deleted': 'income deleted',
     'income.subtitle': 'retainers, rent you collect, client subscriptions — anything that lands regularly.',
     'income.monthly': 'per month',
     'thing.ownership': 'ownership',
@@ -790,7 +865,9 @@ const dict: Record<Lang, Record<string, string>> = {
     'expense.title': 'recurring expenses',
     'expense.new': 'new expense',
     'expense.count': '{n} lines · roughly {cost} per month',
+    'expense.count.one': '{n} line · roughly {cost} per month',
     'expense.countPrefix': '{n} lines · roughly',
+    'expense.countPrefix.one': '{n} line · roughly',
     'expense.searchPlaceholder': 'search name or project…',
     'expense.category': 'category',
     'expense.amount': 'amount',
@@ -798,9 +875,8 @@ const dict: Record<Lang, Record<string, string>> = {
     'expense.startedOn': 'started',
     'expense.endedOn': 'ended',
     'expense.none': 'no expenses yet.',
-    'expense.saved': 'saved',
-    'expense.deleted': 'deleted',
-    'expense.noProject': '(no project)',
+    'expense.saved': 'expense saved',
+    'expense.deleted': 'expense deleted',
     'expense.title2': 'expenses',
     'expense.subtitle': 'salaries, subscriptions, instalments, bills — what goes out on a schedule and is not an asset.',
     'cal.kind.expense': 'expense',
@@ -848,15 +924,21 @@ const dict: Record<Lang, Record<string, string>> = {
     'security.enrolOther': 'register a phone (qr)',
     'security.linkButton': 'make a one-time link',
     'security.devices': 'sign-in devices',
+    'security.cancelled': 'cancelled, or it timed out',
+    'security.alreadyEnrolled': 'this device is already registered',
     'push.title': 'notifications',
     'push.on': 'notifications are on for this device. every morning you get what is due this week.',
     'push.off': 'notifications are off on this device.',
     'push.unsupported': 'this browser cannot do notifications. on a phone, open HQ from the installed icon.',
     'push.blocked': 'notifications are blocked for this site. re-allow them in the browser site settings.',
+    'push.notConfigured': 'the server is not set up to send notifications.',
+    'push.notGranted': 'notification permission was not given.',
+    'push.badSubscription': 'the browser handed back an incomplete subscription.',
     'push.enable': 'turn on for this device',
     'push.disable': 'turn off',
     'push.test': 'send a test',
     'push.tested': 'sent to {n} devices',
+    'push.tested.one': 'sent to {n} device',
     'push.enabled': 'notifications on',
     'push.disabled': 'notifications off',
     'push.failed': 'could not turn notifications on',
@@ -921,25 +1003,33 @@ const dict: Record<Lang, Record<string, string>> = {
     'project.role': 'role',
     'project.rolePlaceholder': 'role (web, db, domain…)',
     'project.attach': 'attach',
+    'project.attachFailed': 'could not attach the asset',
+    'project.detachAsset': 'detach asset',
     'project.newAsset': 'new asset',
     'project.assetAttached': 'asset attached',
     'project.assetDetached': 'asset detached',
     'project.addTag': '+ tag',
-    'project.noName': 'untitled',
+    'project.removeTag': 'remove the tag {name}',
+    'project.tagFailed': 'could not add the tag',
 
     'link.title': 'links',
-    'link.label': 'label',
     'link.category': 'category',
-    'link.url': 'url',
     'link.none': 'no links yet.',
     'link.added': 'link added',
+    'link.addFailed': 'could not add the link',
     'link.saved': 'link saved',
+    'link.saveFailed': 'could not save the link',
     'link.deleted': 'link deleted',
+    'link.edit': 'edit link',
+    'link.delete': 'remove link',
 
     'credential.title': 'credentials',
     'credential.new': 'new credential',
+    'credential.edit': 'edit credential',
+    'credential.add': 'add a credential',
     'credential.count': '{n} saved. encrypted at rest, shown only when you ask.',
     'credential.none': 'no credentials yet.',
+    'credential.notFound': 'that credential does not exist',
     'credential.secret': 'secret',
     'credential.secretKept': '— already set, fill only to replace',
     'credential.secretNote':
@@ -948,12 +1038,12 @@ const dict: Record<Lang, Record<string, string>> = {
     'credential.host': 'host',
     'credential.saved': 'credential saved',
     'credential.deleted': 'credential deleted',
-    'credential.noProject': '(no project)',
     'credential.revealFailed': 'could not reveal the secret',
 
     'client.title': 'clients',
     'client.new': 'new client',
     'client.count': '{n} clients.',
+    'client.count.one': '{n} client.',
     'client.company': 'company',
     'client.kind': 'client type',
     'client.companyName': 'company name',
@@ -975,18 +1065,27 @@ const dict: Record<Lang, Record<string, string>> = {
     'client.confirmDelete':
       'delete {name}? the projects stay. you can still restore it from trash.',
     'client.contactAdded': 'contact added',
+    'client.contactAddFailed': 'could not add the contact',
     'client.contactSaved': 'contact saved',
+    'client.contactSaveFailed': 'could not save the contact',
     'client.contactDeleted': 'contact deleted',
+    'client.editContact': 'edit contact',
+    'client.deleteContact': 'remove contact',
     'client.primary': 'main contact',
 
     'asset.title': 'assets & subscriptions',
     'asset.new': 'new asset',
+    'asset.edit': 'edit asset',
     'asset.count': '{n} assets · roughly {cost} per month',
+    'asset.count.one': '{n} asset · roughly {cost} per month',
     'asset.searchPlaceholder': 'search name, provider, ip, domain…',
     'asset.provider': 'provider',
-    'asset.identifier': 'identifier',
+    'asset.identifier': 'address or number',
     'asset.identifierHint': '— ip, domain name, account number',
     'asset.providerHint': '— biznet, cloudflare, …',
+    'asset.account': 'provider account',
+    'asset.accountHint': '— the login you signed up with. pick it from credentials so it is not typed twice.',
+    'asset.noAccount': 'not recorded yet',
     'asset.cost': 'cost',
     'asset.currency': 'currency',
     'asset.cycle': 'cycle',
@@ -1001,15 +1100,21 @@ const dict: Record<Lang, Record<string, string>> = {
     'asset.deleted': 'asset deleted',
     'asset.projectAttached': 'project attached',
     'asset.projectDetached': 'project detached',
+    'asset.attachFailed': 'could not attach the project',
+    'asset.detachProject': 'detach project',
     'asset.subtitle':
       'a vps, a domain, a certificate — anything that keeps running and has a renewal date.',
 
     'doc.title': 'documents',
     'doc.new': 'new document',
+    'doc.edit': 'edit document',
     'doc.count': '{n} documents. the numbers are encrypted.',
+    'doc.count.one': '{n} document. the number is encrypted.',
     'doc.searchPlaceholder': 'search name, holder, issuer…',
     'doc.holder': 'holder',
+    'doc.holderHint': '— whose it is',
     'doc.issuer': 'issuer',
+    'doc.issuerHint': '— the office that issued it',
     'doc.number': 'number',
     'doc.numberKept': '— already set, fill only to replace',
     'doc.issued': 'issued',
@@ -1029,11 +1134,12 @@ const dict: Record<Lang, Record<string, string>> = {
     'thing.title': 'things',
     'thing.new': 'new thing',
     'thing.count': '{n} things.',
+    'thing.count.one': '{n} thing.',
     'thing.searchPlaceholder': 'search name, brand, plate, location…',
     'thing.brand': 'brand',
     'thing.model': 'model',
     'thing.year': 'year',
-    'thing.identifier': 'identifier',
+    'thing.identifier': 'number',
     'thing.identifierHint': '— plate number, serial',
     'thing.location': 'location',
     'thing.price': 'price paid',
@@ -1042,9 +1148,9 @@ const dict: Record<Lang, Record<string, string>> = {
     'thing.warrantyUntil': 'warranty until',
     'thing.nextService': 'next service',
     'thing.none': 'nothing here yet.',
-    'thing.saved': 'saved',
-    'thing.created': 'created',
-    'thing.deleted': 'deleted',
+    'thing.saved': 'thing saved',
+    'thing.created': 'thing created',
+    'thing.deleted': 'thing deleted',
     'thing.totalValue': 'total recorded value: {cost}',
     'thing.subtitle':
       'vehicles, electronics, furniture, property — anything that needs servicing, taxing, or has a warranty.',
@@ -1057,10 +1163,13 @@ const dict: Record<Lang, Record<string, string>> = {
     'thing.log': 'log it',
     'thing.noLogs': 'nothing logged yet.',
     'thing.logAdded': 'service logged',
+    'thing.logFailed': 'could not log it',
+    'thing.removeLog': 'remove entry',
 
     'people.title': 'people',
     'people.new': 'new person',
     'people.count': '{n} people, {due} due a hello.',
+    'people.count.one': '{n} person, {due} due a hello.',
     'people.searchPlaceholder': 'search name, nickname, role, email, phone…',
     'people.nickname': 'nickname',
     'people.nicknameHint': '— what you actually call them',
@@ -1069,6 +1178,7 @@ const dict: Record<Lang, Record<string, string>> = {
     'people.lastTalked': 'last talked',
     'people.never': 'never',
     'people.everyDays': 'every {n} days',
+    'people.everyDays.one': 'every {n} day',
     'people.due': 'due a hello',
     'people.touch': 'talked to them today',
     'people.touched': 'logged: talked to {name} today',
@@ -1076,8 +1186,8 @@ const dict: Record<Lang, Record<string, string>> = {
     'people.reachEvery': 'ping every',
     'people.reachEveryHint': '— days, 0 = never',
     'people.none': 'no one here yet.',
-    'people.saved': 'saved',
-    'people.deleted': 'deleted',
+    'people.saved': 'person saved',
+    'people.deleted': 'person deleted',
     'people.noClient': '(someone you know, not a client contact)',
     'people.scopeAll': 'everyone',
     'people.scopePersonal': 'no client',
@@ -1097,7 +1207,9 @@ const dict: Record<Lang, Record<string, string>> = {
     'cal.kind.birthday': 'birthday',
     'cal.today': 'today',
     'cal.late': '{n} days late',
+    'cal.late.one': '{n} day late',
     'cal.inDays': 'in {n} days',
+    'cal.inDays.one': 'in {n} day',
 
     'trash.title': 'trash',
     'trash.subtitle':
@@ -1335,9 +1447,40 @@ const options: Record<Lang, Record<string, string>> = {
   },
 }
 
+export type Vars = Record<string, string | number>
+
+// Picks the wording, falling back to Indonesian for anything the English side
+// has not been given yet. A ".one" variant wins when the count is exactly one.
+function phrase(lang: Lang, key: string, vars?: Vars): string {
+  const single = vars !== undefined && Number(vars.n) === 1
+  const table = dict[lang]
+  if (single && table[`${key}.one`]) return table[`${key}.one`]
+  if (table[key]) return table[key]
+  if (single && dict.id[`${key}.one`]) return dict.id[`${key}.one`]
+  return dict.id[key] ?? key
+}
+
+function fill(text: string, vars?: Vars): string {
+  if (!vars) return text
+  let out = text
+  for (const [name, value] of Object.entries(vars)) {
+    out = out.replaceAll(`{${name}}`, String(value))
+  }
+  return out
+}
+
+/**
+ * Translates without a React component around it — the fetch wrapper, the push
+ * helpers and the passkey helpers all raise messages a person reads. Inside a
+ * component prefer useT(), which re-renders when the language changes.
+ */
+export function translate(key: string, vars?: Vars): string {
+  return fill(phrase(active, key, vars), vars)
+}
+
 export type Translate = {
   lang: Lang
-  t: (key: string, vars?: Record<string, string | number>) => string
+  t: (key: string, vars?: Vars) => string
   /** Label for one option value, falling back to whatever the API sent. */
   tOpt: (group: string, value: string, fallback?: string) => string
 }
@@ -1351,17 +1494,14 @@ export const I18nContext = createContext<Translate>({
 export const useT = () => useContext(I18nContext)
 
 export function makeTranslate(lang: Lang): Translate {
+  // App memoises this on the language, so it runs during render and before any
+  // child reads a date or throws a translated error. Keeping `active` in step
+  // here rather than in an effect is what makes those two agree on the frame
+  // the language actually changes.
+  active = lang
   return {
     lang,
-    t(key, vars) {
-      let text = dict[lang][key] ?? dict.id[key] ?? key
-      if (vars) {
-        for (const [name, value] of Object.entries(vars)) {
-          text = text.replaceAll(`{${name}}`, String(value))
-        }
-      }
-      return text
-    },
+    t: (key, vars) => fill(phrase(lang, key, vars), vars),
     tOpt(group, value, fallback) {
       return options[lang][`${group}.${value}`] ?? fallback ?? value
     },

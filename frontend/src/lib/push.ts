@@ -1,4 +1,5 @@
 import { api } from '@/api'
+import { currentLang, translate } from '@/i18n'
 import { deviceLabel } from '@/webauthn'
 
 /**
@@ -43,21 +44,17 @@ export async function pushEnabled(): Promise<boolean> {
 
 export async function enablePush(): Promise<void> {
   if (!pushSupported()) {
-    throw new Error('browser ini nggak dukung notifikasi')
+    throw new Error(translate('push.unsupported'))
   }
 
   const { key, enabled } = await api.pushKey()
   if (!enabled || !key) {
-    throw new Error('server belum disetel buat kirim notifikasi')
+    throw new Error(translate('push.notConfigured'))
   }
 
   const permission = await Notification.requestPermission()
   if (permission !== 'granted') {
-    throw new Error(
-      permission === 'denied'
-        ? 'izin notifikasi ditolak. buka setelan situs di browser buat ngizinin lagi.'
-        : 'izin notifikasi belum dikasih',
-    )
+    throw new Error(translate(permission === 'denied' ? 'push.blocked' : 'push.notGranted'))
   }
 
   const registration = await navigator.serviceWorker.ready
@@ -76,13 +73,16 @@ export async function enablePush(): Promise<void> {
     keys?: { p256dh?: string; auth?: string }
   }
   if (!raw.endpoint || !raw.keys?.p256dh || !raw.keys?.auth) {
-    throw new Error('browser ngasih langganan yang nggak lengkap')
+    throw new Error(translate('push.badSubscription'))
   }
 
   await api.pushSubscribe({
     endpoint: raw.endpoint,
     keys: { p256dh: raw.keys.p256dh, auth: raw.keys.auth },
     device: await deviceLabel(),
+    // The morning digest is written on the server, which has no other way of
+    // knowing which language this device reads.
+    lang: currentLang(),
   })
 }
 
