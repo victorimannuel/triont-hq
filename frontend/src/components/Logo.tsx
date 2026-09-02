@@ -1,7 +1,9 @@
 import { cn } from '@/lib/utils'
 
-// A flag planted on a pole: the most literal reading of "headquarters", and it
-// stays legible at 20px where a two-letter monogram turns to mush.
+// Two rings closing on a solid core, broken at the foot: things gathered around
+// one centre, which is what the app is for. Drawn as strokes on nothing rather
+// than a mark on a tile, so it takes the colour it is given and stays legible
+// at 20px. The icon files are the same geometry — see scripts/make-icons.mjs.
 export function Logo({ className }: { className?: string }) {
   return (
     <svg
@@ -9,22 +11,14 @@ export function Logo({ className }: { className?: string }) {
       role="img"
       aria-label="HQ"
       className={cn('size-7 shrink-0', className)}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
     >
-      <defs>
-        <linearGradient id="hq-mark" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="currentColor" stopOpacity="1" />
-          <stop offset="100%" stopColor="currentColor" stopOpacity="0.72" />
-        </linearGradient>
-      </defs>
-      <rect width="32" height="32" rx="9" fill="url(#hq-mark)" />
-      <path
-        d="M10.75 7.5 V24.5"
-        stroke="white"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        opacity="0.95"
-      />
-      <path d="M12.6 8.6 H23.4 l-3.1 3.6 3.1 3.6 H12.6 Z" fill="white" />
+      <path d="M13.21 28.08 A12.4 12.4 0 1 1 18.79 28.08" />
+      <path d="M13.07 22.58 A7.2 7.2 0 1 1 18.93 22.58" />
+      <rect x="13.3" y="13.3" width="5.4" height="5.4" rx="1.05" fill="currentColor" stroke="none" />
     </svg>
   )
 }
