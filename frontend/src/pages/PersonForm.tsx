@@ -123,6 +123,7 @@ export default function PersonForm() {
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader
+        back="/people"
         title={id ? form.name || t('people.title') : t('people.new')}
         description={t('people.subtitle')}
       />

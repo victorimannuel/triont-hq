@@ -131,6 +131,7 @@ export default function IncomeForm() {
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader
+        back="/income"
         title={id ? form.name || t('income.title') : t('income.new')}
         description={t('income.subtitle')}
       />

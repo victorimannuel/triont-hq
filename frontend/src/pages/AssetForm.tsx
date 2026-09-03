@@ -172,6 +172,7 @@ export default function AssetForm() {
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader
+        back="/assets"
         title={id ? t('asset.edit') : t('asset.new')}
         description={t('asset.subtitle')}
       />

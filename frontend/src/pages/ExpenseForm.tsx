@@ -155,6 +155,7 @@ export default function ExpenseForm() {
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader
+        back="/expenses"
         title={id ? form.name || t('expense.title') : t('expense.new')}
         description={t('expense.subtitle')}
       />

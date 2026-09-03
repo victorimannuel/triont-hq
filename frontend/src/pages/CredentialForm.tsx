@@ -132,6 +132,7 @@ export default function CredentialForm() {
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader
+        back="/credentials"
         title={id ? t('credential.edit') : t('credential.new')}
         description={t('credential.secretNote')}
       />

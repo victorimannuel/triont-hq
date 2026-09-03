@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Check, ExternalLink, Pencil, Plus, RotateCcw, Trash2, X } from 'lucide-react'
+import { ArrowLeft, Check, ExternalLink, Pencil, Plus, RotateCcw, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { api } from '@/api'
@@ -258,49 +258,56 @@ export default function ProjectDetail() {
         </div>
       )}
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-2">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {form.name || t('common.noName')}
-          </h1>
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge status={form.status} label={statusLabel} />
-            <Badge variant="secondary">{kindLabel}</Badge>
-            {project.client_slug && (
-              <Link to={`/clients/${project.client_slug}`}>
-                <Badge variant="outline" className="hover:bg-accent">
-                  {project.client}
-                </Badge>
-              </Link>
-            )}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-1.5">
-            {(project.tags ?? []).map((tag) => (
-              <span
-                key={tag.id}
-                className="inline-flex items-center gap-1 rounded-full border bg-secondary/60 py-0.5 pl-2.5 pr-1 text-xs"
-              >
-                <Link to={`/projects?tag=${tag.slug}`} className="hover:underline">
-                  {tag.name}
+        <div className="flex min-w-0 items-start gap-1.5">
+          <Button asChild variant="ghost" size="icon" className="-ml-2 mt-0.5 shrink-0">
+            <Link to="/projects" aria-label={t('common.back')}>
+              <ArrowLeft className="size-4" />
+            </Link>
+          </Button>
+          <div className="min-w-0 space-y-2">
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {form.name || t('common.noName')}
+            </h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge status={form.status} label={statusLabel} />
+              <Badge variant="secondary">{kindLabel}</Badge>
+              {project.client_slug && (
+                <Link to={`/clients/${project.client_slug}`}>
+                  <Badge variant="outline" className="hover:bg-accent">
+                    {project.client}
+                  </Badge>
                 </Link>
-                <button
-                  type="button"
-                  onClick={() => removeTag(tag.id)}
-                  className="rounded-full p-0.5 text-muted-foreground hover:text-destructive"
-                  aria-label={t('project.removeTag', { name: tag.name })}
+              )}
+            </div>
+  
+            <div className="flex flex-wrap items-center gap-1.5">
+              {(project.tags ?? []).map((tag) => (
+                <span
+                  key={tag.id}
+                  className="inline-flex items-center gap-1 rounded-full border bg-secondary/60 py-0.5 pl-2.5 pr-1 text-xs"
                 >
-                  <X className="size-3" />
-                </button>
-              </span>
-            ))}
-            <form onSubmit={addTag}>
-              <Input
-                className="h-7 w-32 rounded-full px-3 text-xs"
-                placeholder={t('project.addTag')}
-                value={tagDraft}
-                onChange={(e) => setTagDraft(e.target.value)}
-              />
-            </form>
+                  <Link to={`/projects?tag=${tag.slug}`} className="hover:underline">
+                    {tag.name}
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => removeTag(tag.id)}
+                    className="rounded-full p-0.5 text-muted-foreground hover:text-destructive"
+                    aria-label={t('project.removeTag', { name: tag.name })}
+                  >
+                    <X className="size-3" />
+                  </button>
+                </span>
+              ))}
+              <form onSubmit={addTag}>
+                <Input
+                  className="h-7 w-32 rounded-full px-3 text-xs"
+                  placeholder={t('project.addTag')}
+                  value={tagDraft}
+                  onChange={(e) => setTagDraft(e.target.value)}
+                />
+              </form>
+            </div>
           </div>
         </div>
 

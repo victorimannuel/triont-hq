@@ -1,5 +1,6 @@
 import { useEffect, useState, type ComponentProps, type ReactNode } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { ArrowLeft, Loader2 } from 'lucide-react'
 
 import { currentLocale, useT } from '@/i18n'
 import { Badge } from '@/components/ui/badge'
@@ -44,16 +45,30 @@ export function PageHeader({
   title,
   description,
   action,
+  back,
 }: {
   title: string
   description?: ReactNode
   action?: ReactNode
+  /** Where the arrow beside the title goes. A path rather than history, so it
+   *  lands somewhere sensible even when the page was opened from a link. */
+  back?: string
 }) {
+  const { t } = useT()
   return (
     <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold lowercase tracking-tight">{title}</h1>
-        {description && <p className="text-sm text-muted-foreground">{description}</p>}
+      <div className="flex min-w-0 items-start gap-1.5">
+        {back && (
+          <Button asChild variant="ghost" size="icon" className="-ml-2 mt-0.5 shrink-0">
+            <Link to={back} aria-label={t('common.back')}>
+              <ArrowLeft className="size-4" />
+            </Link>
+          </Button>
+        )}
+        <div className="min-w-0 space-y-1">
+          <h1 className="text-2xl font-semibold lowercase tracking-tight">{title}</h1>
+          {description && <p className="text-sm text-muted-foreground">{description}</p>}
+        </div>
       </div>
       {action}
     </div>

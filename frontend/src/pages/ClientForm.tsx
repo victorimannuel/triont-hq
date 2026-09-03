@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
+  ArrowLeft,
   Check,
   Mail,
   Pencil,
@@ -217,16 +218,23 @@ export default function ClientForm() {
         </div>
       )}
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-2">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {slug ? form.name || t('common.noName') : t('client.new')}
-          </h1>
-          {slug && (
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline">{tOpt('clientstatus', form.status)}</Badge>
-              <Badge variant="secondary">{tOpt('clientkind', form.kind)}</Badge>
-            </div>
-          )}
+        <div className="flex min-w-0 items-start gap-1.5">
+          <Button asChild variant="ghost" size="icon" className="-ml-2 mt-0.5 shrink-0">
+            <Link to="/clients" aria-label={t('common.back')}>
+              <ArrowLeft className="size-4" />
+            </Link>
+          </Button>
+          <div className="min-w-0 space-y-2">
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {slug ? form.name || t('common.noName') : t('client.new')}
+            </h1>
+            {slug && (
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline">{tOpt('clientstatus', form.status)}</Badge>
+                <Badge variant="secondary">{tOpt('clientkind', form.kind)}</Badge>
+              </div>
+            )}
+          </div>
         </div>
         {slug && (
           <Button variant="ghost" className="text-destructive" onClick={removeClient}>

@@ -181,6 +181,7 @@ export default function BelongingForm() {
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader
+        back="/belongings"
         title={id ? form.name || t('thing.title') : t('thing.new')}
         description={t('thing.subtitle')}
       />

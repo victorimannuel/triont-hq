@@ -114,6 +114,7 @@ export default function DocumentForm() {
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader
+        back="/documents"
         title={id ? t('doc.edit') : t('doc.new')}
         description={t('doc.subtitle')}
       />

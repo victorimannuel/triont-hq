@@ -70,7 +70,7 @@ export default function ProjectForm() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <PageHeader title={t('project.new')} description={t('project.onlyNameRequired')} />
+      <PageHeader back="/projects" title={t('project.new')} description={t('project.onlyNameRequired')} />
 
       {error && <ErrorNote>{error}</ErrorNote>}
 

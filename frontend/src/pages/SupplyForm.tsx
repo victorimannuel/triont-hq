@@ -173,7 +173,7 @@ export default function SupplyForm() {
 
   return (
     <>
-      <PageHeader title={id ? form.name || t('supply.edit') : t('supply.new')} />
+      <PageHeader back="/supplies" title={id ? form.name || t('supply.edit') : t('supply.new')} />
 
       {error && <ErrorNote>{error}</ErrorNote>}
 
