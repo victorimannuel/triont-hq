@@ -144,7 +144,6 @@ func (s *Server) handleTestPush(w http.ResponseWriter, r *http.Request) {
 
 	// Send the real digest rather than a canned line: a test that shows
 	// something other than the thing being tested proves less than it looks.
-	due, _ := s.store.DueWithin(r.Context(), digestWindowDays)
 	low, _ := s.store.LowSupplies(r.Context())
 	trouble, _ := s.store.Trouble(r.Context())
 
@@ -152,12 +151,12 @@ func (s *Server) handleTestPush(w http.ResponseWriter, r *http.Request) {
 		body := payload{
 			Title: "HQ",
 			Body:  textNothingDue(lang),
-			URL:   "/calendar",
+			URL:   "/supplies",
 			Tag:   "hq-test",
 		}
-		if len(due) > 0 || len(low) > 0 || len(trouble) > 0 {
-			body.Title = digestTitle(lang, due, low, trouble)
-			body.Body = digestBody(lang, due, low, trouble)
+		if len(low) > 0 || len(trouble) > 0 {
+			body.Title = digestTitle(lang, low, trouble)
+			body.Body = digestBody(lang, low, trouble)
 		}
 		return body
 	}
@@ -248,10 +247,6 @@ func detached() (context.Context, context.CancelFunc) {
 
 // ------------------------------------------------------------ daily digest
 
-// A week ahead: far enough to act on a domain or a bill, near enough that the
-// list stays short enough to read on a lock screen.
-const digestWindowDays = 7
-
 // Reminders go out once a day. The loop wakes often and does nothing most of
 // the time; claiming the day in the database is what makes "once" true across
 // restarts rather than depending on the process staying up.
@@ -280,6 +275,9 @@ func (s *Server) RunReminders(ctx context.Context, hour int) {
 			if !claimed {
 				continue
 			}
+			// Dated things get one notification each; the roundup below is
+			// left with what has no date — what has run out, what is broken.
+			s.announceDueEvents(ctx)
 			s.sendDigest(ctx)
 		}
 	}
@@ -337,11 +335,6 @@ func (s *Server) sendDigest(ctx context.Context) {
 		return
 	}
 
-	due, err := s.store.DueWithin(ctx, digestWindowDays)
-	if err != nil {
-		s.log.Error("digest entries", "err", err)
-		return
-	}
 	low, err := s.store.LowSupplies(ctx)
 	if err != nil {
 		s.log.Error("digest supplies", "err", err)
@@ -352,7 +345,7 @@ func (s *Server) sendDigest(ctx context.Context) {
 		s.log.Error("digest trouble", "err", err)
 		return
 	}
-	if len(due) == 0 && len(low) == 0 && len(trouble) == 0 {
+	if len(low) == 0 && len(trouble) == 0 {
 		return
 	}
 
@@ -360,58 +353,33 @@ func (s *Server) sendDigest(ctx context.Context) {
 	tag := "hq-digest-" + time.Now().Format("2006-01-02")
 	sent := s.pushEach(ctx, subs, func(lang string) payload {
 		return payload{
-			Title: digestTitle(lang, due, low, trouble),
-			Body:  digestBody(lang, due, low, trouble),
-			URL:   "/calendar",
+			Title: digestTitle(lang, low, trouble),
+			Body:  digestBody(lang, low, trouble),
+			URL:   "/supplies",
 			Tag:   tag,
 		}
 	})
-	s.log.Info("digest sent", "entries", len(due), "low", len(low),
-		"trouble", len(trouble), "devices", sent)
+	s.log.Info("digest sent", "low", len(low), "trouble", len(trouble), "devices", sent)
 }
 
 // A morning notification has room for a headline and about two lines. Both
 // halves of it — what falls due, and what has run out — get named as far as
 // that allows, then counted.
 
-func digestTitle(
-	lang string,
-	due []store.CalendarEntry,
-	low []store.Supply,
-	trouble []store.Check,
-) string {
+func digestTitle(lang string, low []store.Supply, trouble []store.Check) string {
 	// Something broken outranks everything else the morning has to say.
 	if len(trouble) > 0 {
 		return textTroubleTitle(lang, len(trouble))
 	}
-	switch {
-	case len(due) > 0 && len(low) > 0:
-		return textDueAndLowTitle(lang, len(due), len(low))
-	case len(due) > 0:
-		return textDueTitle(lang, len(due))
-	default:
-		return textLowTitle(lang, len(low))
-	}
+	return textLowTitle(lang, len(low))
 }
 
-func digestBody(
-	lang string,
-	due []store.CalendarEntry,
-	low []store.Supply,
-	trouble []store.Check,
-) string {
+func digestBody(lang string, low []store.Supply, trouble []store.Check) string {
 	parts := []string{}
 	if len(trouble) > 0 {
 		labels := make([]string, 0, len(trouble))
 		for _, check := range trouble {
 			labels = append(labels, check.Name)
-		}
-		parts = append(parts, listSome(lang, labels, 3))
-	}
-	if len(due) > 0 {
-		labels := make([]string, 0, len(due))
-		for _, entry := range due {
-			labels = append(labels, entry.Label)
 		}
 		parts = append(parts, listSome(lang, labels, 3))
 	}

@@ -41,22 +41,6 @@ func textTroubleTitle(lang string, n int) string {
 	)
 }
 
-func textDueAndLowTitle(lang string, due, low int) string {
-	return pick(lang,
-		fmt.Sprintf("%d tenggat, %d stok menipis", due, low),
-		fmt.Sprintf("%s, %s",
-			count(due, "%d deadline", "%d deadlines"),
-			count(low, "%d supply running low", "%d supplies running low")),
-	)
-}
-
-func textDueTitle(lang string, n int) string {
-	return pick(lang,
-		fmt.Sprintf("%d tenggat minggu ini", n),
-		count(n, "%d deadline this week", "%d deadlines this week"),
-	)
-}
-
 func textLowTitle(lang string, n int) string {
 	return pick(lang,
 		fmt.Sprintf("%d stok menipis", n),
@@ -73,6 +57,48 @@ func textFixedTitle(lang string, n int) string {
 		fmt.Sprintf("%d hal normal lagi", n),
 		count(n, "%d thing is fine again", "%d things are fine again"),
 	)
+}
+
+// The kinds the calendar produces. The browser has its own copy of these in
+// the dictionary; a notification is written here and never reaches it.
+var eventKinds = map[string][2]string{
+	"renewal":     {"perpanjangan", "renewal"},
+	"document":    {"masa berlaku dokumen", "document expiry"},
+	"warranty":    {"garansi", "warranty"},
+	"maintenance": {"perawatan", "service"},
+	"birthday":    {"ulang tahun", "birthday"},
+	"rent":        {"sewa", "rent"},
+	"income":      {"pemasukan", "income"},
+	"expense":     {"pengeluaran", "expense"},
+}
+
+func textEventKind(lang, kind string) string {
+	names, ok := eventKinds[kind]
+	if !ok {
+		return kind
+	}
+	return pick(lang, names[0], names[1])
+}
+
+// textEventDue is the line under a deadline's name: what sort of thing it is,
+// and how long there is. Days are spelled out rather than dated, because a
+// lock screen is read in a second and "3 hari lagi" needs no arithmetic.
+func textEventDue(lang, kind string, days int) string {
+	what := textEventKind(lang, kind)
+	switch {
+	case days < 0:
+		return pick(lang,
+			fmt.Sprintf("%s · telat %s", what, count(-days, "%d hari", "%d hari")),
+			fmt.Sprintf("%s · %s late", what, count(-days, "%d day", "%d days")))
+	case days == 0:
+		return pick(lang, what+" · hari ini", what+" · today")
+	case days == 1:
+		return pick(lang, what+" · besok", what+" · tomorrow")
+	default:
+		return pick(lang,
+			fmt.Sprintf("%s · %d hari lagi", what, days),
+			fmt.Sprintf("%s · in %d days", what, days))
+	}
 }
 
 // What a finished countdown says on a lock screen. A label is the whole point
