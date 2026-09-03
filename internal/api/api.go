@@ -116,6 +116,11 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("POST /api/push/unsubscribe", s.requireAuth(s.handleUnsubscribeEndpoint))
 	mux.Handle("POST /api/push/test", s.requireAuth(s.handleTestPush))
 
+	// The countdown runs in the browser; these only arm and disarm the alarm
+	// that wakes a phone with nothing open.
+	mux.Handle("PUT /api/timer", s.requireAuth(s.handleSetAlarm))
+	mux.Handle("DELETE /api/timer", s.requireAuth(s.handleClearAlarm))
+
 	mux.Handle("GET /api/search", s.requireAuth(s.handleSearch))
 
 	mux.Handle("GET /api/fx", s.requireAuth(s.handleRates))

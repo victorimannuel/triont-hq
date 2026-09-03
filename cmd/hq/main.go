@@ -114,6 +114,10 @@ func run(log *slog.Logger) error {
 	// it stops when the server does.
 	go server.RunReminders(ctx, cfg.ReminderHour)
 
+	// A separate loop, because a countdown wants a ticker close to the second
+	// and the daily reminder wants one that wakes every ten minutes.
+	go server.RunTimers(ctx)
+
 	if ui, err := web.Handler(); err != nil {
 		log.Warn("front-end bundle missing, serving API only", "err", err)
 	} else {

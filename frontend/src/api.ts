@@ -105,6 +105,11 @@ export const api = {
   pushUnsubscribe: (id: number) => send<void>('DELETE', `/push/subscriptions/${id}`),
   pushUnsubscribeHere: (endpoint: string) =>
     send<{ status: string }>('POST', '/push/unsubscribe', { endpoint }),
+  // Arms the server-side alarm for a running countdown. The browser keeps the
+  // clock; this only exists so the thing still goes off with HQ closed.
+  armTimer: (body: { fires_at: number; label: string; kind: string; round: number }) =>
+    send<{ status: string }>('PUT', '/timer', body),
+  disarmTimer: () => send<{ status: string }>('DELETE', '/timer'),
   pushTest: () =>
     send<{ sent: number; devices: number; preview: string }>('POST', '/push/test', {
       lang: currentLang(),

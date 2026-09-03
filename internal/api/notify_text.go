@@ -75,6 +75,27 @@ func textFixedTitle(lang string, n int) string {
 	)
 }
 
+// What a finished countdown says on a lock screen. A label is the whole point
+// of having typed one, so it becomes the headline when there is one.
+func textTimerDone(lang, label string) (string, string) {
+	if label != "" {
+		return label, pick(lang, "hitung mundurnya selesai.", "the countdown is done.")
+	}
+	return pick(lang, "waktunya habis", "time is up"),
+		pick(lang, "hitung mundurnya selesai.", "the countdown is done.")
+}
+
+func textTimerToBreak(lang string, round int) (string, string) {
+	return pick(lang, "istirahat", "break"),
+		pick(lang,
+			fmt.Sprintf("putaran %d selesai. waktunya istirahat.", round),
+			fmt.Sprintf("round %d done. time for a break.", round))
+}
+
+func textTimerToWork(lang string) (string, string) {
+	return pick(lang, "kerja", "work"), pick(lang, "balik kerja.", "back to work.")
+}
+
 func textBuyPrefix(lang string) string {
 	return pick(lang, "beli: ", "buy: ")
 }

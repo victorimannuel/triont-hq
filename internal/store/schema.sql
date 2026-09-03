@@ -516,3 +516,17 @@ create index if not exists attachments_owner_idx on attachments (entity, entity_
 -- language it was subscribed from. Rows that predate the column keep the
 -- Indonesian the digest already spoke.
 alter table push_subscriptions add column if not exists lang text not null default 'id';
+
+-- The alarm for a running countdown, held here so it can go off with the app
+-- closed. One row per person: a phone has one timer, and so does this.
+create table if not exists timer_alarms (
+    user_id  bigint primary key references users (id) on delete cascade,
+    fires_at timestamptz not null,
+    label    text not null default '',
+    -- plain, work or break: a focus run has to know which half just ended so
+    -- the next one can be armed.
+    kind     text not null default 'plain',
+    round    int  not null default 1
+);
+
+create index if not exists timer_alarms_due_idx on timer_alarms (fires_at);

@@ -28,6 +28,7 @@ import {
   Sun,
   ShieldCheck,
   ShoppingBasket,
+  Timer as TimerIcon,
   Trash2,
   UserRound,
   Users,
@@ -60,6 +61,9 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { ConfirmProvider } from '@/components/confirm'
 import { Logo } from '@/components/Logo'
+import { TimerPill } from '@/components/TimerPill'
+import { notifyAlarm, playAlarm } from '@/lib/alarm'
+import { clock, setRingHandler, useTimerAlarm } from '@/lib/timer'
 import { Toaster } from '@/components/ui/sonner'
 import { cn } from '@/lib/utils'
 
@@ -94,6 +98,7 @@ const Supplies = lazy(() => import('@/pages/Supplies'))
 const SupplyForm = lazy(() => import('@/pages/SupplyForm'))
 const Monitor = lazy(() => import('@/pages/Monitor'))
 const Security = lazy(() => import('@/pages/Security'))
+const Timer = lazy(() => import('@/pages/Timer'))
 
 const emptyMeta: Meta = {
   statuses: [],
@@ -148,6 +153,22 @@ export default function App() {
   useEffect(() => {
     if (session) api.meta().then(setMeta).catch(() => setMeta(emptyMeta))
   }, [session])
+
+  // The alarm belongs to the app rather than to the timer page: a countdown
+  // has to go off while you are somewhere else, which is the whole point.
+  useTimerAlarm()
+  useEffect(() => {
+    setRingHandler((done) => {
+      playAlarm()
+      if (done.mode === 'work') notifyAlarm(i18n.t('timer.break'), i18n.t('timer.toBreak'))
+      else if (done.mode === 'break') notifyAlarm(i18n.t('timer.work'), i18n.t('timer.toWork'))
+      else
+        notifyAlarm(
+          done.label || i18n.t('timer.done'),
+          i18n.t('timer.notifBody', { duration: clock(done.duration) }),
+        )
+    })
+  }, [i18n])
 
   const menus = (
     <>
@@ -263,6 +284,7 @@ const NAV_GROUPS = [
     items: [
       { to: '/', key: 'home', icon: House, end: true },
       { to: '/calendar', key: 'calendar', icon: CalendarDays, end: false },
+      { to: '/timer', key: 'timer', icon: TimerIcon, end: false },
     ],
   },
   {
@@ -413,6 +435,8 @@ function Shell({
           ))}
         </nav>
 
+        <TimerPill className="mx-3 mt-3 justify-center" />
+
         <div className="flex items-center gap-1 border-t p-3">
           <div className="min-w-0 flex-1">{userMenu}</div>
           {menus}
@@ -425,6 +449,7 @@ function Shell({
             <Logo className="size-7 text-primary" />
           </Link>
           <div className="ml-auto flex items-center gap-1">
+            <TimerPill />
             {menus}
             {userMenu}
           </div>
@@ -473,6 +498,7 @@ function Shell({
             <Route path="/supplies/:id" element={<SupplyForm />} />
             <Route path="/monitor" element={<Monitor />} />
             <Route path="/security" element={<Security />} />
+            <Route path="/timer" element={<Timer />} />
               <Route path="/trash" element={<Trash />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
