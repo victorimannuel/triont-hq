@@ -32,6 +32,7 @@ import {
   Spinner,
 } from '@/components/bits'
 import { Files } from '@/components/Files'
+import { FEATURES } from '@/lib/features'
 
 const blankBuy: PurchaseInput = {
   bought_on: '',
@@ -295,7 +296,7 @@ export default function SupplyForm() {
         </CardContent>
       </Card>
 
-      {id && (
+      {id && FEATURES.supplyPurchases && (
         <>
           <SectionTitle
             hint={
@@ -399,7 +400,7 @@ export default function SupplyForm() {
         </>
       )}
 
-      {id && <Files entity="supply" id={Number(id)} />}
+      {id && FEATURES.supplyFiles && <Files entity="supply" id={Number(id)} />}
     </>
   )
 }

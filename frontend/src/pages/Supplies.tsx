@@ -21,6 +21,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { BuyDialog } from '@/components/BuyDialog'
+import { FEATURES } from '@/lib/features'
 import { CardList, Responsive } from '@/components/cards'
 import { ErrorNote, PageHeader } from '@/components/bits'
 import { FileCount } from '@/components/Files'
@@ -39,7 +40,7 @@ export default function Supplies() {
     low: 0,
   })
   const { loading, error, query, filtered, update, clear, reload } = list
-  const fileCounts = useFileCounts('supply')
+  const fileCounts = useFileCounts('supply', FEATURES.supplyFiles)
   const supplies = list.data.supplies
 
   // Which item the buy dialog is open for. Adding stock asks why; taking it
@@ -79,7 +80,10 @@ export default function Supplies() {
         variant="outline"
         size="icon"
         className="size-8"
-        onClick={() => setBuying(item)}
+        // Without the buying history there is nothing to ask about: both
+        // answers used to end in the same larger number, so the dialog would
+        // only be a question with one meaningful reply.
+        onClick={() => (FEATURES.supplyPurchases ? setBuying(item) : nudge(item, 1))}
         aria-label={t('supply.addStock')}
       >
         <Plus className="size-3.5" />
@@ -167,7 +171,7 @@ export default function Supplies() {
                     <TableCell>
                       <div className="flex items-center gap-2 font-medium">
                         {item.name}
-                        <FileCount n={fileCounts[item.id]} />
+                        {FEATURES.supplyFiles && <FileCount n={fileCounts[item.id]} />}
                       </div>
                       {item.notes && (
                         <div className="mt-0.5 text-xs text-muted-foreground">
@@ -227,7 +231,7 @@ export default function Supplies() {
                       {t('supply.low')}
                     </Badge>
                   )}
-                  <FileCount n={fileCounts[item.id]} />
+                  {FEATURES.supplyFiles && <FileCount n={fileCounts[item.id]} />}
                 </>
               ),
               footer: buttons(item),
@@ -236,19 +240,21 @@ export default function Supplies() {
         }
       />
 
-      <BuyDialog
-        item={buying}
-        onOpenChange={(open) => !open && setBuying(null)}
-        onDone={() => {
-          setBuying(null)
-          reload()
-        }}
-      />
+      {FEATURES.supplyPurchases && (
+        <BuyDialog
+          item={buying}
+          onOpenChange={(open) => !open && setBuying(null)}
+          onDone={() => {
+            setBuying(null)
+            reload()
+          }}
+        />
+      )}
 
       {supplies.length > 0 && (
         <p className="mt-4 text-xs text-muted-foreground">
           <RotateCw className="mr-1 inline size-3" />
-          {t('supply.hint')}
+          {t(FEATURES.supplyPurchases ? 'supply.hint' : 'supply.hintSimple')}
         </p>
       )}
     </>
