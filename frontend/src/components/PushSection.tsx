@@ -58,8 +58,11 @@ export function PushSection() {
   async function test() {
     setBusy('test')
     try {
-      const { sent } = await api.pushTest()
-      toast.success(t('push.tested', { n: sent }))
+      const { notices, sent } = await api.pushTest()
+      // Nothing accepted means the devices are listed but not reachable, which
+      // is a failure however many notifications the morning would have had.
+      if (sent === 0) throw new Error(t('push.failed'))
+      toast.success(t('push.tested', { n: notices }))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t('push.failed'))
     } finally {

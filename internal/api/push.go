@@ -121,7 +121,18 @@ func (s *Server) handleUnsubscribeEndpoint(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-// handleTestPush proves the whole path works without waiting for tomorrow.
+/*
+handleTestPush plays out a whole morning on demand: every deadline as its own
+notification, then the roundup of what has run out or broken, in the order the
+seven o'clock run would send them.
+
+Sending a canned line would prove less than it looks — a test that shows
+something other than the thing being tested tells you the wording is fine when
+it may not be. So this sends the real notifications, worded and tagged exactly
+as the morning words and tags them.
+
+Nothing is claimed here. Tomorrow's real run still fires.
+*/
 func (s *Server) handleTestPush(w http.ResponseWriter, r *http.Request) {
 	user, _ := r.Context().Value(userKey).(store.User)
 
@@ -142,30 +153,49 @@ func (s *Server) handleTestPush(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Send the real digest rather than a canned line: a test that shows
-	// something other than the thing being tested proves less than it looks.
-	low, _ := s.store.LowSupplies(r.Context())
-	trouble, _ := s.store.Trouble(r.Context())
+	here := known(in.Lang)
+	// What this browser would read, whatever language the other devices are
+	// subscribed in. A deadline puts its name in the title, so the body alone
+	// would leave out the half that identifies it.
+	lines := []string{}
+	sent := 0
 
-	build := func(lang string) payload {
-		body := payload{
-			Title: "HQ",
-			Body:  textNothingDue(lang),
-			URL:   "/supplies",
-			Tag:   "hq-test",
-		}
-		if len(low) > 0 || len(trouble) > 0 {
-			body.Title = digestTitle(lang, low, trouble)
-			body.Body = digestBody(lang, low, trouble)
-		}
-		return body
+	for _, due := range s.dueNow(r.Context()) {
+		sent += s.pushEach(r.Context(), subs, func(lang string) payload {
+			return eventPayload(due, lang)
+		})
+		shown := eventPayload(due, here)
+		lines = append(lines, shown.Title+" — "+shown.Body)
 	}
 
-	sent := s.pushEach(r.Context(), subs, build)
+	low, _ := s.store.LowSupplies(r.Context())
+	trouble, _ := s.store.Trouble(r.Context())
+	if len(low) > 0 || len(trouble) > 0 {
+		sent += s.pushEach(r.Context(), subs, func(lang string) payload {
+			return digestPayload(lang, low, trouble)
+		})
+		shown := digestPayload(here, low, trouble)
+		lines = append(lines, shown.Title+" — "+shown.Body)
+	}
+
+	// A quiet morning still has to prove the path works, so it says so.
+	if len(lines) == 0 {
+		sent += s.pushEach(r.Context(), subs, func(lang string) payload {
+			return payload{
+				Title: "HQ",
+				Body:  textNothingDue(lang),
+				URL:   "/supplies",
+				Tag:   "hq-test",
+			}
+		})
+		lines = append(lines, textNothingDue(here))
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
-		// The preview is the wording this browser would get, whatever the
-		// other devices are subscribed in.
-		"sent": sent, "devices": len(subs), "preview": build(known(in.Lang)).Body,
+		"sent":    sent,
+		"devices": len(subs),
+		"notices": len(lines),
+		"preview": strings.Join(lines, "\n"),
 	})
 }
 
@@ -349,17 +379,21 @@ func (s *Server) sendDigest(ctx context.Context) {
 		return
 	}
 
-	// One tag per day, so a second send would replace rather than stack.
-	tag := "hq-digest-" + time.Now().Format("2006-01-02")
 	sent := s.pushEach(ctx, subs, func(lang string) payload {
-		return payload{
-			Title: digestTitle(lang, low, trouble),
-			Body:  digestBody(lang, low, trouble),
-			URL:   "/supplies",
-			Tag:   tag,
-		}
+		return digestPayload(lang, low, trouble)
 	})
 	s.log.Info("digest sent", "low", len(low), "trouble", len(trouble), "devices", sent)
+}
+
+// digestPayload is the roundup of everything without a date on it. One tag per
+// day, so a second send in the same morning replaces rather than stacks.
+func digestPayload(lang string, low []store.Supply, trouble []store.Check) payload {
+	return payload{
+		Title: digestTitle(lang, low, trouble),
+		Body:  digestBody(lang, low, trouble),
+		URL:   "/supplies",
+		Tag:   "hq-digest-" + time.Now().Format("2006-01-02"),
+	}
 }
 
 // A morning notification has room for a headline and about two lines. Both

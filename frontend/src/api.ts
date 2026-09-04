@@ -111,7 +111,7 @@ export const api = {
     send<{ status: string }>('PUT', '/timer', body),
   disarmTimer: () => send<{ status: string }>('DELETE', '/timer'),
   pushTest: () =>
-    send<{ sent: number; devices: number; preview: string }>('POST', '/push/test', {
+    send<{ sent: number; devices: number; notices: number; preview: string }>('POST', '/push/test', {
       lang: currentLang(),
     }),
 
