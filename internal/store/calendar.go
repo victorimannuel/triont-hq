@@ -13,6 +13,9 @@ type CalendarEntry struct {
 	Label  string    `json:"label"`
 	Detail string    `json:"detail"`
 	URL    string    `json:"url"`
+	// How many days lived, for a milestone. Zero everywhere else, which has
+	// no number to carry.
+	Count int `json:"count"`
 }
 
 // Calendar collects every deadline the app knows about between two dates.
@@ -22,7 +25,7 @@ func (s *Store) Calendar(ctx context.Context, from, to time.Time) ([]CalendarEnt
 	rows, err := s.pool.Query(ctx, `
 		select renews_on, 'renewal', name,
 		       coalesce(nullif(provider, ''), 'perpanjangan'),
-		       '/assets/' || id
+		       '/assets/' || id, 0
 		  from assets
 		 where deleted_at is null and status = 'active'
 		   and renews_on between $1 and $2
@@ -30,45 +33,45 @@ func (s *Store) Calendar(ctx context.Context, from, to time.Time) ([]CalendarEnt
 		union all
 		select expires_on, 'document', name,
 		       coalesce(nullif(holder, ''), 'masa berlaku'),
-		       '/documents/' || id
+		       '/documents/' || id, 0
 		  from documents
 		 where deleted_at is null and expires_on between $1 and $2
 
 		union all
 		select b.warranty_until, 'warranty', b.name, 'garansi habis',
-		       '/belongings/' || b.id
+		       '/belongings/' || b.id, 0
 		  from belongings b
 		 where b.deleted_at is null and b.warranty_until between $1 and $2
 
 		union all
 		select m.next_due, 'maintenance', b.name,
 		       coalesce(nullif(m.description, ''), 'perawatan berikutnya'),
-		       '/belongings/' || b.id
+		       '/belongings/' || b.id, 0
 		  from maintenance_logs m
 		  join belongings b on b.id = m.belonging_id and b.deleted_at is null
 		 where m.next_due between $1 and $2
 
 		union all
-		select b.rent_due_on, 'rent', b.name, 'sewa jatuh tempo', '/belongings/' || b.id
+		select b.rent_due_on, 'rent', b.name, 'sewa jatuh tempo', '/belongings/' || b.id, 0
 		  from belongings b
 		 where b.deleted_at is null and b.ownership <> 'owned'
 		   and b.rent_due_on between $1 and $2
 
 		union all
-		select i.next_due_on, 'income', i.name, 'pemasukan masuk', '/income/' || i.id
+		select i.next_due_on, 'income', i.name, 'pemasukan masuk', '/income/' || i.id, 0
 		  from income_streams i
 		 where i.deleted_at is null and i.status = 'active'
 		   and i.next_due_on between $1 and $2
 
 		union all
 		select e.next_due_on, 'expense', e.name, 'pengeluaran jatuh tempo',
-		       '/expenses/' || e.id
+		       '/expenses/' || e.id, 0
 		  from expense_streams e
 		 where e.deleted_at is null and e.status = 'active'
 		   and e.next_due_on between $1 and $2
 
 		union all
-		select occurrence, 'birthday', name, 'ulang tahun', '/people/' || id
+		select occurrence, 'birthday', name, 'ulang tahun', '/people/' || id, 0
 		  from (
 		    select c.id, c.name,
 		           make_date(y.year, extract(month from c.birthday)::int,
@@ -82,6 +85,16 @@ func (s *Store) Calendar(ctx context.Context, from, to time.Time) ([]CalendarEnt
 		  ) b
 		 where occurrence between $1 and $2
 
+		union all
+		-- Round numbers of days lived. Nobody works these out by hand, which
+		-- is the whole reason they are worth being told about.
+		select (c.birthday + m.n)::date, 'milestone', c.name, 'hitungan hari',
+		       '/people/' || c.id, m.n
+		  from contacts c
+		  cross join (values (7777), (10000), (15000), (20000), (25000), (30000)) as m(n)
+		 where c.deleted_at is null and c.birthday is not null
+		   and (c.birthday + m.n)::date between $1 and $2
+
 		order by 1, 3`, from, to)
 	if err != nil {
 		return nil, err
@@ -91,7 +104,7 @@ func (s *Store) Calendar(ctx context.Context, from, to time.Time) ([]CalendarEnt
 	out := []CalendarEntry{}
 	for rows.Next() {
 		var e CalendarEntry
-		if err := rows.Scan(&e.Date, &e.Kind, &e.Label, &e.Detail, &e.URL); err != nil {
+		if err := rows.Scan(&e.Date, &e.Kind, &e.Label, &e.Detail, &e.URL, &e.Count); err != nil {
 			return nil, err
 		}
 		out = append(out, e)

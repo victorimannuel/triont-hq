@@ -1,6 +1,9 @@
 package api
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+)
 
 // The wording of everything that leaves the server as a notification. The app
 // itself is translated in the browser, but a push notification is written here
@@ -72,7 +75,15 @@ var eventKinds = map[string][2]string{
 	"expense":     {"pengeluaran", "expense"},
 }
 
-func textEventKind(lang, kind string) string {
+// textEventKind names the sort of thing a deadline is. A milestone is the one
+// kind that has no fixed name — the number of days lived is the whole point of
+// it, so it says that instead.
+func textEventKind(lang, kind string, n int) string {
+	if kind == "milestone" {
+		return pick(lang,
+			groupDigits(n, ".")+" hari",
+			groupDigits(n, ",")+" days old")
+	}
 	names, ok := eventKinds[kind]
 	if !ok {
 		return kind
@@ -80,11 +91,29 @@ func textEventKind(lang, kind string) string {
 	return pick(lang, names[0], names[1])
 }
 
+// groupDigits puts a separator every three digits, which Go has no formatter
+// for and a five-figure number is unreadable without.
+func groupDigits(n int, sep string) string {
+	digits := strconv.Itoa(n)
+	if len(digits) <= 3 {
+		return digits
+	}
+	head := len(digits) % 3
+	if head == 0 {
+		head = 3
+	}
+	out := digits[:head]
+	for i := head; i < len(digits); i += 3 {
+		out += sep + digits[i:i+3]
+	}
+	return out
+}
+
 // textEventDue is the line under a deadline's name: what sort of thing it is,
 // and how long there is. Days are spelled out rather than dated, because a
 // lock screen is read in a second and "3 hari lagi" needs no arithmetic.
-func textEventDue(lang, kind string, days int) string {
-	what := textEventKind(lang, kind)
+func textEventDue(lang, kind string, n, days int) string {
+	what := textEventKind(lang, kind, n)
 	switch {
 	case days < 0:
 		return pick(lang,

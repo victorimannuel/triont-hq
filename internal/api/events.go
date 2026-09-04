@@ -33,6 +33,8 @@ type upcoming struct {
 	Label string
 	URL   string
 	Days  int
+	// The number a milestone is about; zero for every other kind.
+	Count int
 }
 
 // dueNow is every deadline the morning would speak about, soonest first.
@@ -58,6 +60,7 @@ func (s *Server) dueNow(ctx context.Context) []upcoming {
 			Label: entry.Label,
 			URL:   entry.URL,
 			Days:  days,
+			Count: entry.Count,
 		})
 	}
 
@@ -70,7 +73,7 @@ func (s *Server) dueNow(ctx context.Context) []upcoming {
 func eventPayload(due upcoming, lang string) payload {
 	return payload{
 		Title: due.Label,
-		Body:  textEventDue(lang, due.Kind, due.Days),
+		Body:  textEventDue(lang, due.Kind, due.Count, due.Days),
 		URL:   due.URL,
 		// Stable across the week, so each morning's copy replaces the last
 		// instead of piling up.

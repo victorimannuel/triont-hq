@@ -516,6 +516,8 @@ export type CalendarEntry = {
   label: string
   detail: string
   url: string
+  // Days lived, for a milestone. Zero for every other kind.
+  count: number
 }
 
 export type Overview = {

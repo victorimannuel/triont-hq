@@ -5,6 +5,7 @@ import {
   FileText,
   Globe,
   Home,
+  PartyPopper,
   Receipt,
   ShieldCheck,
   Wrench,
@@ -13,7 +14,7 @@ import {
 import { useT } from '@/i18n'
 import type { CalendarEntry } from '@/types'
 import { Badge } from '@/components/ui/badge'
-import { daysUntil, formatDate } from '@/components/bits'
+import { daysUntil, formatCount, formatDate } from '@/components/bits'
 import { cn } from '@/lib/utils'
 
 /**
@@ -28,6 +29,7 @@ export const KIND_ICON = {
   warranty: ShieldCheck,
   maintenance: Wrench,
   birthday: Cake,
+  milestone: PartyPopper,
   rent: Home,
   income: Banknote,
   expense: Receipt,
@@ -42,6 +44,7 @@ const KIND_TONE: Record<Kind, string> = {
   warranty: 'bg-violet-500/15 text-violet-700 dark:text-violet-300',
   maintenance: 'bg-orange-500/15 text-orange-700 dark:text-orange-300',
   birthday: 'bg-pink-500/15 text-pink-700 dark:text-pink-300',
+  milestone: 'bg-teal-500/15 text-teal-700 dark:text-teal-300',
   rent: 'bg-rose-500/15 text-rose-700 dark:text-rose-300',
   income: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
   expense: 'bg-red-500/15 text-red-700 dark:text-red-300',
@@ -72,7 +75,11 @@ export function EntryRow({ entry, onPick }: { entry: CalendarEntry; onPick?: () 
       </span>
       <div className="min-w-0 flex-1">
         <div className="truncate font-medium">{entry.label}</div>
-        <div className="truncate text-xs text-muted-foreground">{entry.detail}</div>
+        {/* A milestone is the one kind whose second line is a number rather
+            than a phrase, and the number is the whole point of it. */}
+        <div className="truncate text-xs text-muted-foreground">
+          {entry.count ? t('cal.milestone', { n: formatCount(entry.count) }) : entry.detail}
+        </div>
       </div>
       {/* The icon already carries the kind and its colour; on a phone the badge
           only steals width from the name. */}
@@ -94,7 +101,8 @@ export function EntryRow({ entry, onPick }: { entry: CalendarEntry; onPick?: () 
             )}
           >
             {late
-              ? t('cal.late', { n: Math.abs(days) })
+              ? // A milestone that has gone by is not overdue, it just passed.
+                t(entry.count ? 'cal.ago' : 'cal.late', { n: Math.abs(days) })
               : days === 0
                 ? t('cal.today')
                 : t('cal.inDays', { n: days })}

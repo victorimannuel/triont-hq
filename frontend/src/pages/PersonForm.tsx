@@ -20,15 +20,39 @@ import { Textarea } from '@/components/ui/textarea'
 import { useConfirm } from '@/components/confirm'
 import {
   AuditInfo,
+  daysUntil,
   ErrorNote,
   Field,
+  formatCount,
+  formatDate,
   NameInput,
   PageHeader,
   Spinner,
 } from '@/components/bits'
+import { cn } from '@/lib/utils'
 import { Files } from '@/components/Files'
 
 const NONE = '__none__'
+
+/*
+Round numbers of days lived — the same ones the calendar announces, so the two
+never disagree. Nobody works these out by hand, which is exactly why they are
+worth being shown a date for.
+*/
+const MILESTONES = [7777, 10000, 15000, 20000, 25000, 30000]
+
+// Counted in UTC so a birthday that arrives as a bare date is not nudged onto
+// the day before or after by whatever zone the browser is in.
+function milestoneDates(birthday: string) {
+  const born = new Date(birthday)
+  if (Number.isNaN(born.getTime())) return []
+  return MILESTONES.map((n) => {
+    const on = new Date(
+      Date.UTC(born.getUTCFullYear(), born.getUTCMonth(), born.getUTCDate() + n),
+    )
+    return { n, date: on.toISOString().slice(0, 10) }
+  })
+}
 
 const blank: PersonInput = {
   client_id: null,
@@ -224,6 +248,23 @@ export default function PersonForm() {
                 />
               </Field>
             </div>
+
+            {form.birthday && (
+              <Field label={t('people.milestones')} hint={t('people.milestonesHint')}>
+                <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+                  {milestoneDates(form.birthday).map((m) => {
+                    const days = daysUntil(m.date)
+                    const past = days !== null && days < 0
+                    const soon = days !== null && days >= 0 && days <= 30
+                    return (
+                      <div
+                        key={m.n}
+                        className={cn(
+                          'flex items-baseline justify-between gap-2 rounded-md border px-3 py-2 text-xs',
+                          // A milestone already gone by is history, not a plan.
+                          past && 'opacity-45',
+                          soon && 'border-warning/50',
+                        )}
 
             <Field label={t('common.notes')} htmlFor="notes">
               <Textarea

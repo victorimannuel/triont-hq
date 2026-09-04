@@ -159,6 +159,12 @@ export function formatMoney(amount: number, currency: string) {
   }
 }
 
+// A plain whole number with the reader's own grouping. Five figures of days
+// lived are unreadable without the separators.
+export function formatCount(n: number) {
+  return new Intl.NumberFormat(currentLocale()).format(n)
+}
+
 // Whole days from today, negative once the date has passed.
 export function daysUntil(value?: string | null) {
   if (!value) return null

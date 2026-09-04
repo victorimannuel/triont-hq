@@ -78,23 +78,27 @@ func TestDigestBodyNamesThenCounts(t *testing.T) {
 func TestEventDueReadsAtAGlance(t *testing.T) {
 	cases := []struct {
 		kind           string
+		count          int
 		days           int
 		wantID, wantEN string
 	}{
-		{"birthday", 0, "ulang tahun · hari ini", "birthday · today"},
-		{"birthday", 1, "ulang tahun · besok", "birthday · tomorrow"},
-		{"renewal", 7, "perpanjangan · 7 hari lagi", "renewal · in 7 days"},
-		{"document", 14, "masa berlaku dokumen · 14 hari lagi", "document expiry · in 14 days"},
-		{"renewal", -1, "perpanjangan · telat 1 hari", "renewal · 1 day late"},
-		{"renewal", -3, "perpanjangan · telat 3 hari", "renewal · 3 days late"},
+		{"birthday", 0, 0, "ulang tahun · hari ini", "birthday · today"},
+		{"birthday", 0, 1, "ulang tahun · besok", "birthday · tomorrow"},
+		{"renewal", 0, 7, "perpanjangan · 7 hari lagi", "renewal · in 7 days"},
+		{"document", 0, 14, "masa berlaku dokumen · 14 hari lagi", "document expiry · in 14 days"},
+		{"renewal", 0, -1, "perpanjangan · telat 1 hari", "renewal · 1 day late"},
+		{"renewal", 0, -3, "perpanjangan · telat 3 hari", "renewal · 3 days late"},
+		// A milestone is named by its own number, not by a fixed word.
+		{"milestone", 7777, 0, "7.777 hari · hari ini", "7,777 days old · today"},
+		{"milestone", 10000, 3, "10.000 hari · 3 hari lagi", "10,000 days old · in 3 days"},
 		// A kind the calendar grows later still reads sensibly.
-		{"whatever", 2, "whatever · 2 hari lagi", "whatever · in 2 days"},
+		{"whatever", 0, 2, "whatever · 2 hari lagi", "whatever · in 2 days"},
 	}
 	for _, c := range cases {
-		if got := textEventDue("id", c.kind, c.days); got != c.wantID {
+		if got := textEventDue("id", c.kind, c.count, c.days); got != c.wantID {
 			t.Errorf("id %s/%d: got %q, want %q", c.kind, c.days, got, c.wantID)
 		}
-		if got := textEventDue("en", c.kind, c.days); got != c.wantEN {
+		if got := textEventDue("en", c.kind, c.count, c.days); got != c.wantEN {
 			t.Errorf("en %s/%d: got %q, want %q", c.kind, c.days, got, c.wantEN)
 		}
 	}
