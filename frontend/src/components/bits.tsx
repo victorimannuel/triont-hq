@@ -1,6 +1,6 @@
 import { useEffect, useState, type ComponentProps, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, Loader2 } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Loader2 } from 'lucide-react'
 
 import { currentLocale, useT } from '@/i18n'
 import { Badge } from '@/components/ui/badge'
@@ -236,6 +236,43 @@ export function AuditInfo({
         </dd>
       </div>
     </dl>
+  )
+}
+
+/**
+ * The rest of a form, folded away. Most records here are saved with two or
+ * three fields filled in, so laying eighteen of them out at once makes a
+ * five-second job look like something to be put off until later.
+ *
+ * The note says how much is already in there, because a fold that hides the
+ * fact that something has been filled in is worse than no fold at all.
+ */
+export function MoreFields({
+  label,
+  note,
+  children,
+}: {
+  label: string
+  note?: string
+  children: ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="rounded-lg border border-dashed">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-2 px-4 py-3 text-sm font-medium lowercase text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <ChevronRight className={cn('size-4 transition-transform', open && 'rotate-90')} />
+        {label}
+        {note && !open && <span className="ml-auto text-xs font-normal">{note}</span>}
+      </button>
+      {/* Unmounted rather than hidden: the values live in the page's own state,
+          so nothing is lost, and a field nobody can see cannot block a save. */}
+      {open && <div className="space-y-5 border-t px-4 py-5">{children}</div>}
+    </div>
   )
 }
 

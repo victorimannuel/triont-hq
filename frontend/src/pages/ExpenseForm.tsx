@@ -23,6 +23,7 @@ import {
   AuditInfo,
   ErrorNote,
   Field,
+  MoreFields,
   MoneyInput,
   NameInput,
   PageHeader,
@@ -152,6 +153,14 @@ export default function ExpenseForm() {
     navigate('/expenses')
   }
 
+  // What sits in the folded half, so hiding it never hides that it is filled.
+  const extras = [
+    form.asset_id,
+    form.started_on,
+    form.ended_on,
+    form.notes,
+  ].filter(Boolean).length
+
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader
@@ -202,27 +211,6 @@ export default function ExpenseForm() {
                     {projects.map((p) => (
                       <SelectItem key={p.id} value={String(p.id)}>
                         {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-            </div>
-
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field label={t('expense.asset')} hint={t('expense.assetHint')}>
-                <Select
-                  value={form.asset_id ? String(form.asset_id) : NONE}
-                  onValueChange={(v) => set('asset_id', v === NONE ? null : Number(v))}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NONE}>{t('expense.noAsset')}</SelectItem>
-                    {assets.map((a) => (
-                      <SelectItem key={a.id} value={String(a.id)}>
-                        {a.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -289,33 +277,59 @@ export default function ExpenseForm() {
               </Field>
             </div>
 
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field label={t('expense.startedOn')} htmlFor="started">
-                <Input
-                  id="started"
-                  type="date"
-                  value={form.started_on}
-                  onChange={(e) => set('started_on', e.target.value)}
-                />
-              </Field>
-              <Field label={t('expense.endedOn')} htmlFor="ended">
-                <Input
-                  id="ended"
-                  type="date"
-                  value={form.ended_on}
-                  onChange={(e) => set('ended_on', e.target.value)}
-                />
-              </Field>
-            </div>
+            <MoreFields
+              label={t('form.more')}
+              note={extras ? t('form.filled', { n: extras }) : undefined}
+            >
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Field label={t('expense.asset')} hint={t('expense.assetHint')}>
+                  <Select
+                    value={form.asset_id ? String(form.asset_id) : NONE}
+                    onValueChange={(v) => set('asset_id', v === NONE ? null : Number(v))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NONE}>{t('expense.noAsset')}</SelectItem>
+                      {assets.map((a) => (
+                        <SelectItem key={a.id} value={String(a.id)}>
+                          {a.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
 
-            <Field label={t('common.notes')} htmlFor="notes">
-              <Textarea
-                id="notes"
-                rows={4}
-                value={form.notes}
-                onChange={(e) => set('notes', e.target.value)}
-              />
-            </Field>
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Field label={t('expense.startedOn')} htmlFor="started">
+                  <Input
+                    id="started"
+                    type="date"
+                    value={form.started_on}
+                    onChange={(e) => set('started_on', e.target.value)}
+                  />
+                </Field>
+                <Field label={t('expense.endedOn')} htmlFor="ended">
+                  <Input
+                    id="ended"
+                    type="date"
+                    value={form.ended_on}
+                    onChange={(e) => set('ended_on', e.target.value)}
+                  />
+                </Field>
+              </div>
+
+              <Field label={t('common.notes')} htmlFor="notes">
+                <Textarea
+                  id="notes"
+                  rows={4}
+                  value={form.notes}
+                  onChange={(e) => set('notes', e.target.value)}
+                />
+              </Field>
+            </MoreFields>
 
             <div className="flex items-center gap-2 pt-1">
               <Button type="submit" disabled={busy}>

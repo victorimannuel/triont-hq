@@ -17,7 +17,14 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { ErrorNote, Field, NameInput, PageHeader, Spinner } from '@/components/bits'
+import {
+  ErrorNote,
+  Field,
+  MoreFields,
+  NameInput,
+  PageHeader,
+  Spinner,
+} from '@/components/bits'
 
 const NONE = '__none__'
 
@@ -67,6 +74,9 @@ export default function ProjectForm() {
       setBusy(false)
     }
   }
+
+  // What sits in the folded half, so hiding it never hides that it is filled.
+  const extras = [form.local_path, form.notes].filter(Boolean).length
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -146,23 +156,28 @@ export default function ProjectForm() {
               </Field>
             </div>
 
-            <Field label={t('project.localPath')} htmlFor="path">
-              <Input
-                id="path"
-                className="font-mono text-xs"
-                value={form.local_path}
-                onChange={(e) => set('local_path', e.target.value)}
-              />
-            </Field>
+            <MoreFields
+              label={t('form.more')}
+              note={extras ? t('form.filled', { n: extras }) : undefined}
+            >
+              <Field label={t('project.localPath')} htmlFor="path">
+                <Input
+                  id="path"
+                  className="font-mono text-xs"
+                  value={form.local_path}
+                  onChange={(e) => set('local_path', e.target.value)}
+                />
+              </Field>
 
-            <Field label={t('common.notes')} htmlFor="notes">
-              <Textarea
-                id="notes"
-                rows={5}
-                value={form.notes}
-                onChange={(e) => set('notes', e.target.value)}
-              />
-            </Field>
+              <Field label={t('common.notes')} htmlFor="notes">
+                <Textarea
+                  id="notes"
+                  rows={5}
+                  value={form.notes}
+                  onChange={(e) => set('notes', e.target.value)}
+                />
+              </Field>
+            </MoreFields>
 
             <div className="flex items-center gap-2 pt-1">
               <Button type="submit" disabled={busy}>

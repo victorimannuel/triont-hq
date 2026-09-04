@@ -23,6 +23,7 @@ import {
   AuditInfo,
   ErrorNote,
   Field,
+  MoreFields,
   NameInput,
   PageHeader,
   Spinner,
@@ -111,6 +112,15 @@ export default function DocumentForm() {
     navigate('/documents')
   }
 
+  // What sits in the folded half, so hiding it never hides that it is filled.
+  const extras = [
+    form.holder,
+    form.issuer,
+    form.number,
+    form.location,
+    form.notes,
+  ].filter(Boolean).length
+
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader
@@ -150,38 +160,6 @@ export default function DocumentForm() {
             </div>
 
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field label={t('doc.holder')} htmlFor="holder" hint={t('doc.holderHint')}>
-                <NameInput
-                  id="holder"
-                  value={form.holder}
-                  onValue={(v) => set('holder', v)}
-                />
-              </Field>
-              <Field label={t('doc.issuer')} htmlFor="issuer" hint={t('doc.issuerHint')}>
-                <Input
-                  id="issuer"
-                  value={form.issuer}
-                  onChange={(e) => set('issuer', e.target.value)}
-                />
-              </Field>
-            </div>
-
-            <Field
-              label={t('doc.number')}
-              htmlFor="number"
-              hint={record?.has_number ? t('doc.numberKept') : undefined}
-            >
-              <Input
-                id="number"
-                type="password"
-                autoComplete="off"
-                className="font-mono text-xs"
-                value={form.number}
-                onChange={(e) => set('number', e.target.value)}
-              />
-            </Field>
-
-            <div className="grid gap-5 sm:grid-cols-2">
               <Field label={t('doc.issued')} htmlFor="issued">
                 <Input
                   id="issued"
@@ -200,22 +178,59 @@ export default function DocumentForm() {
               </Field>
             </div>
 
-            <Field label={t('doc.location')} htmlFor="location" hint={t('doc.locationHint')}>
-              <NameInput
-                id="location"
-                value={form.location}
-                onValue={(v) => set('location', v)}
-              />
-            </Field>
+            <MoreFields
+              label={t('form.more')}
+              note={extras ? t('form.filled', { n: extras }) : undefined}
+            >
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Field label={t('doc.holder')} htmlFor="holder" hint={t('doc.holderHint')}>
+                  <NameInput
+                    id="holder"
+                    value={form.holder}
+                    onValue={(v) => set('holder', v)}
+                  />
+                </Field>
+                <Field label={t('doc.issuer')} htmlFor="issuer" hint={t('doc.issuerHint')}>
+                  <Input
+                    id="issuer"
+                    value={form.issuer}
+                    onChange={(e) => set('issuer', e.target.value)}
+                  />
+                </Field>
+              </div>
 
-            <Field label={t('common.notes')} htmlFor="notes">
-              <Textarea
-                id="notes"
-                rows={4}
-                value={form.notes}
-                onChange={(e) => set('notes', e.target.value)}
-              />
-            </Field>
+              <Field
+                label={t('doc.number')}
+                htmlFor="number"
+                hint={record?.has_number ? t('doc.numberKept') : undefined}
+              >
+                <Input
+                  id="number"
+                  type="password"
+                  autoComplete="off"
+                  className="font-mono text-xs"
+                  value={form.number}
+                  onChange={(e) => set('number', e.target.value)}
+                />
+              </Field>
+
+              <Field label={t('doc.location')} htmlFor="location" hint={t('doc.locationHint')}>
+                <NameInput
+                  id="location"
+                  value={form.location}
+                  onValue={(v) => set('location', v)}
+                />
+              </Field>
+
+              <Field label={t('common.notes')} htmlFor="notes">
+                <Textarea
+                  id="notes"
+                  rows={4}
+                  value={form.notes}
+                  onChange={(e) => set('notes', e.target.value)}
+                />
+              </Field>
+            </MoreFields>
 
             <div className="flex items-center gap-2 pt-1">
               <Button type="submit" disabled={busy}>

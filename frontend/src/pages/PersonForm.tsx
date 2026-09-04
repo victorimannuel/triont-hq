@@ -23,6 +23,7 @@ import {
   daysUntil,
   ErrorNote,
   Field,
+  MoreFields,
   formatCount,
   formatDate,
   NameInput,
@@ -144,6 +145,16 @@ export default function PersonForm() {
     navigate('/people')
   }
 
+  // What sits in the folded half, so hiding it never hides that it is filled.
+  const extras = [
+    form.nickname,
+    form.role,
+    form.client_id,
+    form.email,
+    form.phone,
+    form.notes,
+  ].filter(Boolean).length
+
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader
@@ -157,68 +168,14 @@ export default function PersonForm() {
       <Card>
         <CardContent>
           <form className="space-y-5" onSubmit={submit}>
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field label={t('common.name')} htmlFor="name">
-                <NameInput
-                  id="name"
-                  required
-                  value={form.name}
-                  onValue={(v) => set('name', v)}
-                />
-              </Field>
-              <Field label={t('people.nickname')} htmlFor="nickname" hint={t('people.nicknameHint')}>
-                <NameInput
-                  id="nickname"
-                  value={form.nickname}
-                  onValue={(v) => set('nickname', v)}
-                />
-              </Field>
-              <Field label={t('people.role')} htmlFor="role">
-                <NameInput
-                  id="role"
-                  value={form.role}
-                  onValue={(v) => set('role', v)}
-                />
-              </Field>
-            </div>
-
-            <Field label={t('project.client')}>
-              <Select
-                value={form.client_id ? String(form.client_id) : NONE}
-                onValueChange={(v) => set('client_id', v === NONE ? null : Number(v))}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE}>{t('people.noClient')}</SelectItem>
-                  {clients.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <Field label={t('common.name')} htmlFor="name">
+              <NameInput
+                id="name"
+                required
+                value={form.name}
+                onValue={(v) => set('name', v)}
+              />
             </Field>
-
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Email" htmlFor="email">
-                <Input
-                  id="email"
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => set('email', e.target.value)}
-                />
-              </Field>
-              <Field label={t('client.phone')} htmlFor="phone">
-                <Input
-                  id="phone"
-                  className="font-mono text-xs"
-                  value={form.phone}
-                  onChange={(e) => set('phone', e.target.value)}
-                />
-              </Field>
-            </div>
 
             <div className="grid gap-5 sm:grid-cols-3">
               <Field label={t('people.birthday')} htmlFor="birthday">
@@ -265,15 +222,93 @@ export default function PersonForm() {
                           past && 'opacity-45',
                           soon && 'border-warning/50',
                         )}
+                      >
+                        <span className="font-medium tabular-nums">{formatCount(m.n)}</span>
+                        <span className="text-right text-muted-foreground">
+                          <span className="tabular-nums">{formatDate(m.date)}</span>
+                          {days !== null && (
+                            <span className={cn('ml-2', soon && 'text-warning')}>
+                              {past
+                                ? t('cal.ago', { n: Math.abs(days) })
+                                : days === 0
+                                  ? t('cal.today')
+                                  : t('cal.inDays', { n: days })}
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </Field>
+            )}
 
-            <Field label={t('common.notes')} htmlFor="notes">
-              <Textarea
-                id="notes"
-                rows={4}
-                value={form.notes}
-                onChange={(e) => set('notes', e.target.value)}
-              />
-            </Field>
+            <MoreFields
+              label={t('form.more')}
+              note={extras ? t('form.filled', { n: extras }) : undefined}
+            >
+              <Field label={t('people.nickname')} htmlFor="nickname" hint={t('people.nicknameHint')}>
+                <NameInput
+                  id="nickname"
+                  value={form.nickname}
+                  onValue={(v) => set('nickname', v)}
+                />
+              </Field>
+              <Field label={t('people.role')} htmlFor="role">
+                <NameInput
+                  id="role"
+                  value={form.role}
+                  onValue={(v) => set('role', v)}
+                />
+              </Field>
+
+              <Field label={t('project.client')}>
+                <Select
+                  value={form.client_id ? String(form.client_id) : NONE}
+                  onValueChange={(v) => set('client_id', v === NONE ? null : Number(v))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>{t('people.noClient')}</SelectItem>
+                    {clients.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Field label="Email" htmlFor="email">
+                  <Input
+                    id="email"
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => set('email', e.target.value)}
+                  />
+                </Field>
+                <Field label={t('client.phone')} htmlFor="phone">
+                  <Input
+                    id="phone"
+                    className="font-mono text-xs"
+                    value={form.phone}
+                    onChange={(e) => set('phone', e.target.value)}
+                  />
+                </Field>
+              </div>
+
+              <Field label={t('common.notes')} htmlFor="notes">
+                <Textarea
+                  id="notes"
+                  rows={4}
+                  value={form.notes}
+                  onChange={(e) => set('notes', e.target.value)}
+                />
+              </Field>
+            </MoreFields>
 
             <div className="flex items-center gap-2 pt-1">
               <Button type="submit" disabled={busy}>

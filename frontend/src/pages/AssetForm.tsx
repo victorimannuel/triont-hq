@@ -31,6 +31,7 @@ import {
   AuditInfo,
   ErrorNote,
   Field,
+  MoreFields,
   MoneyInput,
   NameInput,
   PageHeader,
@@ -169,6 +170,15 @@ export default function AssetForm() {
     navigate('/assets')
   }
 
+  // What sits in the folded half, so hiding it never hides that it is filled.
+  const extras = [
+    form.provider,
+    form.identifier,
+    form.credential_id,
+    form.cost_amount,
+    form.notes,
+  ].filter(Boolean).length
+
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader
@@ -208,88 +218,6 @@ export default function AssetForm() {
             </div>
 
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field label={t('asset.provider')} htmlFor="provider" hint={t('asset.providerHint')}>
-                <NameInput
-                  id="provider"
-                  value={form.provider}
-                  onValue={(v) => set('provider', v)}
-                />
-              </Field>
-              <Field
-                label={t('asset.identifier')}
-                htmlFor="identifier"
-                hint={t('asset.identifierHint')}
-              >
-                <Input
-                  id="identifier"
-                  className="font-mono text-xs"
-                  value={form.identifier}
-                  onChange={(e) => set('identifier', e.target.value)}
-                />
-              </Field>
-            </div>
-
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field label={t('asset.account')} hint={t('asset.accountHint')}>
-                <Select
-                  value={form.credential_id ? String(form.credential_id) : NONE}
-                  onValueChange={(v) => set('credential_id', v === NONE ? null : Number(v))}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NONE}>{t('asset.noAccount')}</SelectItem>
-                    {credentials.map((c) => (
-                      <SelectItem key={c.id} value={String(c.id)}>
-                        {c.label}
-                        {c.username ? ` — ${c.username}` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-            </div>
-
-            <div className="grid gap-5 sm:grid-cols-3">
-              <Field label={t('asset.cost')} htmlFor="cost">
-                <MoneyInput
-                  id="cost"
-                  value={form.cost_amount}
-                  onValue={(v) => set('cost_amount', v)}
-                />
-              </Field>
-              <Field label={t('asset.currency')}>
-                <Select value={form.cost_currency} onValueChange={(v) => set('cost_currency', v)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {meta.currencies.map((o) => (
-                      <SelectItem key={o.value} value={o.value}>
-                        {o.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field label={t('asset.cycle')}>
-                <Select value={form.billing_cycle} onValueChange={(v) => set('billing_cycle', v)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {meta.billing_cycles.map((o) => (
-                      <SelectItem key={o.value} value={o.value}>
-                        {tOpt('cycle', o.value, o.label)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-            </div>
-
-            <div className="grid gap-5 sm:grid-cols-2">
               <Field label={t('asset.nextRenewal')} htmlFor="renews">
                 <Input
                   id="renews"
@@ -314,24 +242,111 @@ export default function AssetForm() {
               </Field>
             </div>
 
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                className="size-4 accent-[var(--primary)]"
-                checked={form.auto_renew}
-                onChange={(e) => set('auto_renew', e.target.checked)}
-              />
-              {t('asset.autoRenew')}
-            </label>
+            <MoreFields
+              label={t('form.more')}
+              note={extras ? t('form.filled', { n: extras }) : undefined}
+            >
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Field label={t('asset.provider')} htmlFor="provider" hint={t('asset.providerHint')}>
+                  <NameInput
+                    id="provider"
+                    value={form.provider}
+                    onValue={(v) => set('provider', v)}
+                  />
+                </Field>
+                <Field
+                  label={t('asset.identifier')}
+                  htmlFor="identifier"
+                  hint={t('asset.identifierHint')}
+                >
+                  <Input
+                    id="identifier"
+                    className="font-mono text-xs"
+                    value={form.identifier}
+                    onChange={(e) => set('identifier', e.target.value)}
+                  />
+                </Field>
+              </div>
 
-            <Field label={t('common.notes')} htmlFor="notes">
-              <Textarea
-                id="notes"
-                rows={4}
-                value={form.notes}
-                onChange={(e) => set('notes', e.target.value)}
-              />
-            </Field>
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Field label={t('asset.account')} hint={t('asset.accountHint')}>
+                  <Select
+                    value={form.credential_id ? String(form.credential_id) : NONE}
+                    onValueChange={(v) => set('credential_id', v === NONE ? null : Number(v))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NONE}>{t('asset.noAccount')}</SelectItem>
+                      {credentials.map((c) => (
+                        <SelectItem key={c.id} value={String(c.id)}>
+                          {c.label}
+                          {c.username ? ` — ${c.username}` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
+
+              <div className="grid gap-5 sm:grid-cols-3">
+                <Field label={t('asset.cost')} htmlFor="cost">
+                  <MoneyInput
+                    id="cost"
+                    value={form.cost_amount}
+                    onValue={(v) => set('cost_amount', v)}
+                  />
+                </Field>
+                <Field label={t('asset.currency')}>
+                  <Select value={form.cost_currency} onValueChange={(v) => set('cost_currency', v)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {meta.currencies.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label={t('asset.cycle')}>
+                  <Select value={form.billing_cycle} onValueChange={(v) => set('billing_cycle', v)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {meta.billing_cycles.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {tOpt('cycle', o.value, o.label)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
+
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="size-4 accent-[var(--primary)]"
+                  checked={form.auto_renew}
+                  onChange={(e) => set('auto_renew', e.target.checked)}
+                />
+                {t('asset.autoRenew')}
+              </label>
+
+              <Field label={t('common.notes')} htmlFor="notes">
+                <Textarea
+                  id="notes"
+                  rows={4}
+                  value={form.notes}
+                  onChange={(e) => set('notes', e.target.value)}
+                />
+              </Field>
+            </MoreFields>
 
             <div className="flex items-center gap-2 pt-1">
               <Button type="submit" disabled={busy}>

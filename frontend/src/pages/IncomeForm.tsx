@@ -23,6 +23,7 @@ import {
   AuditInfo,
   ErrorNote,
   Field,
+  MoreFields,
   MoneyInput,
   NameInput,
   PageHeader,
@@ -128,6 +129,15 @@ export default function IncomeForm() {
     navigate('/income')
   }
 
+  // What sits in the folded half, so hiding it never hides that it is filled.
+  const extras = [
+    form.client_id,
+    form.project_id,
+    form.started_on,
+    form.ended_on,
+    form.notes,
+  ].filter(Boolean).length
+
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader
@@ -149,45 +159,6 @@ export default function IncomeForm() {
                 onValue={(v) => set('name', v)}
               />
             </Field>
-
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field label={t('project.client')}>
-                <Select
-                  value={form.client_id ? String(form.client_id) : NONE}
-                  onValueChange={(v) => set('client_id', v === NONE ? null : Number(v))}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NONE}>{t('common.noClient')}</SelectItem>
-                    {clients.map((c) => (
-                      <SelectItem key={c.id} value={String(c.id)}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field label={t('nav.projects')}>
-                <Select
-                  value={form.project_id ? String(form.project_id) : NONE}
-                  onValueChange={(v) => set('project_id', v === NONE ? null : Number(v))}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NONE}>{t('common.noProject')}</SelectItem>
-                    {projects.map((p) => (
-                      <SelectItem key={p.id} value={String(p.id)}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-            </div>
 
             <div className="grid gap-5 sm:grid-cols-3">
               <Field label={t('income.amount')} htmlFor="amount">
@@ -248,33 +219,77 @@ export default function IncomeForm() {
               </Field>
             </div>
 
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field label={t('income.startedOn')} htmlFor="started">
-                <Input
-                  id="started"
-                  type="date"
-                  value={form.started_on}
-                  onChange={(e) => set('started_on', e.target.value)}
-                />
-              </Field>
-              <Field label={t('income.endedOn')} htmlFor="ended">
-                <Input
-                  id="ended"
-                  type="date"
-                  value={form.ended_on}
-                  onChange={(e) => set('ended_on', e.target.value)}
-                />
-              </Field>
-            </div>
+            <MoreFields
+              label={t('form.more')}
+              note={extras ? t('form.filled', { n: extras }) : undefined}
+            >
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Field label={t('project.client')}>
+                  <Select
+                    value={form.client_id ? String(form.client_id) : NONE}
+                    onValueChange={(v) => set('client_id', v === NONE ? null : Number(v))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NONE}>{t('common.noClient')}</SelectItem>
+                      {clients.map((c) => (
+                        <SelectItem key={c.id} value={String(c.id)}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label={t('nav.projects')}>
+                  <Select
+                    value={form.project_id ? String(form.project_id) : NONE}
+                    onValueChange={(v) => set('project_id', v === NONE ? null : Number(v))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NONE}>{t('common.noProject')}</SelectItem>
+                      {projects.map((p) => (
+                        <SelectItem key={p.id} value={String(p.id)}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
 
-            <Field label={t('common.notes')} htmlFor="notes">
-              <Textarea
-                id="notes"
-                rows={4}
-                value={form.notes}
-                onChange={(e) => set('notes', e.target.value)}
-              />
-            </Field>
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Field label={t('income.startedOn')} htmlFor="started">
+                  <Input
+                    id="started"
+                    type="date"
+                    value={form.started_on}
+                    onChange={(e) => set('started_on', e.target.value)}
+                  />
+                </Field>
+                <Field label={t('income.endedOn')} htmlFor="ended">
+                  <Input
+                    id="ended"
+                    type="date"
+                    value={form.ended_on}
+                    onChange={(e) => set('ended_on', e.target.value)}
+                  />
+                </Field>
+              </div>
+
+              <Field label={t('common.notes')} htmlFor="notes">
+                <Textarea
+                  id="notes"
+                  rows={4}
+                  value={form.notes}
+                  onChange={(e) => set('notes', e.target.value)}
+                />
+              </Field>
+            </MoreFields>
 
             <div className="flex items-center gap-2 pt-1">
               <Button type="submit" disabled={busy}>

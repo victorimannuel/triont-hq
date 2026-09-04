@@ -23,6 +23,7 @@ import {
   AuditInfo,
   ErrorNote,
   Field,
+  MoreFields,
   formatDate,
   formatMoney,
   MoneyInput,
@@ -171,6 +172,13 @@ export default function SupplyForm() {
     }
   }
 
+  // What sits in the folded half, so hiding it never hides that it is filled.
+  const extras = [
+    form.location,
+    form.last_restocked_on,
+    form.notes,
+  ].filter(Boolean).length
+
   return (
     <>
       <PageHeader back="/supplies" title={id ? form.name || t('supply.edit') : t('supply.new')} />
@@ -233,32 +241,37 @@ export default function SupplyForm() {
               </Field>
             </div>
 
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field label={t('supply.where')} htmlFor="location" hint={t('supply.whereHint')}>
-                <NameInput
-                  id="location"
-                  value={form.location}
-                  onValue={(v) => set('location', v)}
-                />
-              </Field>
-              <Field label={t('supply.restockedOn')} htmlFor="restocked">
-                <Input
-                  id="restocked"
-                  type="date"
-                  value={form.last_restocked_on}
-                  onChange={(e) => set('last_restocked_on', e.target.value)}
-                />
-              </Field>
-            </div>
+            <MoreFields
+              label={t('form.more')}
+              note={extras ? t('form.filled', { n: extras }) : undefined}
+            >
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Field label={t('supply.where')} htmlFor="location" hint={t('supply.whereHint')}>
+                  <NameInput
+                    id="location"
+                    value={form.location}
+                    onValue={(v) => set('location', v)}
+                  />
+                </Field>
+                <Field label={t('supply.restockedOn')} htmlFor="restocked">
+                  <Input
+                    id="restocked"
+                    type="date"
+                    value={form.last_restocked_on}
+                    onChange={(e) => set('last_restocked_on', e.target.value)}
+                  />
+                </Field>
+              </div>
 
-            <Field label={t('common.notes')} htmlFor="notes">
-              <Textarea
-                id="notes"
-                rows={3}
-                value={form.notes}
-                onChange={(e) => set('notes', e.target.value)}
-              />
-            </Field>
+              <Field label={t('common.notes')} htmlFor="notes">
+                <Textarea
+                  id="notes"
+                  rows={3}
+                  value={form.notes}
+                  onChange={(e) => set('notes', e.target.value)}
+                />
+              </Field>
+            </MoreFields>
 
             <div className="flex flex-wrap items-center gap-3">
               <Button type="submit" disabled={busy}>

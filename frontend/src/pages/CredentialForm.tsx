@@ -23,6 +23,7 @@ import {
   AuditInfo,
   ErrorNote,
   Field,
+  MoreFields,
   NameInput,
   PageHeader,
   Spinner,
@@ -129,6 +130,13 @@ export default function CredentialForm() {
     navigate('/credentials')
   }
 
+  // What sits in the folded half, so hiding it never hides that it is filled.
+  const extras = [
+    form.project_id,
+    form.url,
+    form.notes,
+  ].filter(Boolean).length
+
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader
@@ -167,25 +175,6 @@ export default function CredentialForm() {
               </Field>
             </div>
 
-            <Field label={t('common.project')}>
-              <Select
-                value={form.project_id ? String(form.project_id) : NONE}
-                onValueChange={(v) => set('project_id', v === NONE ? null : Number(v))}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE}>{t('common.noProject')}</SelectItem>
-                  {projects.map((p) => (
-                    <SelectItem key={p.id} value={String(p.id)}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-
             <div className="grid gap-5 sm:grid-cols-2">
               <Field label={t('credential.user')} htmlFor="username">
                 <Input
@@ -206,15 +195,6 @@ export default function CredentialForm() {
               </Field>
             </div>
 
-            <Field label={t('common.url')} htmlFor="url">
-              <Input
-                id="url"
-                className="font-mono text-xs"
-                value={form.url}
-                onChange={(e) => set('url', e.target.value)}
-              />
-            </Field>
-
             <Field
               label={t('credential.secret')}
               htmlFor="secret"
@@ -229,14 +209,47 @@ export default function CredentialForm() {
               />
             </Field>
 
-            <Field label={t('common.notes')} htmlFor="notes">
-              <Textarea
-                id="notes"
-                rows={4}
-                value={form.notes}
-                onChange={(e) => set('notes', e.target.value)}
-              />
-            </Field>
+            <MoreFields
+              label={t('form.more')}
+              note={extras ? t('form.filled', { n: extras }) : undefined}
+            >
+              <Field label={t('common.project')}>
+                <Select
+                  value={form.project_id ? String(form.project_id) : NONE}
+                  onValueChange={(v) => set('project_id', v === NONE ? null : Number(v))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>{t('common.noProject')}</SelectItem>
+                    {projects.map((p) => (
+                      <SelectItem key={p.id} value={String(p.id)}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+
+              <Field label={t('common.url')} htmlFor="url">
+                <Input
+                  id="url"
+                  className="font-mono text-xs"
+                  value={form.url}
+                  onChange={(e) => set('url', e.target.value)}
+                />
+              </Field>
+
+              <Field label={t('common.notes')} htmlFor="notes">
+                <Textarea
+                  id="notes"
+                  rows={4}
+                  value={form.notes}
+                  onChange={(e) => set('notes', e.target.value)}
+                />
+              </Field>
+            </MoreFields>
 
             <div className="flex items-center gap-2 pt-1">
               <Button type="submit" disabled={busy}>

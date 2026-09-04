@@ -31,6 +31,7 @@ import {
   AuditInfo,
   ErrorNote,
   Field,
+  MoreFields,
   formatDate,
   formatMoney,
   MoneyInput,
@@ -178,6 +179,18 @@ export default function BelongingForm() {
     load()
   }
 
+  // What sits in the folded half, so hiding it never hides that it is filled.
+  const extras = [
+    form.brand,
+    form.model,
+    form.year,
+    form.identifier,
+    form.price,
+    form.acquired_on,
+    form.warranty_until,
+    form.notes,
+  ].filter(Boolean).length
+
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader
@@ -216,53 +229,13 @@ export default function BelongingForm() {
               </Field>
             </div>
 
-            <div className="grid gap-5 sm:grid-cols-3">
-              <Field label={t('thing.brand')} htmlFor="brand">
-                <NameInput
-                  id="brand"
-                  value={form.brand}
-                  onValue={(v) => set('brand', v)}
-                />
-              </Field>
-              <Field label={t('thing.model')} htmlFor="model">
-                <NameInput
-                  id="model"
-                  value={form.model}
-                  onValue={(v) => set('model', v)}
-                />
-              </Field>
-              <Field label={t('thing.year')} htmlFor="year">
-                <Input
-                  id="year"
-                  type="number"
-                  className="tabular-nums"
-                  value={form.year ?? ''}
-                  onChange={(e) => set('year', e.target.value ? Number(e.target.value) : null)}
-                />
-              </Field>
-            </div>
-
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field
-                label={t('thing.identifier')}
-                htmlFor="identifier"
-                hint={t('thing.identifierHint')}
-              >
-                <Input
-                  id="identifier"
-                  className="font-mono text-xs"
-                  value={form.identifier}
-                  onChange={(e) => set('identifier', e.target.value)}
-                />
-              </Field>
-              <Field label={t('thing.location')} htmlFor="location">
-                <NameInput
-                  id="location"
-                  value={form.location}
-                  onValue={(v) => set('location', v)}
-                />
-              </Field>
-            </div>
+            <Field label={t('thing.location')} htmlFor="location">
+              <NameInput
+                id="location"
+                value={form.location}
+                onValue={(v) => set('location', v)}
+              />
+            </Field>
 
             <Field label={t('thing.ownership')}>
               <div className="flex w-fit flex-wrap items-center gap-1 rounded-md border p-0.5">
@@ -280,10 +253,12 @@ export default function BelongingForm() {
               </div>
             </Field>
 
-            {/* Owned things have a purchase price and a condition; rented ones
-                have a rent and a due date. Showing both at once is noise. */}
+            {/* What the toggle above decides. Owned things have a condition and
+                a status; rented ones have a rent and a day it falls due, which
+                is the whole reason the calendar knows about them. Both stay in
+                the open half so the toggle visibly does something. */}
             {form.ownership === 'owned' ? (
-              <>
+              <div className="grid gap-5 sm:grid-cols-2">
                 <Field label={t('thing.condition')}>
                   <div className="flex w-fit items-center gap-1 rounded-md border p-0.5">
                     {meta.conditions.map((item) => (
@@ -299,45 +274,21 @@ export default function BelongingForm() {
                     ))}
                   </div>
                 </Field>
-
-                <div className="grid gap-5 sm:grid-cols-3">
-                  <Field label={t('thing.price')} htmlFor="price">
-                    <MoneyInput
-                      id="price"
-                      value={form.price}
-                      onValue={(v) => set('price', v)}
-                    />
-                  </Field>
-                  <Field label={t('asset.currency')}>
-                    <Select value={form.currency} onValueChange={(v) => set('currency', v)}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {meta.currencies.map((item) => (
-                          <SelectItem key={item.value} value={item.value}>
-                            {item.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <Field label={t('common.status')}>
-                    <Select value={form.status} onValueChange={(v) => set('status', v)}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {meta.belonging_statuses.map((item) => (
-                          <SelectItem key={item.value} value={item.value}>
-                            {tOpt('thingstatus', item.value, item.label)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                </div>
-              </>
+                <Field label={t('common.status')}>
+                  <Select value={form.status} onValueChange={(v) => set('status', v)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {meta.belonging_statuses.map((item) => (
+                        <SelectItem key={item.value} value={item.value}>
+                          {tOpt('thingstatus', item.value, item.label)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
             ) : (
               <div className="grid gap-5 sm:grid-cols-3">
                 <Field label={t('thing.rent')} htmlFor="rent">
@@ -372,33 +323,103 @@ export default function BelongingForm() {
               </div>
             )}
 
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field label={t('thing.bought')} htmlFor="acquired">
-                <Input
-                  id="acquired"
-                  type="date"
-                  value={form.acquired_on}
-                  onChange={(e) => set('acquired_on', e.target.value)}
-                />
-              </Field>
-              <Field label={t('thing.warrantyUntil')} htmlFor="warranty">
-                <Input
-                  id="warranty"
-                  type="date"
-                  value={form.warranty_until}
-                  onChange={(e) => set('warranty_until', e.target.value)}
-                />
-              </Field>
-            </div>
+            <MoreFields
+              label={t('form.more')}
+              note={extras ? t('form.filled', { n: extras }) : undefined}
+            >
+              <div className="grid gap-5 sm:grid-cols-3">
+                <Field label={t('thing.brand')} htmlFor="brand">
+                  <NameInput
+                    id="brand"
+                    value={form.brand}
+                    onValue={(v) => set('brand', v)}
+                  />
+                </Field>
+                <Field label={t('thing.model')} htmlFor="model">
+                  <NameInput
+                    id="model"
+                    value={form.model}
+                    onValue={(v) => set('model', v)}
+                  />
+                </Field>
+                <Field label={t('thing.year')} htmlFor="year">
+                  <Input
+                    id="year"
+                    type="number"
+                    className="tabular-nums"
+                    value={form.year ?? ''}
+                    onChange={(e) => set('year', e.target.value ? Number(e.target.value) : null)}
+                  />
+                </Field>
+              </div>
 
-            <Field label={t('common.notes')} htmlFor="notes">
-              <Textarea
-                id="notes"
-                rows={4}
-                value={form.notes}
-                onChange={(e) => set('notes', e.target.value)}
-              />
-            </Field>
+              <Field
+                label={t('thing.identifier')}
+                htmlFor="identifier"
+                hint={t('thing.identifierHint')}
+              >
+                <Input
+                  id="identifier"
+                  className="font-mono text-xs"
+                  value={form.identifier}
+                  onChange={(e) => set('identifier', e.target.value)}
+                />
+              </Field>
+
+              {form.ownership === 'owned' && (
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <Field label={t('thing.price')} htmlFor="price">
+                    <MoneyInput
+                      id="price"
+                      value={form.price}
+                      onValue={(v) => set('price', v)}
+                    />
+                  </Field>
+                  <Field label={t('asset.currency')}>
+                    <Select value={form.currency} onValueChange={(v) => set('currency', v)}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {meta.currencies.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                </div>
+              )}
+
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Field label={t('thing.bought')} htmlFor="acquired">
+                  <Input
+                    id="acquired"
+                    type="date"
+                    value={form.acquired_on}
+                    onChange={(e) => set('acquired_on', e.target.value)}
+                  />
+                </Field>
+                <Field label={t('thing.warrantyUntil')} htmlFor="warranty">
+                  <Input
+                    id="warranty"
+                    type="date"
+                    value={form.warranty_until}
+                    onChange={(e) => set('warranty_until', e.target.value)}
+                  />
+                </Field>
+              </div>
+
+              <Field label={t('common.notes')} htmlFor="notes">
+                <Textarea
+                  id="notes"
+                  rows={4}
+                  value={form.notes}
+                  onChange={(e) => set('notes', e.target.value)}
+                />
+              </Field>
+            </MoreFields>
 
             <div className="flex items-center gap-2 pt-1">
               <Button type="submit" disabled={busy}>
