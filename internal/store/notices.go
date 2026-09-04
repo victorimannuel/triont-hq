@@ -6,18 +6,18 @@ import (
 )
 
 /*
-ClaimEventNotice reserves the right to announce one deadline, and reports
-whether this caller got it. The insert is the claim: a second attempt for the
-same key conflicts and returns false, so a restart in the middle of a morning
-cannot send the same birthday twice.
+ClaimEventNotice reserves the right to announce one deadline on one morning,
+and reports whether this caller got it. The insert is the claim: a second
+attempt for the same deadline on the same day conflicts and returns false, so
+a restart mid-morning cannot say the same thing twice.
 
-The key has to identify one occurrence rather than one record — a birthday
-comes round every year and each year deserves its own notification.
+The day is part of the claim because a deadline speaks every morning of the
+week before it lands. What must not repeat is one deadline on one day.
 */
-func (s *Store) ClaimEventNotice(ctx context.Context, key string) (bool, error) {
+func (s *Store) ClaimEventNotice(ctx context.Context, key string, day time.Time) (bool, error) {
 	tag, err := s.pool.Exec(ctx, `
-		insert into event_notices (event_key) values ($1)
-		on conflict (event_key) do nothing`, key)
+		insert into event_notices (event_key, sent_on) values ($1, $2)
+		on conflict (event_key, sent_on) do nothing`, key, day)
 	if err != nil {
 		return false, err
 	}

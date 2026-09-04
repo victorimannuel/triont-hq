@@ -531,9 +531,14 @@ create table if not exists timer_alarms (
 
 create index if not exists timer_alarms_due_idx on timer_alarms (fires_at);
 
--- One row per deadline already announced. Without it a restart would send the
--- same birthday again; the key carries the date, so next year is a new row.
+-- One row per deadline per morning it was announced. A deadline speaks every
+-- day of the week before it lands, so the day is part of the key; without it
+-- the first morning would be the only one. The key also carries the deadline's
+-- own date, which is what makes next year's birthday a new row rather than one
+-- already spoken for.
 create table if not exists event_notices (
-    event_key text primary key,
-    sent_at   timestamptz not null default now()
+    event_key text not null,
+    sent_on   date not null,
+    sent_at   timestamptz not null default now(),
+    primary key (event_key, sent_on)
 );

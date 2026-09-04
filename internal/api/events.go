@@ -3,88 +3,104 @@ package api
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/victorimannuel/triont-hq/internal/store"
 )
 
-// One deadline, one notification. The morning roundup is good at states — what
-// has run out, what is broken — but a dated thing wants its own line on the
-// lock screen, dismissible on its own, arriving when it is still useful.
+// One deadline, one notification of its own — not a line inside a roundup. The
+// morning digest is left with what has no date: what has run out, what is
+// broken. Anything with a day on it speaks for itself.
 
 /*
-How far ahead each kind is announced, in days. The number is not a guess about
-importance, it is how long the thing takes to act on: a birthday is only worth
-knowing on the day, a passport that has expired is worth a fortnight's warning
-because renewing one is not a same-day errand.
+How far ahead a deadline starts speaking, and it speaks every morning from
+there until the day itself. A week is long enough to renew a domain or book a
+service, and short enough that the week before is still the week you would
+have acted in anyway.
 
-Editing this table is the whole knob. Nothing else reads the numbers.
+Once the day has passed it goes quiet. A thing you missed is on the calendar in
+red; it does not need to keep waking your phone.
 */
-var leadDays = map[string]int{
-	"birthday":    0,
-	"maintenance": 3,
-	"rent":        3,
-	"income":      3,
-	"expense":     3,
-	"renewal":     7,
-	"warranty":    7,
-	"document":    14,
+const noticeLead = 7
+
+// upcoming is one deadline as a notification is about to describe it: already
+// counted in days, already carrying the key that keeps it from being announced
+// twice in a morning.
+type upcoming struct {
+	Key   string
+	Kind  string
+	Label string
+	URL   string
+	Days  int
 }
 
-// Anything the calendar grows later still gets announced, just with a middling
-// amount of warning rather than none.
-const defaultLead = 3
+// dueNow is every deadline the morning would speak about, soonest first.
+func (s *Server) dueNow(ctx context.Context) []upcoming {
+	entries, err := s.store.DueWithin(ctx, noticeLead)
+	if err != nil {
+		s.log.Error("due events", "err", err)
+		return nil
+	}
 
-// The furthest any kind looks ahead, which is how wide the query has to be.
-func widestLead() int {
-	widest := defaultLead
-	for _, days := range leadDays {
-		if days > widest {
-			widest = days
+	today := time.Now()
+	out := make([]upcoming, 0, len(entries))
+	for _, entry := range entries {
+		days := daysUntil(today, entry.Date)
+		// Before the window it is too early to be useful; after the day it is
+		// too late to be a reminder.
+		if days < 0 || days > noticeLead {
+			continue
 		}
+		out = append(out, upcoming{
+			Key:   noticeKey(entry),
+			Kind:  entry.Kind,
+			Label: entry.Label,
+			URL:   entry.URL,
+			Days:  days,
+		})
 	}
-	return widest
+
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Days < out[j].Days })
+	return out
 }
 
-func leadFor(kind string) int {
-	if days, ok := leadDays[kind]; ok {
-		return days
+// eventPayload is the one place a deadline is worded, so the morning run and
+// the test button cannot drift apart.
+func eventPayload(due upcoming, lang string) payload {
+	return payload{
+		Title: due.Label,
+		Body:  textEventDue(lang, due.Kind, due.Days),
+		URL:   due.URL,
+		// Stable across the week, so each morning's copy replaces the last
+		// instead of piling up.
+		Tag: "hq-event-" + due.Key,
 	}
-	return defaultLead
 }
 
 /*
-announceDueEvents sends one push per deadline that has come within reach.
-
-It fires on "close enough" rather than "exactly today" on purpose. A server
-that was down on the morning something was due should still say so late; only
-the claim in the database decides that it has been said at all.
+announceDueEvents sends one push per deadline inside the window, once each
+morning. The same notification tag is reused across days on purpose: the phone
+replaces yesterday's copy rather than stacking eight of them, so it alerts
+again each morning without the tray filling up.
 */
 func (s *Server) announceDueEvents(ctx context.Context) {
-	entries, err := s.store.DueWithin(ctx, widestLead())
-	if err != nil {
-		s.log.Error("event notices", "err", err)
-		return
-	}
-
 	subs, err := s.store.AllSubscriptions(ctx)
 	if err != nil {
 		s.log.Error("event subscriptions", "err", err)
 		return
 	}
 
-	today := time.Now()
-	sent := 0
-	for _, entry := range entries {
-		days := daysUntil(today, entry.Date)
-		if days > leadFor(entry.Kind) {
-			continue
-		}
+	// The calendar day this run belongs to, which is what a claim is made
+	// against — two runs in one morning must not say the same thing twice.
+	y, m, d := time.Now().Date()
+	day := time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 
-		key := noticeKey(entry)
-		claimed, err := s.store.ClaimEventNotice(ctx, key)
+	sent := 0
+	for _, due := range s.dueNow(ctx) {
+		claimed, err := s.store.ClaimEventNotice(ctx, due.Key, day)
 		if err != nil {
-			s.log.Error("claim event notice", "key", key, "err", err)
+			s.log.Error("claim event notice", "key", due.Key, "err", err)
 			continue
 		}
 		if !claimed {
@@ -93,14 +109,7 @@ func (s *Server) announceDueEvents(ctx context.Context) {
 
 		if len(subs) > 0 {
 			s.pushEach(ctx, subs, func(lang string) payload {
-				return payload{
-					Title: entry.Label,
-					Body:  textEventDue(lang, entry.Kind, days),
-					URL:   entry.URL,
-					// Its own tag, so several falling on one day stack as
-					// separate notifications instead of replacing each other.
-					Tag: "hq-event-" + key,
-				}
+				return eventPayload(due, lang)
 			})
 		}
 		sent++

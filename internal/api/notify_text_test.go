@@ -119,20 +119,44 @@ func TestNoticeKeyIsPerOccurrence(t *testing.T) {
 	}
 }
 
-func TestLeadTimeMatchesHowLongActingTakes(t *testing.T) {
-	// A birthday is only worth knowing on the day; a document takes weeks.
-	if leadFor("birthday") != 0 {
-		t.Errorf("birthday should land on the day, got %d", leadFor("birthday"))
+/*
+The window is the week before, spoken every morning of it. These are the edges
+that decide whether a given morning says anything at all, so they are worth
+pinning: a week out speaks, eight days out does not, the day itself speaks, and
+the day after has nothing left to warn about.
+*/
+func TestNoticeWindowIsTheWeekBefore(t *testing.T) {
+	jakarta := time.FixedZone("WIB", 7*3600)
+	morning := time.Date(2026, 9, 4, 7, 0, 0, 0, jakarta)
+	on := func(d int) time.Time { return time.Date(2026, 9, d, 0, 0, 0, 0, time.UTC) }
+
+	speaks := func(date time.Time) bool {
+		days := daysUntil(morning, date)
+		return days >= 0 && days <= noticeLead
 	}
-	if leadFor("document") <= leadFor("maintenance") {
-		t.Error("renewing a document takes longer to arrange than a service")
+
+	cases := []struct {
+		day  int
+		want bool
+		why  string
+	}{
+		{4, true, "hari ini"},
+		{5, true, "besok"},
+		{11, true, "tepat seminggu lagi"},
+		{12, false, "delapan hari, masih terlalu jauh"},
+		{3, false, "kemarin, sudah lewat"},
 	}
-	// Anything the calendar grows later still gets some warning.
-	if leadFor("something-new") != defaultLead {
-		t.Errorf("unknown kind should fall back, got %d", leadFor("something-new"))
+	for _, c := range cases {
+		if got := speaks(on(c.day)); got != c.want {
+			t.Errorf("%s: bunyi=%v, mestinya %v", c.why, got, c.want)
+		}
 	}
-	if widestLead() < leadFor("document") {
-		t.Error("the query window has to reach the furthest lead")
+
+	// Every morning in between speaks, which is the point of the change.
+	for day := 4; day <= 11; day++ {
+		if !speaks(on(day)) {
+			t.Errorf("tanggal %d harusnya ikut bunyi", day)
+		}
 	}
 }
 
