@@ -72,8 +72,8 @@ const (
 	upcomingWindowDays = 30
 	// Generous enough that the month view is never quietly cut short, and
 	// still a bound.
-	upcomingRows = 60
-	recentProjects     = 8
+	upcomingRows   = 60
+	recentProjects = 8
 )
 
 func (s *Store) Overview(ctx context.Context) (Overview, error) {
