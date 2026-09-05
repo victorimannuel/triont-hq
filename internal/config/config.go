@@ -33,6 +33,9 @@ type Config struct {
 	// Bearer token external monitors use to report in. The only door into
 	// HQ that a session cookie does not open.
 	MonitorToken string
+	// Bearer token an MCP client carries. Another door a session cookie does
+	// not open, but everything behind this one is read-only.
+	MCPToken string
 }
 
 func Load() (Config, error) {
@@ -56,6 +59,9 @@ func Load() (Config, error) {
 		// Empty disables the monitor ingest endpoint outright rather than
 		// leaving it open with a guessable secret.
 		MonitorToken: os.Getenv("HQ_MONITOR_TOKEN"),
+		// Same bargain: empty leaves the endpoint closed rather than open
+		// with a token somebody could guess.
+		MCPToken: os.Getenv("HQ_MCP_TOKEN"),
 	}
 
 	if cfg.DatabaseURL == "" {

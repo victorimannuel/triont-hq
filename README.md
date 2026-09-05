@@ -94,6 +94,37 @@ python3 scripts/scan.py --server my-server             # then send
 What the scanner guesses — project kind, client, which asset belongs to which
 project — is not always right. Check it in HQ afterwards.
 
+## Talking to it from Claude
+
+`POST /api/mcp` is an MCP server: it lists the tools an assistant may call and
+then runs them. Every tool is read-only and credentials are not exposed at all,
+so the worst a confused model can do is tell you something you already own.
+
+Set `HQ_MCP_TOKEN` to a long random string. Empty leaves the endpoint closed
+rather than open with a token somebody could guess.
+
+```bash
+claude mcp add --transport http hq https://hq.example/api/mcp \
+  --header "Authorization: Bearer YOUR_TOKEN"
+```
+
+Or in `.mcp.json`, the same file Claude Desktop reads:
+
+```json
+{
+  "mcpServers": {
+    "hq": {
+      "type": "http",
+      "url": "https://hq.example/api/mcp",
+      "headers": { "Authorization": "Bearer YOUR_TOKEN" }
+    }
+  }
+}
+```
+
+The phone app cannot carry a bearer token. Adding it there means registering a
+custom connector, which wants OAuth instead.
+
 ## Deploying
 
 ```bash
@@ -201,6 +232,38 @@ python3 scripts/scan.py --server my-server             # baru kirim
 
 Yang ditebak scanner (jenis project, klien, aset mana milik project mana) belum
 tentu benar — periksa di HQ setelahnya.
+
+## Ngobrol lewat Claude
+
+`POST /api/mcp` itu server MCP: dia ngasih daftar tool yang boleh dipanggil
+asisten, terus ngejalanin. Semua tool-nya cuma baca dan credential nggak
+diekspos sama sekali, jadi paling parah model yang salah paham cuma ngasih tau
+sesuatu yang emang udah punya kamu.
+
+Isi `HQ_MCP_TOKEN` pakai string acak yang panjang. Dikosongkan berarti
+endpoint-nya mati, bukan kebuka dengan token yang gampang ditebak.
+
+```bash
+claude mcp add --transport http hq https://hq.example/api/mcp \
+  --header "Authorization: Bearer TOKEN_KAMU"
+```
+
+Atau lewat `.mcp.json`, file yang sama yang dibaca Claude Desktop:
+
+```json
+{
+  "mcpServers": {
+    "hq": {
+      "type": "http",
+      "url": "https://hq.example/api/mcp",
+      "headers": { "Authorization": "Bearer TOKEN_KAMU" }
+    }
+  }
+}
+```
+
+App HP nggak bisa pakai bearer token. Di sana caranya didaftarin sebagai custom
+connector, dan itu minta OAuth.
 
 ## Deploy
 

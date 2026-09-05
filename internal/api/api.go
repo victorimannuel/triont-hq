@@ -91,6 +91,10 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/monitor/report", s.handleReport)
 	mux.Handle("GET /api/monitor", s.requireAuth(s.handleMonitor))
 
+	// Token-authenticated too, and read-only: the caller is an assistant
+	// asking questions about the data on your behalf.
+	mux.HandleFunc("POST /api/mcp", s.handleMCP)
+
 	// One table for every module, the way tags work: entity plus id.
 	// A literal last segment, so it beats {entity}/{id} and cannot collide
 	// with {id}/download the way /files/counts/{entity} did.
