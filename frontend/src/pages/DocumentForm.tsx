@@ -23,12 +23,14 @@ import {
   AuditInfo,
   ErrorNote,
   Field,
+  FormLayout,
   MoreFields,
   NameInput,
   PageHeader,
   Spinner,
 } from '@/components/bits'
 import { Files } from '@/components/Files'
+import { cn } from '@/lib/utils'
 
 const blank: DocumentInput = {
   name: '',
@@ -122,7 +124,7 @@ export default function DocumentForm() {
   ].filter(Boolean).length
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className={cn('mx-auto', id ? 'max-w-2xl lg:max-w-5xl' : 'max-w-2xl')}>
       <PageHeader
         back="/documents"
         title={id ? t('doc.edit') : t('doc.new')}
@@ -131,141 +133,141 @@ export default function DocumentForm() {
 
       {error && <ErrorNote>{error}</ErrorNote>}
 
-      <Card>
-        <CardContent>
-          <form className="space-y-5" onSubmit={submit}>
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field label={t('common.name')} htmlFor="name" hint={t('doc.nameHint')}>
-                <NameInput
-                  id="name"
-                  required
-                  value={form.name}
-                  onValue={(v) => set('name', v)}
-                />
-              </Field>
-              <Field label={t('common.kind')}>
-                <Select value={form.kind} onValueChange={(v) => set('kind', v)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {meta.document_kinds.map((o) => (
-                      <SelectItem key={o.value} value={o.value}>
-                        {tOpt('dockind', o.value, o.label)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-            </div>
-
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field label={t('doc.issued')} htmlFor="issued">
-                <Input
-                  id="issued"
-                  type="date"
-                  value={form.issued_on}
-                  onChange={(e) => set('issued_on', e.target.value)}
-                />
-              </Field>
-              <Field label={t('doc.expires')} htmlFor="expires">
-                <Input
-                  id="expires"
-                  type="date"
-                  value={form.expires_on}
-                  onChange={(e) => set('expires_on', e.target.value)}
-                />
-              </Field>
-            </div>
-
-            <MoreFields
-              label={t('form.more')}
-              note={extras ? t('form.filled', { n: extras }) : undefined}
-            >
+      <FormLayout side={id && <Files entity="document" id={Number(id)} />}>
+        <Card>
+          <CardContent>
+            <form className="space-y-5" onSubmit={submit}>
               <div className="grid gap-5 sm:grid-cols-2">
-                <Field label={t('doc.holder')} htmlFor="holder" hint={t('doc.holderHint')}>
+                <Field label={t('common.name')} htmlFor="name" hint={t('doc.nameHint')}>
                   <NameInput
-                    id="holder"
-                    value={form.holder}
-                    onValue={(v) => set('holder', v)}
+                    id="name"
+                    required
+                    value={form.name}
+                    onValue={(v) => set('name', v)}
                   />
                 </Field>
-                <Field label={t('doc.issuer')} htmlFor="issuer" hint={t('doc.issuerHint')}>
+                <Field label={t('common.kind')}>
+                  <Select value={form.kind} onValueChange={(v) => set('kind', v)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {meta.document_kinds.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {tOpt('dockind', o.value, o.label)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
+
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Field label={t('doc.issued')} htmlFor="issued">
                   <Input
-                    id="issuer"
-                    value={form.issuer}
-                    onChange={(e) => set('issuer', e.target.value)}
+                    id="issued"
+                    type="date"
+                    value={form.issued_on}
+                    onChange={(e) => set('issued_on', e.target.value)}
+                  />
+                </Field>
+                <Field label={t('doc.expires')} htmlFor="expires">
+                  <Input
+                    id="expires"
+                    type="date"
+                    value={form.expires_on}
+                    onChange={(e) => set('expires_on', e.target.value)}
                   />
                 </Field>
               </div>
 
-              <Field
-                label={t('doc.number')}
-                htmlFor="number"
-                hint={record?.has_number ? t('doc.numberKept') : undefined}
+              <MoreFields
+                label={t('form.more')}
+                note={extras ? t('form.filled', { n: extras }) : undefined}
               >
-                <Input
-                  id="number"
-                  type="password"
-                  autoComplete="off"
-                  className="font-mono text-xs"
-                  value={form.number}
-                  onChange={(e) => set('number', e.target.value)}
-                />
-              </Field>
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <Field label={t('doc.holder')} htmlFor="holder" hint={t('doc.holderHint')}>
+                    <NameInput
+                      id="holder"
+                      value={form.holder}
+                      onValue={(v) => set('holder', v)}
+                    />
+                  </Field>
+                  <Field label={t('doc.issuer')} htmlFor="issuer" hint={t('doc.issuerHint')}>
+                    <Input
+                      id="issuer"
+                      value={form.issuer}
+                      onChange={(e) => set('issuer', e.target.value)}
+                    />
+                  </Field>
+                </div>
 
-              <Field label={t('doc.location')} htmlFor="location" hint={t('doc.locationHint')}>
-                <NameInput
-                  id="location"
-                  value={form.location}
-                  onValue={(v) => set('location', v)}
-                />
-              </Field>
-
-              <Field label={t('common.notes')} htmlFor="notes">
-                <Textarea
-                  id="notes"
-                  rows={4}
-                  value={form.notes}
-                  onChange={(e) => set('notes', e.target.value)}
-                />
-              </Field>
-            </MoreFields>
-
-            <div className="flex items-center gap-2 pt-1">
-              <Button type="submit" disabled={busy}>
-                {busy && <Spinner />}
-                {t('common.save')}
-              </Button>
-              <Button variant="ghost" asChild>
-                <Link to="/documents">{t('common.cancel')}</Link>
-              </Button>
-              {id && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="ml-auto text-destructive"
-                  onClick={remove}
+                <Field
+                  label={t('doc.number')}
+                  htmlFor="number"
+                  hint={record?.has_number ? t('doc.numberKept') : undefined}
                 >
-                  <Trash2 className="size-4" />
-                  {t('common.delete')}
+                  <Input
+                    id="number"
+                    type="password"
+                    autoComplete="off"
+                    className="font-mono text-xs"
+                    value={form.number}
+                    onChange={(e) => set('number', e.target.value)}
+                  />
+                </Field>
+
+                <Field label={t('doc.location')} htmlFor="location" hint={t('doc.locationHint')}>
+                  <NameInput
+                    id="location"
+                    value={form.location}
+                    onValue={(v) => set('location', v)}
+                  />
+                </Field>
+
+                <Field label={t('common.notes')} htmlFor="notes">
+                  <Textarea
+                    id="notes"
+                    rows={4}
+                    value={form.notes}
+                    onChange={(e) => set('notes', e.target.value)}
+                  />
+                </Field>
+              </MoreFields>
+
+              <div className="flex items-center gap-2 pt-1">
+                <Button type="submit" disabled={busy}>
+                  {busy && <Spinner />}
+                  {t('common.save')}
                 </Button>
-              )}
-            </div>
-          </form>
+                <Button variant="ghost" asChild>
+                  <Link to="/documents">{t('common.cancel')}</Link>
+                </Button>
+                {id && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="ml-auto text-destructive"
+                    onClick={remove}
+                  >
+                    <Trash2 className="size-4" />
+                    {t('common.delete')}
+                  </Button>
+                )}
+              </div>
+            </form>
 
-          {record && (
-            <AuditInfo
-              createdBy={record.created_by}
-              createdAt={record.created_at}
-              updatedBy={record.updated_by}
-              updatedAt={record.updated_at}
-            />
-          )}
-        </CardContent>
-      </Card>
-
-      {id && <Files entity="document" id={Number(id)} />}
+            {record && (
+              <AuditInfo
+                createdBy={record.created_by}
+                createdAt={record.created_at}
+                updatedBy={record.updated_by}
+                updatedAt={record.updated_at}
+              />
+            )}
+          </CardContent>
+        </Card>
+      </FormLayout>
     </div>
   )
 }

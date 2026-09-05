@@ -240,6 +240,27 @@ export function AuditInfo({
 }
 
 /**
+ * A form with its attachments beside it instead of underneath. On a wide
+ * screen the two sit side by side; below that they stack, which is where they
+ * were before.
+ *
+ * A record that does not exist yet has nothing to attach, so there is no side
+ * and no grid — the page keeps its old single-column width rather than leaving
+ * the form stranded in the corner of an empty one.
+ */
+export function FormLayout({ side, children }: { side?: ReactNode; children: ReactNode }) {
+  if (!side) return <>{children}</>
+  return (
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+      <div>{children}</div>
+      {/* Wrapped, because a fragment would spill its own children into
+          separate grid cells and drop half of them back under the form. */}
+      <div>{side}</div>
+    </div>
+  )
+}
+
+/**
  * The rest of a form, folded away. Most records here are saved with two or
  * three fields filled in, so laying eighteen of them out at once makes a
  * five-second job look like something to be put off until later.

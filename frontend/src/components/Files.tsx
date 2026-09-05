@@ -92,14 +92,18 @@ export function Files({ entity, id }: { entity: string; id: number }) {
               className="hidden"
               onChange={(e) => upload(e.target.files)}
             />
+            {/* The panel is narrow enough that a worded button eats a third of
+                it. An arrow into a tray needs no caption. */}
             <Button
               type="button"
               variant="outline"
+              size="icon"
               disabled={busy}
               onClick={() => picker.current?.click()}
+              aria-label={busy ? t('file.uploading') : t('file.add')}
+              title={busy ? t('file.uploading') : t('file.add')}
             >
               {busy ? <Spinner /> : <Upload className="size-4" />}
-              {busy ? t('file.uploading') : t('file.add')}
             </Button>
           </div>
 

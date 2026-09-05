@@ -31,6 +31,7 @@ import {
   AuditInfo,
   ErrorNote,
   Field,
+  FormLayout,
   MoreFields,
   MoneyInput,
   NameInput,
@@ -38,6 +39,7 @@ import {
   Spinner,
 } from '@/components/bits'
 import { Files } from '@/components/Files'
+import { cn } from '@/lib/utils'
 
 const NONE = '__none__'
 
@@ -180,7 +182,7 @@ export default function AssetForm() {
   ].filter(Boolean).length
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className={cn('mx-auto', id ? 'max-w-2xl lg:max-w-5xl' : 'max-w-2xl')}>
       <PageHeader
         back="/assets"
         title={id ? t('asset.edit') : t('asset.new')}
@@ -189,138 +191,53 @@ export default function AssetForm() {
 
       {error && <ErrorNote>{error}</ErrorNote>}
 
-      <Card>
-        <CardContent>
-          <form className="space-y-5" onSubmit={submit}>
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field label={t('common.name')} htmlFor="name">
-                <NameInput
-                  id="name"
-                  required
-                  value={form.name}
-                  onValue={(v) => set('name', v)}
-                />
-              </Field>
-              <Field label={t('common.kind')}>
-                <Select value={form.kind} onValueChange={(v) => set('kind', v)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {meta.asset_kinds.map((o) => (
-                      <SelectItem key={o.value} value={o.value}>
-                        {tOpt('assetkind', o.value, o.label)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-            </div>
-
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field label={t('asset.nextRenewal')} htmlFor="renews">
-                <Input
-                  id="renews"
-                  type="date"
-                  value={form.renews_on}
-                  onChange={(e) => set('renews_on', e.target.value)}
-                />
-              </Field>
-              <Field label={t('common.status')}>
-                <Select value={form.status} onValueChange={(v) => set('status', v)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {meta.asset_statuses.map((o) => (
-                      <SelectItem key={o.value} value={o.value}>
-                        {tOpt('assetstatus', o.value, o.label)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-            </div>
-
-            <MoreFields
-              label={t('form.more')}
-              note={extras ? t('form.filled', { n: extras }) : undefined}
-            >
+      <FormLayout side={id && <Files entity="asset" id={Number(id)} />}>
+        <Card>
+          <CardContent>
+            <form className="space-y-5" onSubmit={submit}>
               <div className="grid gap-5 sm:grid-cols-2">
-                <Field label={t('asset.provider')} htmlFor="provider" hint={t('asset.providerHint')}>
+                <Field label={t('common.name')} htmlFor="name">
                   <NameInput
-                    id="provider"
-                    value={form.provider}
-                    onValue={(v) => set('provider', v)}
+                    id="name"
+                    required
+                    value={form.name}
+                    onValue={(v) => set('name', v)}
                   />
                 </Field>
-                <Field
-                  label={t('asset.identifier')}
-                  htmlFor="identifier"
-                  hint={t('asset.identifierHint')}
-                >
-                  <Input
-                    id="identifier"
-                    className="font-mono text-xs"
-                    value={form.identifier}
-                    onChange={(e) => set('identifier', e.target.value)}
-                  />
+                <Field label={t('common.kind')}>
+                  <Select value={form.kind} onValueChange={(v) => set('kind', v)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {meta.asset_kinds.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {tOpt('assetkind', o.value, o.label)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </Field>
               </div>
 
               <div className="grid gap-5 sm:grid-cols-2">
-                <Field label={t('asset.account')} hint={t('asset.accountHint')}>
-                  <Select
-                    value={form.credential_id ? String(form.credential_id) : NONE}
-                    onValueChange={(v) => set('credential_id', v === NONE ? null : Number(v))}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NONE}>{t('asset.noAccount')}</SelectItem>
-                      {credentials.map((c) => (
-                        <SelectItem key={c.id} value={String(c.id)}>
-                          {c.label}
-                          {c.username ? ` — ${c.username}` : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-              </div>
-
-              <div className="grid gap-5 sm:grid-cols-3">
-                <Field label={t('asset.cost')} htmlFor="cost">
-                  <MoneyInput
-                    id="cost"
-                    value={form.cost_amount}
-                    onValue={(v) => set('cost_amount', v)}
+                <Field label={t('asset.nextRenewal')} htmlFor="renews">
+                  <Input
+                    id="renews"
+                    type="date"
+                    value={form.renews_on}
+                    onChange={(e) => set('renews_on', e.target.value)}
                   />
                 </Field>
-                <Field label={t('asset.currency')}>
-                  <Select value={form.cost_currency} onValueChange={(v) => set('cost_currency', v)}>
+                <Field label={t('common.status')}>
+                  <Select value={form.status} onValueChange={(v) => set('status', v)}>
                     <SelectTrigger className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {meta.currencies.map((o) => (
+                      {meta.asset_statuses.map((o) => (
                         <SelectItem key={o.value} value={o.value}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field label={t('asset.cycle')}>
-                  <Select value={form.billing_cycle} onValueChange={(v) => set('billing_cycle', v)}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {meta.billing_cycles.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>
-                          {tOpt('cycle', o.value, o.label)}
+                          {tOpt('assetstatus', o.value, o.label)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -328,141 +245,226 @@ export default function AssetForm() {
                 </Field>
               </div>
 
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="size-4 accent-[var(--primary)]"
-                  checked={form.auto_renew}
-                  onChange={(e) => set('auto_renew', e.target.checked)}
-                />
-                {t('asset.autoRenew')}
-              </label>
+              <MoreFields
+                label={t('form.more')}
+                note={extras ? t('form.filled', { n: extras }) : undefined}
+              >
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <Field label={t('asset.provider')} htmlFor="provider" hint={t('asset.providerHint')}>
+                    <NameInput
+                      id="provider"
+                      value={form.provider}
+                      onValue={(v) => set('provider', v)}
+                    />
+                  </Field>
+                  <Field
+                    label={t('asset.identifier')}
+                    htmlFor="identifier"
+                    hint={t('asset.identifierHint')}
+                  >
+                    <Input
+                      id="identifier"
+                      className="font-mono text-xs"
+                      value={form.identifier}
+                      onChange={(e) => set('identifier', e.target.value)}
+                    />
+                  </Field>
+                </div>
 
-              <Field label={t('common.notes')} htmlFor="notes">
-                <Textarea
-                  id="notes"
-                  rows={4}
-                  value={form.notes}
-                  onChange={(e) => set('notes', e.target.value)}
-                />
-              </Field>
-            </MoreFields>
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <Field label={t('asset.account')} hint={t('asset.accountHint')}>
+                    <Select
+                      value={form.credential_id ? String(form.credential_id) : NONE}
+                      onValueChange={(v) => set('credential_id', v === NONE ? null : Number(v))}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={NONE}>{t('asset.noAccount')}</SelectItem>
+                        {credentials.map((c) => (
+                          <SelectItem key={c.id} value={String(c.id)}>
+                            {c.label}
+                            {c.username ? ` — ${c.username}` : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                </div>
 
-            <div className="flex items-center gap-2 pt-1">
-              <Button type="submit" disabled={busy}>
-                {busy && <Spinner />}
-                {t('common.save')}
-              </Button>
-              <Button variant="ghost" asChild>
-                <Link to="/assets">{t('common.cancel')}</Link>
-              </Button>
-              {id && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="ml-auto text-destructive"
-                  onClick={remove}
-                >
-                  <Trash2 className="size-4" />
-                  {t('common.delete')}
+                <div className="grid gap-5 sm:grid-cols-3">
+                  <Field label={t('asset.cost')} htmlFor="cost">
+                    <MoneyInput
+                      id="cost"
+                      value={form.cost_amount}
+                      onValue={(v) => set('cost_amount', v)}
+                    />
+                  </Field>
+                  <Field label={t('asset.currency')}>
+                    <Select value={form.cost_currency} onValueChange={(v) => set('cost_currency', v)}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {meta.currencies.map((o) => (
+                          <SelectItem key={o.value} value={o.value}>
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field label={t('asset.cycle')}>
+                    <Select value={form.billing_cycle} onValueChange={(v) => set('billing_cycle', v)}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {meta.billing_cycles.map((o) => (
+                          <SelectItem key={o.value} value={o.value}>
+                            {tOpt('cycle', o.value, o.label)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                </div>
+
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="size-4 accent-[var(--primary)]"
+                    checked={form.auto_renew}
+                    onChange={(e) => set('auto_renew', e.target.checked)}
+                  />
+                  {t('asset.autoRenew')}
+                </label>
+
+                <Field label={t('common.notes')} htmlFor="notes">
+                  <Textarea
+                    id="notes"
+                    rows={4}
+                    value={form.notes}
+                    onChange={(e) => set('notes', e.target.value)}
+                  />
+                </Field>
+              </MoreFields>
+
+              <div className="flex items-center gap-2 pt-1">
+                <Button type="submit" disabled={busy}>
+                  {busy && <Spinner />}
+                  {t('common.save')}
                 </Button>
-              )}
-            </div>
-          </form>
-
-          {record && (
-            <AuditInfo
-              createdBy={record.created_by}
-              createdAt={record.created_at}
-              updatedBy={record.updated_by}
-              updatedAt={record.updated_at}
-            />
-          )}
-        </CardContent>
-      </Card>
-
-      {record && (
-        <>
-          <h2 className="mt-10 mb-3 text-lg font-semibold tracking-tight">{t('asset.usedBy')}</h2>
-
-          <Card className="py-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('common.project')}</TableHead>
-                  <TableHead>{t('project.role')}</TableHead>
-                  <TableHead className="w-10" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(record.projects ?? []).map((usage) => (
-                  <TableRow key={usage.project_id}>
-                    <TableCell className="font-medium">
-                      <Link
-                        to={`/projects/${usage.project_slug}`}
-                        className="hover:underline"
-                      >
-                        {usage.project_name}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{usage.role || '—'}</TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-muted-foreground hover:text-destructive"
-                        onClick={() => detachProject(usage.project_slug)}
-                        aria-label={t('asset.detachProject')}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {(record.projects ?? []).length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={3} className="py-8 text-center text-muted-foreground">
-                      {t('asset.notUsed')}
-                    </TableCell>
-                  </TableRow>
+                <Button variant="ghost" asChild>
+                  <Link to="/assets">{t('common.cancel')}</Link>
+                </Button>
+                {id && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="ml-auto text-destructive"
+                    onClick={remove}
+                  >
+                    <Trash2 className="size-4" />
+                    {t('common.delete')}
+                  </Button>
                 )}
-              </TableBody>
-            </Table>
-          </Card>
+              </div>
+            </form>
 
-          <form className="mt-3 flex flex-wrap items-center gap-2" onSubmit={attachProject}>
-            <Select
-              value={attachDraft.slug}
-              onValueChange={(v) => setAttachDraft({ ...attachDraft, slug: v })}
-            >
-              <SelectTrigger className="w-64">
-                <SelectValue placeholder={t('asset.pickProject')} />
-              </SelectTrigger>
-              <SelectContent>
-                {projects
-                  .filter((p) => !(record.projects ?? []).some((u) => u.project_id === p.id))
-                  .map((p) => (
-                    <SelectItem key={p.id} value={p.slug}>
-                      {p.name}
-                    </SelectItem>
+            {record && (
+              <AuditInfo
+                createdBy={record.created_by}
+                createdAt={record.created_at}
+                updatedBy={record.updated_by}
+                updatedAt={record.updated_at}
+              />
+            )}
+          </CardContent>
+        </Card>
+
+        {record && (
+          <>
+            <h2 className="mt-10 mb-3 text-lg font-semibold tracking-tight">{t('asset.usedBy')}</h2>
+
+            <Card className="py-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{t('common.project')}</TableHead>
+                    <TableHead>{t('project.role')}</TableHead>
+                    <TableHead className="w-10" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(record.projects ?? []).map((usage) => (
+                    <TableRow key={usage.project_id}>
+                      <TableCell className="font-medium">
+                        <Link
+                          to={`/projects/${usage.project_slug}`}
+                          className="hover:underline"
+                        >
+                          {usage.project_name}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{usage.role || '—'}</TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-muted-foreground hover:text-destructive"
+                          onClick={() => detachProject(usage.project_slug)}
+                          aria-label={t('asset.detachProject')}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
                   ))}
-              </SelectContent>
-            </Select>
-            <Input
-              className="w-48"
-              placeholder={t('project.rolePlaceholder')}
-              value={attachDraft.role}
-              onChange={(e) => setAttachDraft({ ...attachDraft, role: e.target.value })}
-            />
-            <Button type="submit" disabled={!attachDraft.slug}>
-              <Plus className="size-4" />
-              {t('project.attach')}
-            </Button>
-          </form>
-        </>
-      )}
+                  {(record.projects ?? []).length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={3} className="py-8 text-center text-muted-foreground">
+                        {t('asset.notUsed')}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </Card>
 
-      {id && <Files entity="asset" id={Number(id)} />}
+            <form className="mt-3 flex flex-wrap items-center gap-2" onSubmit={attachProject}>
+              <Select
+                value={attachDraft.slug}
+                onValueChange={(v) => setAttachDraft({ ...attachDraft, slug: v })}
+              >
+                <SelectTrigger className="w-64">
+                  <SelectValue placeholder={t('asset.pickProject')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {projects
+                    .filter((p) => !(record.projects ?? []).some((u) => u.project_id === p.id))
+                    .map((p) => (
+                      <SelectItem key={p.id} value={p.slug}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <Input
+                className="w-48"
+                placeholder={t('project.rolePlaceholder')}
+                value={attachDraft.role}
+                onChange={(e) => setAttachDraft({ ...attachDraft, role: e.target.value })}
+              />
+              <Button type="submit" disabled={!attachDraft.slug}>
+                <Plus className="size-4" />
+                {t('project.attach')}
+              </Button>
+            </form>
+          </>
+        )}
+      </FormLayout>
     </div>
   )
 }
