@@ -116,6 +116,12 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("POST /api/push/unsubscribe", s.requireAuth(s.handleUnsubscribeEndpoint))
 	mux.Handle("POST /api/push/test", s.requireAuth(s.handleTestPush))
 
+	// What has already been sent, and whether it has been dealt with. Its own
+	// page, because a notification you missed is otherwise gone for good.
+	mux.Handle("GET /api/notices", s.requireAuth(s.handleNotices))
+	mux.Handle("GET /api/notices/unread", s.requireAuth(s.handleUnreadNotices))
+	mux.Handle("POST /api/notices/read", s.requireAuth(s.handleMarkNoticeRead))
+
 	// The countdown runs in the browser; these only arm and disarm the alarm
 	// that wakes a phone with nothing open.
 	mux.Handle("PUT /api/timer", s.requireAuth(s.handleSetAlarm))

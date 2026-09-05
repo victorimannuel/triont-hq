@@ -35,6 +35,7 @@ import type {
   SupplyInput,
   SupplyPurchase,
   PushDevice,
+  SentNotice,
   Project,
   ProjectInput,
   Tag,
@@ -96,6 +97,10 @@ export const api = {
   pushKey: () => request<{ key: string; enabled: boolean }>('/push/key'),
   pushDevices: () =>
     request<{ subscriptions: PushDevice[] }>('/push/subscriptions'),
+  notices: () => request<{ notices: SentNotice[]; unread: number }>('/notices'),
+  noticesUnread: () => request<{ unread: number }>('/notices/unread'),
+  markNoticeRead: (body: { key?: string; sent_on?: string; all?: boolean }) =>
+    request<{ unread: number }>('/notices/read', { method: 'POST', body: JSON.stringify(body) }),
   pushSubscribe: (body: {
     endpoint: string
     keys: { p256dh: string; auth: string }

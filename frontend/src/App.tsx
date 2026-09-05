@@ -9,6 +9,7 @@ import {
   useNavigate,
 } from 'react-router-dom'
 import {
+  Bell,
   CalendarDays,
   FileText,
   FolderGit2,
@@ -50,6 +51,7 @@ import {
 import type { Meta } from '@/types'
 import { Button } from '@/components/ui/button'
 import { SearchPalette, useSearchHotkey } from '@/components/Search'
+import { Badge } from '@/components/ui/badge'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import {
   DropdownMenu,
@@ -63,6 +65,7 @@ import { ConfirmProvider } from '@/components/confirm'
 import { Logo } from '@/components/Logo'
 import { TimerPill } from '@/components/TimerPill'
 import { notifyAlarm, playAlarm } from '@/lib/alarm'
+import { refreshUnread, useUnread } from '@/lib/notices'
 import { clock, setRingHandler, useTimerAlarm } from '@/lib/timer'
 import { Toaster } from '@/components/ui/sonner'
 import { cn } from '@/lib/utils'
@@ -94,6 +97,7 @@ const IncomeForm = lazy(() => import('@/pages/IncomeForm'))
 const Expenses = lazy(() => import('@/pages/Expenses'))
 const ExpenseForm = lazy(() => import('@/pages/ExpenseForm'))
 const Trash = lazy(() => import('@/pages/Trash'))
+const Notices = lazy(() => import('@/pages/Notices'))
 const Supplies = lazy(() => import('@/pages/Supplies'))
 const SupplyForm = lazy(() => import('@/pages/SupplyForm'))
 const Monitor = lazy(() => import('@/pages/Monitor'))
@@ -284,6 +288,7 @@ const NAV_GROUPS = [
     items: [
       { to: '/', key: 'home', icon: House, end: true },
       { to: '/calendar', key: 'calendar', icon: CalendarDays, end: false },
+      { to: '/notices', key: 'notices', icon: Bell, end: false },
       { to: '/timer', key: 'timer', icon: TimerIcon, end: false },
     ],
   },
@@ -335,6 +340,14 @@ function Shell({
   const { t } = useT()
   const [drawer, setDrawer] = useState(false)
   const [finder, setFinder] = useState(false)
+  const unread = useUnread()
+
+  // Re-counted on every page change rather than on a timer: the badge only has
+  // to be right when you are looking at it, and you are looking at it whenever
+  // a page has just arrived.
+  useEffect(() => {
+    void refreshUnread()
+  }, [location.pathname])
   useSearchHotkey(useCallback(() => setFinder(true), []))
 
   // The drawer tab lights up when the page you are on lives inside it.
@@ -428,7 +441,8 @@ function Shell({
                   }
                 >
                   <item.icon className="size-4 shrink-0" />
-                  {t(`nav.${item.key}`)}
+                  <span className="flex-1">{t(`nav.${item.key}`)}</span>
+                  {item.key === 'notices' && unread > 0 && <Badge>{unread}</Badge>}
                 </NavLink>
               ))}
             </div>
@@ -497,6 +511,7 @@ function Shell({
             <Route path="/supplies/new" element={<SupplyForm />} />
             <Route path="/supplies/:id" element={<SupplyForm />} />
             <Route path="/monitor" element={<Monitor />} />
+            <Route path="/notices" element={<Notices />} />
             <Route path="/security" element={<Security />} />
             <Route path="/timer" element={<Timer />} />
               <Route path="/trash" element={<Trash />} />
@@ -570,7 +585,12 @@ function Shell({
                   restActive ? 'text-primary' : 'text-muted-foreground',
                 )}
               >
-                <Menu className="size-5" />
+                <span className="relative">
+                  <Menu className="size-5" />
+                  {unread > 0 && (
+                    <span className="absolute -right-1 -top-0.5 size-2 rounded-full bg-primary" />
+                  )}
+                </span>
                 <span className="w-full truncate text-center">{t('nav.more')}</span>
               </button>
             </SheetTrigger>
@@ -604,7 +624,8 @@ function Shell({
                           }
                         >
                           <item.icon className="size-4" />
-                          {t(`nav.${item.key}`)}
+                          <span className="flex-1">{t(`nav.${item.key}`)}</span>
+                          {item.key === 'notices' && unread > 0 && <Badge>{unread}</Badge>}
                         </NavLink>
                       ))}
                     </div>

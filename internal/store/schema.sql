@@ -542,3 +542,16 @@ create table if not exists event_notices (
     sent_at   timestamptz not null default now(),
     primary key (event_key, sent_on)
 );
+
+-- What the notification actually said it was about. The key identifies the
+-- deadline but is not readable, and the row it pointed at may be gone by the
+-- time anybody looks back, so the name is kept here rather than looked up.
+alter table event_notices add column if not exists label text not null default '';
+
+-- Read state, so the list of what was sent can be worked through rather than
+-- only looked at. Null means unread, which is what every row starts as.
+alter table event_notices add column if not exists read_at timestamptz;
+alter table push_digests  add column if not exists read_at timestamptz;
+
+create index if not exists event_notices_unread_idx on event_notices (read_at)
+    where read_at is null;

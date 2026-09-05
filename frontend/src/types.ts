@@ -8,6 +8,23 @@ export type PushDevice = {
   failures: number
 }
 
+/**
+ * One notification that has already gone out. A notification is the only part
+ * of HQ that leaves no trace you can look at afterwards, so this is the record
+ * of what it said. A kind of 'digest' is the daily roundup, which is about
+ * everything at once and so has no link of its own.
+ */
+export type SentNotice = {
+  key: string
+  read: boolean
+  sent_on: string
+  sent_at: string
+  kind: string
+  label: string
+  url: string
+  due_on: string
+}
+
 export type Passkey = {
   id: number
   name: string

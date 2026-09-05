@@ -101,7 +101,7 @@ func (s *Server) announceDueEvents(ctx context.Context) {
 
 	sent := 0
 	for _, due := range s.dueNow(ctx) {
-		claimed, err := s.store.ClaimEventNotice(ctx, due.Key, day)
+		claimed, err := s.store.ClaimEventNotice(ctx, due.Key, due.Label, day)
 		if err != nil {
 			s.log.Error("claim event notice", "key", due.Key, "err", err)
 			continue
