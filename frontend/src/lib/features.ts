@@ -17,4 +17,11 @@ export const FEATURES = {
 
   /** Attachments on a supply, and the paperclip count in the list. */
   supplyFiles: false,
+
+  /**
+   * How often a person should be said hello to, and the "waktunya nyapa"
+   * nudge built on it. Off because nobody has ever set one: the field only
+   * asked a question the address book did not need to answer.
+   */
+  peopleReachEvery: false,
 } as const
