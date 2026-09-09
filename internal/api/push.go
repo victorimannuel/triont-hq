@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -123,7 +124,7 @@ func (s *Server) handleUnsubscribeEndpoint(w http.ResponseWriter, r *http.Reques
 
 /*
 handleTestPush plays out a whole morning on demand: every deadline as its own
-notification, then the roundup of what has run out or broken, in the order the
+notification, then what has broken and what has run out, in the order the
 seven o'clock run would send them.
 
 Sending a canned line would prove less than it looks — a test that shows
@@ -170,11 +171,11 @@ func (s *Server) handleTestPush(w http.ResponseWriter, r *http.Request) {
 
 	low, _ := s.store.LowSupplies(r.Context())
 	trouble, _ := s.store.Trouble(r.Context())
-	if len(low) > 0 || len(trouble) > 0 {
+	for _, group := range roundups(low, trouble) {
 		sent += s.pushEach(r.Context(), subs, func(lang string) payload {
-			return digestPayload(lang, low, trouble)
+			return roundupPayload(group, lang)
 		})
-		shown := digestPayload(here, low, trouble)
+		shown := roundupPayload(group, here)
 		lines = append(lines, shown.Title+" — "+shown.Body)
 	}
 
@@ -275,7 +276,7 @@ func detached() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), 30*time.Second)
 }
 
-// ------------------------------------------------------------ daily digest
+// --------------------------------------------------------- the morning run
 
 // Reminders go out once a day. The loop wakes often and does nothing most of
 // the time; claiming the day in the database is what makes "once" true across
@@ -294,6 +295,13 @@ func (s *Server) RunReminders(ctx context.Context, hour int) {
 			s.announceSilence(ctx)
 
 			now := time.Now()
+			// The check-in gets its own hour. Asking at seven in the morning
+			// would list every habit every day, because none of them have
+			// happened yet — a notification that is always the same is one
+			// you stop reading.
+			if now.Hour() == s.cfg.HabitHour {
+				s.announceHabits(ctx)
+			}
 			if now.Hour() != hour {
 				continue
 			}
@@ -305,10 +313,10 @@ func (s *Server) RunReminders(ctx context.Context, hour int) {
 			if !claimed {
 				continue
 			}
-			// Dated things get one notification each; the roundup below is
+			// Dated things get one notification each; the roundups below are
 			// left with what has no date — what has run out, what is broken.
 			s.announceDueEvents(ctx)
-			s.sendDigest(ctx)
+			s.announceRoundups(ctx)
 		}
 	}
 }
@@ -355,76 +363,178 @@ func since(lang string, at time.Time) string {
 	}
 }
 
-func (s *Server) sendDigest(ctx context.Context) {
-	subs, err := s.store.AllSubscriptions(ctx)
+/*
+roundup is one half of the morning's dateless news: what has run out, or what
+has broken. They used to leave as a single notification — a headline about
+something broken with a shopping list underneath and one link for both — so
+neither could be opened, acted on, or put away without the other.
+
+They are separate errands. One ends at the shop and one ends at the monitor,
+so each gets its own notification and its own row in the inbox.
+*/
+type roundup struct {
+	// Kind picks the icon and the wording in the app. Neither of these is a
+	// calendar kind: nothing here has a date, it is simply true until dealt
+	// with.
+	Kind  string
+	URL   string
+	Names []string
+	// How many of the supplies have actually run out, as opposed to merely
+	// got low. Zero on the trouble half, which has no such distinction.
+	Out int
+}
+
+func roundups(low []store.Supply, trouble []store.Check) []roundup {
+	out := []roundup{}
+	// Something broken outranks the shopping list, so it goes first and lands
+	// above it on the lock screen.
+	if len(trouble) > 0 {
+		names := make([]string, 0, len(trouble))
+		for _, check := range trouble {
+			names = append(names, check.Name)
+		}
+		out = append(out, roundup{Kind: "trouble", URL: "/monitor", Names: names})
+	}
+	if len(low) > 0 {
+		names := make([]string, 0, len(low))
+		empty := 0
+		for _, item := range low {
+			names = append(names, item.Name)
+			if item.Quantity <= 0 {
+				empty++
+			}
+		}
+		out = append(out, roundup{
+			Kind: "supply", URL: "/supplies", Names: names, Out: empty,
+		})
+	}
+	return out
+}
+
+/*
+announceHabits is the evening check-in. It is a question rather than a report:
+the notification opens the page that asks about each habit in turn, so the
+answer costs one tap from a lock screen instead of a trip to a grid.
+
+Nothing left to ask means nothing is sent. A tracker that congratulates you
+every night teaches you to swipe its notifications away.
+*/
+func (s *Server) announceHabits(ctx context.Context) {
+	y, m, d := time.Now().Date()
+	day := time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+
+	left, err := s.store.HabitsUndone(ctx, day)
 	if err != nil {
-		s.log.Error("digest subscriptions", "err", err)
+		s.log.Error("habits undone", "err", err)
 		return
 	}
-	if len(subs) == 0 {
+	if len(left) == 0 {
 		return
 	}
 
-	low, err := s.store.LowSupplies(ctx)
+	// The same shape as a deadline's key, so the inbox unpacks it and the row
+	// links to the check-in like any other notification.
+	key := fmt.Sprintf("habit|/habits/checkin|%s", day.Format("2006-01-02"))
+	claimed, err := s.store.ClaimEventNotice(ctx, key, strings.Join(left, ", "), day)
 	if err != nil {
-		s.log.Error("digest supplies", "err", err)
+		s.log.Error("claim habit nudge", "err", err)
 		return
 	}
-	trouble, err := s.store.Trouble(ctx)
-	if err != nil {
-		s.log.Error("digest trouble", "err", err)
+	if !claimed {
 		return
 	}
-	if len(low) == 0 && len(trouble) == 0 {
+
+	subs, err := s.store.AllSubscriptions(ctx)
+	if err != nil || len(subs) == 0 {
 		return
 	}
 
 	sent := s.pushEach(ctx, subs, func(lang string) payload {
-		return digestPayload(lang, low, trouble)
+		return payload{
+			Title: textHabitTitle(lang, len(left)),
+			Body:  listSome(lang, left, 3),
+			URL:   "/habits/checkin",
+			Tag:   "hq-habit-" + day.Format("2006-01-02"),
+		}
 	})
-	s.log.Info("digest sent", "low", len(low), "trouble", len(trouble), "devices", sent)
+	s.log.Info("habit check-in sent", "left", len(left), "devices", sent)
 }
 
-// digestPayload is the roundup of everything without a date on it. One tag per
-// day, so a second send in the same morning replaces rather than stacks.
-func digestPayload(lang string, low []store.Supply, trouble []store.Check) payload {
+// roundupPayload words one of them. A notification has room for a headline and
+// about two lines, so the names run as far as that allows and are counted
+// after.
+func roundupPayload(r roundup, lang string) payload {
+	title, body := textLowTitle(lang, r.Out, len(r.Names)-r.Out), listSome(lang, r.Names, 3)
+	if r.Kind == "trouble" {
+		title = textTroubleTitle(lang, len(r.Names))
+	} else {
+		// Naming what has run out is an instruction, not a report.
+		body = textBuyPrefix(lang) + body
+	}
+
 	return payload{
-		Title: digestTitle(lang, low, trouble),
-		Body:  digestBody(lang, low, trouble),
-		URL:   "/supplies",
-		Tag:   "hq-digest-" + time.Now().Format("2006-01-02"),
+		Title: title,
+		Body:  body,
+		URL:   r.URL,
+		// One tag per kind per day, so a second run in the same morning
+		// replaces its own notification instead of stacking beside it.
+		Tag: "hq-" + r.Kind + "-" + time.Now().Format("2006-01-02"),
 	}
 }
 
-// A morning notification has room for a headline and about two lines. Both
-// halves of it — what falls due, and what has run out — get named as far as
-// that allows, then counted.
-
-func digestTitle(lang string, low []store.Supply, trouble []store.Check) string {
-	// Something broken outranks everything else the morning has to say.
-	if len(trouble) > 0 {
-		return textTroubleTitle(lang, len(trouble))
-	}
-	return textLowTitle(lang, len(low))
+// roundupKey is the shape noticeKey builds, so the inbox unpacks a roundup the
+// same way it unpacks a deadline.
+func roundupKey(r roundup, day time.Time) string {
+	return fmt.Sprintf("%s|%s|%s", r.Kind, r.URL, day.Format("2006-01-02"))
 }
 
-func digestBody(lang string, low []store.Supply, trouble []store.Check) string {
-	parts := []string{}
-	if len(trouble) > 0 {
-		labels := make([]string, 0, len(trouble))
-		for _, check := range trouble {
-			labels = append(labels, check.Name)
-		}
-		parts = append(parts, listSome(lang, labels, 3))
+// announceRoundups sends what has no date on it. Each half is claimed the way
+// a deadline is, so it lands in the inbox as its own row with its own link and
+// a restart mid-morning cannot say it twice.
+func (s *Server) announceRoundups(ctx context.Context) {
+	low, err := s.store.LowSupplies(ctx)
+	if err != nil {
+		s.log.Error("roundup supplies", "err", err)
+		return
 	}
-	if len(low) > 0 {
-		labels := make([]string, 0, len(low))
-		for _, item := range low {
-			labels = append(labels, item.Name)
-		}
-		parts = append(parts, textBuyPrefix(lang)+listSome(lang, labels, 3))
+	trouble, err := s.store.Trouble(ctx)
+	if err != nil {
+		s.log.Error("roundup trouble", "err", err)
+		return
 	}
-	return strings.Join(parts, " · ")
+
+	groups := roundups(low, trouble)
+	if len(groups) == 0 {
+		return
+	}
+
+	subs, err := s.store.AllSubscriptions(ctx)
+	if err != nil {
+		s.log.Error("roundup subscriptions", "err", err)
+		return
+	}
+
+	y, m, d := time.Now().Date()
+	day := time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+
+	for _, group := range groups {
+		// The whole list, not the three the phone had room for. The inbox is
+		// read on a screen that can scroll.
+		label := strings.Join(group.Names, ", ")
+		claimed, err := s.store.ClaimEventNotice(ctx, roundupKey(group, day), label, day)
+		if err != nil {
+			s.log.Error("claim roundup", "kind", group.Kind, "err", err)
+			continue
+		}
+		if !claimed || len(subs) == 0 {
+			continue
+		}
+
+		sent := s.pushEach(ctx, subs, func(lang string) payload {
+			return roundupPayload(group, lang)
+		})
+		s.log.Info("roundup sent", "kind", group.Kind, "count", len(group.Names), "devices", sent)
+	}
 }
 
 // listSome names the first few and counts whatever is left, because a

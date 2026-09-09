@@ -41,11 +41,8 @@ func (s *Server) noticeLog(ctx context.Context, days int) ([]noticeLogEntry, err
 			SentAt: row.SentAt.Format(time.RFC3339),
 			Label:  row.Label,
 			Read:   row.ReadAt != nil,
-			// No key means the roundup, which is about everything at once and
-			// so about no single deadline.
-			Kind: "digest",
 		}
-		// "kind|url|date", the shape noticeKey builds.
+		// "kind|url|date", the shape noticeKey and roundupKey both build.
 		if parts := strings.Split(row.Key, "|"); len(parts) == 3 {
 			entry.Kind, entry.URL, entry.DueOn = parts[0], parts[1], parts[2]
 		}
@@ -81,8 +78,8 @@ func (s *Server) handleUnreadNotices(w http.ResponseWriter, r *http.Request) {
 }
 
 type readRequest struct {
-	// Empty key with a day means the roundup for that morning; both empty
-	// means everything still unread.
+	// Key and day name one notification; both empty means everything still
+	// unread.
 	Key    string `json:"key"`
 	SentOn string `json:"sent_on"`
 	All    bool   `json:"all"`

@@ -38,8 +38,8 @@ type NoticeRow struct {
 }
 
 // NoticeLog is what has actually been sent over the last so many days, newest
-// first. The daily roundup joins the list with an empty key, because it is not
-// about any one deadline.
+// first. push_digests is not in here: it records that a morning ran, not that
+// anything was said, and a quiet morning claims a row all the same.
 func (s *Store) NoticeLog(ctx context.Context, days int) ([]NoticeRow, error) {
 	if days <= 0 || days > 400 {
 		days = 30
@@ -47,10 +47,6 @@ func (s *Store) NoticeLog(ctx context.Context, days int) ([]NoticeRow, error) {
 	rows, err := s.pool.Query(ctx, `
 		select sent_on, sent_at, event_key, label, read_at
 		  from event_notices
-		 where sent_on >= current_date - $1::int
-		union all
-		select sent_on, sent_at, '', '', read_at
-		  from push_digests
 		 where sent_on >= current_date - $1::int
 		 order by sent_at desc`, days)
 	if err != nil {
@@ -73,25 +69,13 @@ func (s *Store) NoticeLog(ctx context.Context, days int) ([]NoticeRow, error) {
 MarkNoticeRead marks one notification read, or every unread one at once when
 the key and day are left empty.
 
-An empty key with a day names the roundup for that morning, which lives in its
-own table because it is not about any one deadline. Marking something already
-read is not an error: two taps on the same row should settle, not fail.
+Marking something already read is not an error: two taps on the same row
+should settle, not fail.
 */
 func (s *Store) MarkNoticeRead(ctx context.Context, key string, day time.Time) error {
 	if key == "" && day.IsZero() {
-		if _, err := s.pool.Exec(ctx,
-			`update event_notices set read_at = now() where read_at is null`); err != nil {
-			return err
-		}
 		_, err := s.pool.Exec(ctx,
-			`update push_digests set read_at = now() where read_at is null`)
-		return err
-	}
-
-	if key == "" {
-		_, err := s.pool.Exec(ctx,
-			`update push_digests set read_at = now()
-			  where sent_on = $1 and read_at is null`, day)
+			`update event_notices set read_at = now() where read_at is null`)
 		return err
 	}
 
@@ -101,13 +85,11 @@ func (s *Store) MarkNoticeRead(ctx context.Context, key string, day time.Time) e
 	return err
 }
 
-// UnreadNotices is what the badge counts. Both tables, because the roundup is
-// as unread as anything else.
+// UnreadNotices is what the badge counts.
 func (s *Store) UnreadNotices(ctx context.Context) (int, error) {
 	var n int
-	err := s.pool.QueryRow(ctx, `
-		select (select count(*) from event_notices where read_at is null)
-		     + (select count(*) from push_digests  where read_at is null)`).Scan(&n)
+	err := s.pool.QueryRow(ctx,
+		`select count(*) from event_notices where read_at is null`).Scan(&n)
 	return n, err
 }
 

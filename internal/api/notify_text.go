@@ -44,10 +44,35 @@ func textTroubleTitle(lang string, n int) string {
 	)
 }
 
-func textLowTitle(lang string, n int) string {
+/*
+textLowTitle is the shopping half of the morning. Having run out and running
+low are different errands — one is a trip today and the other is a trip this
+week — so a roundup holding both says both rather than filing everything
+under the gentler word.
+*/
+func textLowTitle(lang string, out, low int) string {
+	switch {
+	case out > 0 && low > 0:
+		return pick(lang,
+			fmt.Sprintf("%d stok habis, %d menipis", out, low),
+			fmt.Sprintf("%d out, %d running low", out, low))
+	case out > 0:
+		return pick(lang,
+			fmt.Sprintf("%d stok habis", out),
+			count(out, "%d supply run out", "%d supplies run out"))
+	default:
+		return pick(lang,
+			fmt.Sprintf("%d stok menipis", low),
+			count(low, "%d supply running low", "%d supplies running low"))
+	}
+}
+
+// The evening check-in. Worded as something still to answer rather than
+// something failed: the day is not over yet.
+func textHabitTitle(lang string, n int) string {
 	return pick(lang,
-		fmt.Sprintf("%d stok menipis", n),
-		count(n, "%d supply running low", "%d supplies running low"),
+		fmt.Sprintf("%d kebiasaan belum dijawab", n),
+		count(n, "%d habit still to answer", "%d habits still to answer"),
 	)
 }
 
@@ -65,6 +90,7 @@ func textFixedTitle(lang string, n int) string {
 // The kinds the calendar produces. The browser has its own copy of these in
 // the dictionary; a notification is written here and never reaches it.
 var eventKinds = map[string][2]string{
+	"todo":        {"to-do", "to-do"},
 	"renewal":     {"perpanjangan", "renewal"},
 	"document":    {"masa berlaku dokumen", "document expiry"},
 	"warranty":    {"garansi", "warranty"},

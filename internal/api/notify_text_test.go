@@ -1,6 +1,7 @@
 package api
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -10,10 +11,20 @@ import (
 // A notification is written on the server and read on a locked phone, so there
 // is no screen anywhere that would show these strings being wrong.
 
+// Low but not gone. The quantity matters: nothing left is worded differently
+// from nearly nothing left, and a zero here would quietly test the wrong one.
 func supplies(n int) []store.Supply {
 	out := make([]store.Supply, n)
 	for i := range out {
-		out[i] = store.Supply{Name: "tisu"}
+		out[i] = store.Supply{Name: "tisu", Quantity: 1}
+	}
+	return out
+}
+
+func empties(n int) []store.Supply {
+	out := make([]store.Supply, n)
+	for i := range out {
+		out[i] = store.Supply{Name: "minyak", Quantity: 0}
 	}
 	return out
 }
@@ -26,8 +37,45 @@ func checks(n int) []store.Check {
 	return out
 }
 
-// The roundup is left with what has no date; dated things get their own push.
-func TestDigestTitleSpeaksBothLanguages(t *testing.T) {
+// The roundups are left with what has no date; dated things get their own
+// push. Running low and having broken are separate errands with separate
+// pages, so one morning produces one notification for each and not one for
+// both.
+func TestRoundupsSplitAndRankThemselves(t *testing.T) {
+	both := roundups(supplies(2), checks(1))
+	if len(both) != 2 {
+		t.Fatalf("got %d roundups, want 2", len(both))
+	}
+	// Something broken outranks the shopping list.
+	if both[0].Kind != "trouble" || both[1].Kind != "supply" {
+		t.Errorf("order: got %q then %q", both[0].Kind, both[1].Kind)
+	}
+	if both[0].URL != "/monitor" || both[1].URL != "/supplies" {
+		t.Errorf("links: got %q and %q", both[0].URL, both[1].URL)
+	}
+
+	if len(roundups(nil, nil)) != 0 {
+		t.Error("a quiet morning should produce nothing at all")
+	}
+	if only := roundups(supplies(3), nil); len(only) != 1 || only[0].Kind != "supply" {
+		t.Errorf("supplies alone: got %+v", only)
+	}
+}
+
+// The inbox splits a key on "|" into kind, link and date. A roundup has to
+// arrive in that shape or it lands in the list unnamed and with nowhere to go.
+func TestRoundupKeyMatchesWhatTheInboxUnpacks(t *testing.T) {
+	day := time.Date(2026, 9, 5, 0, 0, 0, 0, time.UTC)
+	key := roundupKey(roundups(supplies(1), nil)[0], day)
+	if want := "supply|/supplies|2026-09-05"; key != want {
+		t.Fatalf("got %q, want %q", key, want)
+	}
+	if parts := strings.Split(key, "|"); len(parts) != 3 {
+		t.Errorf("the inbox would not unpack %q", key)
+	}
+}
+
+func TestRoundupTitleSpeaksBothLanguages(t *testing.T) {
 	cases := []struct {
 		name           string
 		low, trouble   int
@@ -35,17 +83,16 @@ func TestDigestTitleSpeaksBothLanguages(t *testing.T) {
 	}{
 		{"one low", 1, 0, "1 stok menipis", "1 supply running low"},
 		{"several low", 4, 0, "4 stok menipis", "4 supplies running low"},
-		// Something broken outranks the shopping list.
-		{"trouble wins", 5, 1, "1 hal bermasalah", "1 thing in trouble"},
-		{"trouble plural", 0, 2, "2 hal bermasalah", "2 things in trouble"},
+		{"one broken", 0, 1, "1 hal bermasalah", "1 thing in trouble"},
+		{"several broken", 0, 2, "2 hal bermasalah", "2 things in trouble"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			low, trouble := supplies(c.low), checks(c.trouble)
-			if got := digestTitle("id", low, trouble); got != c.wantID {
+			only := roundups(supplies(c.low), checks(c.trouble))[0]
+			if got := roundupPayload(only, "id").Title; got != c.wantID {
 				t.Errorf("id: got %q, want %q", got, c.wantID)
 			}
-			if got := digestTitle("en", low, trouble); got != c.wantEN {
+			if got := roundupPayload(only, "en").Title; got != c.wantEN {
 				t.Errorf("en: got %q, want %q", got, c.wantEN)
 			}
 		})
@@ -54,23 +101,58 @@ func TestDigestTitleSpeaksBothLanguages(t *testing.T) {
 
 // An unknown or absent language must not produce an empty notification.
 func TestUnknownLanguageFallsBackToIndonesian(t *testing.T) {
+	only := roundups(supplies(2), nil)[0]
 	for _, lang := range []string{"", "fr", "en-GB", "ID"} {
-		if got := digestTitle(lang, supplies(2), nil); got != "2 stok menipis" {
+		if got := roundupPayload(only, lang).Title; got != "2 stok menipis" {
 			t.Errorf("lang %q: got %q", lang, got)
 		}
 	}
 }
 
-func TestDigestBodyNamesThenCounts(t *testing.T) {
+func TestRoundupTitleSeparatesEmptyFromLow(t *testing.T) {
+	cases := []struct {
+		name           string
+		low, empty     int
+		wantID, wantEN string
+	}{
+		{"all gone", 0, 2, "2 stok habis", "2 supplies run out"},
+		{"one gone", 0, 1, "1 stok habis", "1 supply run out"},
+		{"some of each", 1, 2, "2 stok habis, 1 menipis", "2 out, 1 running low"},
+		{"none gone", 3, 0, "3 stok menipis", "3 supplies running low"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			// Empties first, the way the shopping list is ordered by name in
+			// practice — the count is what matters, not the order.
+			mixed := append(empties(c.empty), supplies(c.low)...)
+			only := roundups(mixed, nil)[0]
+			if got := roundupPayload(only, "id").Title; got != c.wantID {
+				t.Errorf("id: got %q, want %q", got, c.wantID)
+			}
+			if got := roundupPayload(only, "en").Title; got != c.wantEN {
+				t.Errorf("en: got %q, want %q", got, c.wantEN)
+			}
+		})
+	}
+}
+
+func TestRoundupBodyNamesThenCounts(t *testing.T) {
 	// Four names is one more than the notification has room for.
 	low := []store.Supply{{Name: "tisu"}, {Name: "sabun"}, {Name: "kopi"}, {Name: "garam"}}
-	if got, want := digestBody("id", low, nil),
+	only := roundups(low, nil)[0]
+	if got, want := roundupPayload(only, "id").Body,
 		"beli: tisu, sabun, kopi, dan 1 lagi"; got != want {
 		t.Errorf("id: got %q, want %q", got, want)
 	}
-	if got, want := digestBody("en", low, nil),
+	if got, want := roundupPayload(only, "en").Body,
 		"buy: tisu, sabun, kopi, and 1 more"; got != want {
 		t.Errorf("en: got %q, want %q", got, want)
+	}
+
+	// The shopping list is an instruction; what has broken is not.
+	broken := roundups(nil, checks(1))[0]
+	if got := roundupPayload(broken, "id").Body; got != "nginx" {
+		t.Errorf("trouble body: got %q, want %q", got, "nginx")
 	}
 }
 

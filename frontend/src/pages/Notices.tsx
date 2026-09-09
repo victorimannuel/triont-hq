@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Bell, BellOff, Check, CheckCheck, Globe } from 'lucide-react'
+import {
+  BellOff,
+  Check,
+  CheckCheck,
+  Globe,
+  Repeat2,
+  ShoppingCart,
+  TriangleAlert,
+  type LucideIcon,
+} from 'lucide-react'
 import { toast } from 'sonner'
 
 import { api } from '@/api'
@@ -23,6 +32,21 @@ import { KIND_ICON, tone, type Kind } from '@/components/EntryRow'
 // Two notifications are the same one when they are about the same deadline on
 // the same morning, which is exactly the key the database uses.
 const same = (a: SentNotice, b: SentNotice) => a.key === b.key && a.sent_on === b.sent_on
+
+// Two kinds the calendar never produces, because nothing here has a date on
+// it: it is simply true until dealt with. They carry their own icon and their
+// own wording, and the calendar's cover everything else.
+const ROUNDUP_ICON: Record<string, LucideIcon> = {
+  habit: Repeat2,
+  supply: ShoppingCart,
+  trouble: TriangleAlert,
+}
+
+const ROUNDUP_TONE: Record<string, string> = {
+  habit: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300',
+  supply: 'bg-sky-500/15 text-sky-700 dark:text-sky-300',
+  trouble: 'bg-red-500/15 text-red-700 dark:text-red-300',
+}
 
 export default function Notices() {
   const { t } = useT()
@@ -120,25 +144,25 @@ export default function Notices() {
 
 function NoticeRow({ notice, onRead }: { notice: SentNotice; onRead: () => void }) {
   const { t } = useT()
-  const digest = notice.kind === 'digest'
-  const Icon = digest ? Bell : (KIND_ICON[notice.kind as Kind] ?? Globe)
+  const roundup = notice.kind in ROUNDUP_ICON
+  const Icon = ROUNDUP_ICON[notice.kind] ?? KIND_ICON[notice.kind as Kind] ?? Globe
 
   const body = (
     <>
       <span
         className={cn(
           'grid size-7 shrink-0 place-items-center rounded',
-          digest ? 'bg-muted text-muted-foreground' : tone(notice.kind),
+          ROUNDUP_TONE[notice.kind] ?? tone(notice.kind),
         )}
       >
         <Icon className="size-4" />
       </span>
       <div className="min-w-0 flex-1">
         <p className={cn('truncate text-sm', !notice.read && 'font-medium')}>
-          {digest ? t('notices.digestName') : notice.label || t('notices.unnamed')}
+          {notice.label || t('notices.unnamed')}
         </p>
         <p className="truncate text-xs text-muted-foreground">
-          {digest ? t('notices.digestWhat') : t(`cal.kind.${notice.kind}`)}
+          {roundup ? t(`notices.kind.${notice.kind}`) : t(`cal.kind.${notice.kind}`)}
         </p>
       </div>
       <p className="shrink-0 text-xs text-muted-foreground">{formatDate(notice.sent_on)}</p>
@@ -153,8 +177,7 @@ function NoticeRow({ notice, onRead }: { notice: SentNotice; onRead: () => void 
         className={cn('size-2 shrink-0 rounded-full', notice.read ? 'bg-transparent' : 'bg-primary')}
       />
 
-      {/* The roundup has no page of its own, and a deadline whose row was
-          deleted since has nowhere left to go either. */}
+      {/* A deadline whose row was deleted since has nowhere left to go. */}
       {notice.url ? (
         <Link
           to={notice.url}
