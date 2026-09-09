@@ -354,8 +354,10 @@ export const api = {
   updateHabit: (id: number, input: HabitInput) => send<Habit>('PUT', `/habits/${id}`, input),
   // The day is the caller's own local date, not the server's: a tick belongs
   // to the day the person standing there thinks it is.
-  setHabitDay: (id: number, on: string, done: boolean) =>
-    send<void>('POST', `/habits/${id}/day`, { on, done }),
+  // amount is what the day was worth for a habit that counts something. Left
+  // off, the server records one, which is what a plain tick has always meant.
+  setHabitDay: (id: number, on: string, done: boolean, amount?: number) =>
+    send<void>('POST', `/habits/${id}/day`, { on, done, amount: amount ?? 0 }),
   deleteHabit: (id: number) => send<void>('DELETE', `/habits/${id}`),
 
   setlists: () => request<{ setlists: Setlist[] }>('/setlists'),

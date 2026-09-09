@@ -57,7 +57,12 @@ export default function HabitForm() {
           return
         }
         setRecord(found)
-        setForm({ name: found.name, notes: found.notes, active: found.active })
+        setForm({
+          name: found.name,
+          notes: found.notes,
+          unit: found.unit,
+          active: found.active,
+        })
       })
       .catch((err) => setError(err instanceof Error ? err.message : t('habit.failed')))
   }, [id, t])
@@ -130,6 +135,18 @@ export default function HabitForm() {
                 value={form.notes}
                 onChange={(event) => set('notes', event.target.value)}
                 placeholder={t('habit.notesPlaceholder')}
+              />
+            </Field>
+
+            {/* Left blank on purpose by most habits. Filling it in turns the
+                nightly question from "did you" into "how many", which is what
+                you want for the ones that are a quantity rather than an act. */}
+            <Field label={t('habit.unit')} htmlFor="unit" hint={t('habit.unitHint')}>
+              <Input
+                id="unit"
+                value={form.unit}
+                onChange={(event) => set('unit', event.target.value)}
+                placeholder={t('habit.unitPlaceholder')}
               />
             </Field>
 

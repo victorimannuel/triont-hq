@@ -34,6 +34,20 @@ type Habit struct {
 	// Out of the last seven days. This is the honest number for anything that
 	// was never meant to be daily.
 	LastSeven int `json:"last_seven"`
+	/*
+		What one day's worth is counted in — "kali", "pasal", "menit" — written
+		by hand rather than picked from a list, because the useful unit for a
+		habit is whatever its owner already says out loud.
+
+		Empty means the habit is a plain yes or no, which is what every habit
+		was before this and what most of them still want to be.
+	*/
+	Unit string `json:"unit"`
+	// Added up across the window that was asked for, and today's on its own.
+	// Both are zero for a habit with no unit, where the count of days is the
+	// only number that means anything.
+	Total float64 `json:"total"`
+	Today float64 `json:"today"`
 	// The first image attached, if any. Carried on the row so the check-in can
 	// show a picture per question without a request per habit.
 	ImageID   *int64    `json:"image_id"`
@@ -46,10 +60,11 @@ type Habit struct {
 type HabitInput struct {
 	Name   string `json:"name"`
 	Notes  string `json:"notes"`
+	Unit   string `json:"unit"`
 	Active bool   `json:"active"`
 }
 
-const habitCols = `id, name, notes, active,
+const habitCols = `id, name, notes, unit, active,
 	created_by, updated_by, created_at, updated_at,
 	-- The oldest image attached to this habit. A subquery rather than a join,
 	-- because a join would multiply the row by every file on it.
@@ -63,7 +78,7 @@ const habitCols = `id, name, notes, active,
 
 func scanHabit(row interface{ Scan(...any) error }) (Habit, error) {
 	var h Habit
-	err := row.Scan(&h.ID, &h.Name, &h.Notes, &h.Active,
+	err := row.Scan(&h.ID, &h.Name, &h.Notes, &h.Unit, &h.Active,
 		&h.CreatedBy, &h.UpdatedBy, &h.CreatedAt, &h.UpdatedAt, &h.ImageID)
 	return h, err
 }
@@ -105,7 +120,7 @@ func (s *Store) Habits(ctx context.Context, days int) ([]Habit, error) {
 	// Everything at once rather than a query per habit. The whole history a
 	// run could reach across is a few hundred rows.
 	ticks, err := s.pool.Query(ctx, `
-		select habit_id, on_date
+		select habit_id, on_date, amount
 		  from habit_days
 		 where on_date >= current_date - $1::int
 		 order by habit_id, on_date desc`, habitWindow)
@@ -115,14 +130,18 @@ func (s *Store) Habits(ctx context.Context, days int) ([]Habit, error) {
 	defer ticks.Close()
 
 	// Per habit, newest first, which is the order a run is counted in.
-	history := map[int64][]time.Time{}
+	type tick struct {
+		day    time.Time
+		amount float64
+	}
+	history := map[int64][]tick{}
 	for ticks.Next() {
 		var id int64
-		var day time.Time
-		if err := ticks.Scan(&id, &day); err != nil {
+		var t tick
+		if err := ticks.Scan(&id, &t.day, &t.amount); err != nil {
 			return nil, err
 		}
-		history[id] = append(history[id], day)
+		history[id] = append(history[id], t)
 	}
 	if err := ticks.Err(); err != nil {
 		return nil, err
@@ -135,12 +154,23 @@ func (s *Store) Habits(ctx context.Context, days int) ([]Habit, error) {
 			continue
 		}
 		habit := &out[at]
-		habit.Streak = streak(done, today)
 
-		for _, day := range done {
-			since := int(today.Sub(startOfDay(day)).Hours() / 24)
+		// A run is counted in days, not in amounts: three chapters on Monday
+		// does not carry Tuesday.
+		when := make([]time.Time, len(done))
+		for i, t := range done {
+			when[i] = t.day
+		}
+		habit.Streak = streak(when, today)
+
+		for _, t := range done {
+			since := int(today.Sub(startOfDay(t.day)).Hours() / 24)
 			if since >= 0 && since < days {
-				habit.Days = append(habit.Days, day.Format("2006-01-02"))
+				habit.Days = append(habit.Days, t.day.Format("2006-01-02"))
+				habit.Total += t.amount
+			}
+			if since == 0 {
+				habit.Today = t.amount
 			}
 			if since >= 0 && since < 7 {
 				habit.LastSeven++
@@ -239,9 +269,9 @@ func (s *Store) HabitsToday(ctx context.Context, day time.Time) (done, total int
 
 func (s *Store) CreateHabit(ctx context.Context, in HabitInput, actor string) (Habit, error) {
 	habit, err := scanHabit(s.pool.QueryRow(ctx, `
-		insert into habits (name, notes, created_by, updated_by)
-		values ($1, $2, $3, $3)
-		returning `+habitCols, in.Name, in.Notes, actor))
+		insert into habits (name, notes, unit, created_by, updated_by)
+		values ($1, $2, $3, $4, $4)
+		returning `+habitCols, in.Name, in.Notes, in.Unit, actor))
 	if err != nil {
 		return habit, norm(err)
 	}
@@ -251,10 +281,10 @@ func (s *Store) CreateHabit(ctx context.Context, in HabitInput, actor string) (H
 
 func (s *Store) UpdateHabit(ctx context.Context, id int64, in HabitInput, actor string) (Habit, error) {
 	habit, err := scanHabit(s.pool.QueryRow(ctx, `
-		update habits set name = $1, notes = $2, active = $3,
-		       updated_by = $4, updated_at = now()
-		 where id = $5 and deleted_at is null
-		returning `+habitCols, in.Name, in.Notes, in.Active, actor, id))
+		update habits set name = $1, notes = $2, unit = $3, active = $4,
+		       updated_by = $5, updated_at = now()
+		 where id = $6 and deleted_at is null
+		returning `+habitCols, in.Name, in.Notes, in.Unit, in.Active, actor, id))
 	if err != nil {
 		return habit, norm(err)
 	}
@@ -270,17 +300,29 @@ func (s *Store) RestoreHabit(ctx context.Context, id int64, actor string) error 
 	return s.restore(ctx, "habits", id, actor)
 }
 
-// SetHabitDay ticks or unticks one day. Ticking twice is not an error and
-// unticking a day that was never ticked is not either: a tap on a cell should
-// settle on what it says, not fail because of what it already said.
-func (s *Store) SetHabitDay(ctx context.Context, habitID int64, day time.Time, done bool) error {
+/*
+SetHabitDay ticks or unticks one day. Ticking twice is not an error and
+unticking a day that was never ticked is not either: a tap on a cell should
+settle on what it says, not fail because of what it already said.
+
+The amount is what a habit with a unit recorded that day — three chapters, ten
+minutes. A plain tick sends 1, which is what the column defaults to, so a habit
+with no unit behaves exactly as it did before there were amounts. Ticking a day
+that already has an amount overwrites it rather than adding, because the tap
+means "this is what today was", not "one more".
+*/
+func (s *Store) SetHabitDay(ctx context.Context, habitID int64, day time.Time, done bool, amount float64) error {
 	if !done {
 		_, err := s.pool.Exec(ctx,
 			`delete from habit_days where habit_id = $1 and on_date = $2`, habitID, day)
 		return err
 	}
+	if amount <= 0 {
+		amount = 1
+	}
 	_, err := s.pool.Exec(ctx, `
-		insert into habit_days (habit_id, on_date) values ($1, $2)
-		on conflict do nothing`, habitID, day)
+		insert into habit_days (habit_id, on_date, amount) values ($1, $2, $3)
+		on conflict (habit_id, on_date) do update set amount = excluded.amount`,
+		habitID, day, amount)
 	return norm(err)
 }

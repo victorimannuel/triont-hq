@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, Check, NotebookPen, PartyPopper, Repeat2, X } from 'lucide-react'
+import { ArrowLeft, Check, Minus, NotebookPen, PartyPopper, Plus, Repeat2, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { api } from '@/api'
@@ -37,6 +37,10 @@ export default function HabitCheckin() {
   // The last question. Loaded with the habits so the whole run is offline
   // of the server once it starts.
   const [line, setLine] = useState<string | null>(null)
+  // What the habit on screen counted today, for the ones that count. Held as
+  // the typed string rather than a number so the field can be empty, which is
+  // not the same as nought.
+  const [count, setCount] = useState('')
   const today = useMemo(todayKey, [])
 
   const load = useCallback(() => {
@@ -58,7 +62,19 @@ export default function HabitCheckin() {
 
   useEffect(load, [load])
 
-  async function answer(habit: Habit, done: boolean) {
+  // Each question starts on what that habit already recorded today, so a
+  // second pass through corrects a number instead of asking for it again.
+  useEffect(() => {
+    const current = habits?.[at]
+    setCount(current && current.today > 0 ? String(current.today) : '')
+  }, [at, habits])
+
+  // Never below nought, and an empty field counts as nought on the way up, so
+  // the first tap on + reads 1 rather than doing nothing.
+  const bump = (delta: number) =>
+    setCount((n) => String(Math.max(0, (Number(n) || 0) + delta)))
+
+  async function answer(habit: Habit, done: boolean, amount = 0) {
     if (busy) return
     setBusy(true)
     // Recorded in place so the next question comes up at once. The counts on
@@ -66,13 +82,17 @@ export default function HabitCheckin() {
     setHabits((list) =>
       (list ?? []).map((row) =>
         row.id === habit.id
-          ? { ...row, days: done ? [today] : row.days.filter((d) => d !== today) }
+          ? {
+              ...row,
+              days: done ? [today] : row.days.filter((d) => d !== today),
+              today: done ? amount || 1 : 0,
+            }
           : row,
       ),
     )
     setAt((n) => n + 1)
     try {
-      await api.setHabitDay(habit.id, today, done)
+      await api.setHabitDay(habit.id, today, done, amount)
     } catch {
       toast.error(t('habit.failed'))
     } finally {
@@ -196,6 +216,11 @@ export default function HabitCheckin() {
                     <span className={cn('min-w-0 truncate', !ticked && 'text-muted-foreground')}>
                       {habit.name}
                     </span>
+                    {ticked && habit.unit !== '' && (
+                      <span className="ml-auto shrink-0 tabular-nums text-muted-foreground">
+                        {habit.today} {habit.unit}
+                      </span>
+                    )}
                   </p>
                 )
               })}
@@ -270,6 +295,54 @@ export default function HabitCheckin() {
             )}
           </div>
 
+          {/* A habit with a unit asks how many rather than whether. The field
+              carries the whole answer, so "ya" with it left empty still means
+              once — the point of the evening run is that it can be got through
+              without deciding anything twice. */}
+          {habit.unit !== '' && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-center gap-2">
+                {/* Most nights the answer is a small number a couple of taps
+                    away, and the keyboard is the slow way to say it. Typing
+                    still works for the night it was fourteen. */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="size-12 shrink-0"
+                  disabled={busy || (Number(count) || 0) <= 0}
+                  onClick={() => bump(-1)}
+                  aria-label="−1"
+                >
+                  <Minus className="size-5" />
+                </Button>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="any"
+                  value={count}
+                  onChange={(event) => setCount(event.target.value)}
+                  placeholder="1"
+                  className="h-16 w-28 text-center text-2xl font-semibold tabular-nums"
+                  aria-label={habit.unit}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="size-12 shrink-0"
+                  disabled={busy}
+                  onClick={() => bump(1)}
+                  aria-label="+1"
+                >
+                  <Plus className="size-5" />
+                </Button>
+              </div>
+              <p className="text-center text-sm text-muted-foreground">{habit.unit}</p>
+            </div>
+          )}
+
           <div className="flex gap-3">
             <Button
               variant="outline"
@@ -285,7 +358,7 @@ export default function HabitCheckin() {
               size="lg"
               className="h-16 flex-1 text-base"
               disabled={busy}
-              onClick={() => answer(habit, true)}
+              onClick={() => answer(habit, true, Number(count) || 0)}
             >
               <Check className="size-5" />
               {t('checkin.yes')}

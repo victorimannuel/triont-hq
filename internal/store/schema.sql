@@ -663,6 +663,15 @@ create table if not exists habit_days (
 
 create index if not exists habit_days_recent_idx on habit_days (on_date);
 
+-- What a day of this habit is counted in, written by hand: "kali", "pasal",
+-- "menit". Empty leaves the habit a plain yes or no, which is what all of them
+-- were before this.
+alter table habits add column if not exists unit text not null default '';
+
+-- How much got done that day. Defaulting to 1 is what keeps every row written
+-- before this column existed meaning exactly what it meant then: done once.
+alter table habit_days add column if not exists amount numeric not null default 1;
+
 -- One line a day. Keyed by the date rather than an id: the point of it is that
 -- there is exactly one per day, and an empty line is no row at all rather than
 -- a row that says nothing.

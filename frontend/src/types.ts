@@ -69,6 +69,13 @@ export type Habit = Audit & {
   /** Consecutive days up to now. Today not being ticked yet does not break it. */
   streak: number
   last_seven: number
+  /** What a day of this is counted in: "kali", "pasal", "menit". Empty means
+   *  the habit is a plain yes or no. */
+  unit: string
+  /** Added up across the window that was asked for, and today on its own.
+   *  Both are meaningless without a unit. */
+  total: number
+  today: number
   /** The first image attached, for the check-in to show. Null when there is none. */
   image_id: number | null
 }
@@ -76,6 +83,7 @@ export type Habit = Audit & {
 export type HabitInput = {
   name: string
   notes: string
+  unit: string
   active: boolean
 }
 

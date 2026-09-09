@@ -28,6 +28,7 @@ func (s *Server) readHabit(r *http.Request) (store.HabitInput, string) {
 		return in, "nama kebiasaannya wajib diisi"
 	}
 	in.Notes = trim(in.Notes)
+	in.Unit = trim(in.Unit)
 	return in, ""
 }
 
@@ -97,6 +98,9 @@ func (s *Server) handleSetHabitDay(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		On   string `json:"on"`
 		Done bool   `json:"done"`
+		// What today was worth, for a habit that counts something. Absent or
+		// zero means one, which is what a plain tick has always meant.
+		Amount float64 `json:"amount"`
 	}
 	if err := readJSON(r, &in); err != nil {
 		fail(w, http.StatusBadRequest, "isian nggak kebaca")
@@ -114,7 +118,7 @@ func (s *Server) handleSetHabitDay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.store.SetHabitDay(r.Context(), id, day, in.Done); err != nil {
+	if err := s.store.SetHabitDay(r.Context(), id, day, in.Done, in.Amount); err != nil {
 		s.oops(w, err)
 		return
 	}

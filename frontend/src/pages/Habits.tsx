@@ -123,7 +123,7 @@ export default function Habits() {
     }
     setBusy(true)
     try {
-      await api.createHabit({ name: trimmed, notes: '', active: true })
+      await api.createHabit({ name: trimmed, notes: '', unit: '', active: true })
       setName('')
       load()
     } catch (err) {
@@ -298,6 +298,13 @@ export default function Habits() {
                       <span className="whitespace-nowrap">
                         {t('habit.lastSeven', { n: habit.last_seven })}
                       </span>
+                      {/* Only for the ones that count something. A total of
+                          days is already the number to the left of this. */}
+                      {habit.unit !== '' && habit.total > 0 && (
+                        <span className="whitespace-nowrap font-medium text-foreground">
+                          {habit.total} {habit.unit}
+                        </span>
+                      )}
                     </p>
                   </div>
 
