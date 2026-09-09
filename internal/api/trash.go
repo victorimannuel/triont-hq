@@ -43,6 +43,26 @@ func (s *Server) handleRestore(w http.ResponseWriter, r *http.Request) {
 		err = s.store.RestoreExpense(r.Context(), id, who)
 	case "supply":
 		err = s.store.RestoreSupply(r.Context(), id, who)
+	case "song":
+		err = s.store.RestoreSong(r.Context(), id, who)
+	case "setlist":
+		err = s.store.RestoreSetlist(r.Context(), id, who)
+	case "habit":
+		err = s.store.RestoreHabit(r.Context(), id, who)
+	case "link":
+		err = s.store.RestoreLink(r.Context(), id)
+	case "maintenance":
+		err = s.store.RestoreMaintenance(r.Context(), id)
+	case "purchase":
+		_, err = s.store.RestorePurchase(r.Context(), id)
+	case "setlistsong":
+		err = s.store.RestoreSetlistSong(r.Context(), id)
+	case "file":
+		err = s.store.RestoreAttachment(r.Context(), id)
+	case "task":
+		err = s.store.RestoreTask(r.Context(), id)
+	case "journal":
+		err = s.store.RestoreJournalDay(r.Context(), id)
 	default:
 		fail(w, http.StatusBadRequest, "jenis nggak dikenal")
 		return

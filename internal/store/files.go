@@ -35,6 +35,7 @@ var fileEntities = map[string]string{
 	"supply":    "supplies",
 	"person":    "contacts",
 	"asset":     "assets",
+	"habit":     "habits",
 }
 
 func FileEntityOK(entity string) bool {
@@ -54,7 +55,8 @@ func scanAttachment(row interface{ Scan(...any) error }) (Attachment, error) {
 
 func (s *Store) Attachments(ctx context.Context, entity string, entityID int64) ([]Attachment, error) {
 	rows, err := s.pool.Query(ctx, `select `+attachmentCols+`
-		  from attachments where entity = $1 and entity_id = $2
+		  from attachments
+		 where entity = $1 and entity_id = $2 and deleted_at is null
 		 order by created_at`, entity, entityID)
 	if err != nil {
 		return nil, err
@@ -90,7 +92,7 @@ func (s *Store) AttachmentContent(ctx context.Context, id int64) (Attachment, []
 	var a Attachment
 	var sealed []byte
 	err := s.pool.QueryRow(ctx, `select `+attachmentCols+`, content
-		  from attachments where id = $1`, id).Scan(
+		  from attachments where id = $1 and deleted_at is null`, id).Scan(
 		&a.ID, &a.Entity, &a.EntityID, &a.Name, &a.MimeType, &a.Size,
 		&a.Notes, &a.CreatedBy, &a.CreatedAt, &sealed)
 	if err != nil {
@@ -99,22 +101,17 @@ func (s *Store) AttachmentContent(ctx context.Context, id int64) (Attachment, []
 	return a, sealed, nil
 }
 
-func (s *Store) DeleteAttachment(ctx context.Context, id int64) error {
-	tag, err := s.pool.Exec(ctx, `delete from attachments where id = $1`, id)
-	if err != nil {
-		return err
-	}
-	if tag.RowsAffected() == 0 {
-		return ErrNotFound
-	}
-	return nil
+func (s *Store) DeleteAttachment(ctx context.Context, id int64, actor string) error {
+	return s.softDeleteByID(ctx, "attachments", id, actor)
 }
 
 // AttachmentCounts says how many files each record of one kind carries, so a
 // list can show a paperclip without fetching every attachment on the page.
 func (s *Store) AttachmentCounts(ctx context.Context, entity string) (map[int64]int, error) {
 	rows, err := s.pool.Query(ctx,
-		`select entity_id, count(*) from attachments where entity = $1 group by entity_id`,
+		`select entity_id, count(*) from attachments
+		  where entity = $1 and deleted_at is null
+		 group by entity_id`,
 		entity)
 	if err != nil {
 		return nil, err
@@ -139,6 +136,11 @@ func (s *Store) StorageUsed(ctx context.Context) (int64, int, error) {
 	var bytes int64
 	var count int
 	err := s.pool.QueryRow(ctx,
-		`select coalesce(sum(size), 0), count(*) from attachments`).Scan(&bytes, &count)
+		`select coalesce(sum(size), 0), count(*) from attachments
+		  where deleted_at is null`).Scan(&bytes, &count)
 	return bytes, count, err
+}
+
+func (s *Store) RestoreAttachment(ctx context.Context, id int64) error {
+	return s.restoreBare(ctx, "attachments", "id", id)
 }

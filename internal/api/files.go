@@ -183,7 +183,7 @@ func (s *Server) handleDeleteAttachment(w http.ResponseWriter, r *http.Request) 
 	// Files are deleted outright rather than soft-deleted: a soft-deleted file
 	// still sits decryptable in every backup, which is not what "delete this
 	// scan of my passport" means.
-	if err := s.store.DeleteAttachment(r.Context(), id); err != nil {
+	if err := s.store.DeleteAttachment(r.Context(), id, actor(r)); err != nil {
 		s.oops(w, err)
 		return
 	}

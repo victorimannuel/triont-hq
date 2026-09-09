@@ -146,7 +146,7 @@ func (s *Server) handleDeleteLink(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, "id nggak valid")
 		return
 	}
-	if err := s.store.DeleteLink(r.Context(), id); err != nil {
+	if err := s.store.DeleteLink(r.Context(), id, actor(r)); err != nil {
 		s.oops(w, err)
 		return
 	}

@@ -206,7 +206,8 @@ func scanPurchase(row interface{ Scan(...any) error }) (SupplyPurchase, error) {
 func (s *Store) Purchases(ctx context.Context, supplyID int64) ([]SupplyPurchase, error) {
 	rows, err := s.pool.Query(ctx, `
 		select * from (select `+purchaseCols+`
-		                 from supply_purchases where supply_id = $1) p
+		                 from supply_purchases
+	                 where supply_id = $1 and deleted_at is null) p
 		 order by bought_on desc, id desc`, supplyID)
 	if err != nil {
 		return nil, err
@@ -266,8 +267,10 @@ func (s *Store) AddPurchase(ctx context.Context, supplyID int64, in PurchaseInpu
 }
 
 // DeletePurchase takes the stock back down with it, so undoing a mistyped
-// purchase leaves the count where it started.
-func (s *Store) DeletePurchase(ctx context.Context, id int64) (Supply, error) {
+// purchase leaves the count where it started. The row is hidden rather than
+// dropped — it is a receipt, and the average it feeds is worth being able to
+// get back — but the stock moves either way, in the same transaction.
+func (s *Store) DeletePurchase(ctx context.Context, id int64, actor string) (Supply, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return Supply{}, err
@@ -277,8 +280,9 @@ func (s *Store) DeletePurchase(ctx context.Context, id int64) (Supply, error) {
 	var supplyID int64
 	var quantity float64
 	if err := tx.QueryRow(ctx, `
-		delete from supply_purchases where id = $1
-		returning supply_id, quantity`, id).Scan(&supplyID, &quantity); err != nil {
+		update supply_purchases set deleted_at = now(), deleted_by = $2
+		 where id = $1 and deleted_at is null
+		returning supply_id, quantity`, id, actor).Scan(&supplyID, &quantity); err != nil {
 		return Supply{}, norm(err)
 	}
 	if _, err := tx.Exec(ctx, `
@@ -299,11 +303,38 @@ func (s *Store) TypicalDays(ctx context.Context, supplyID int64) (*int, error) {
 	err := s.pool.QueryRow(ctx, `
 		select avg(gap) from (
 		  select (bought_on - lag(bought_on) over (order by bought_on))::int as gap
-		    from supply_purchases where supply_id = $1
+		    from supply_purchases where supply_id = $1 and deleted_at is null
 		) g where gap is not null`, supplyID).Scan(&days)
 	if err != nil || days == nil {
 		return nil, err
 	}
 	rounded := int(*days + 0.5)
 	return &rounded, nil
+}
+
+// RestorePurchase puts the stock back up with it, the mirror of the delete.
+func (s *Store) RestorePurchase(ctx context.Context, id int64) (Supply, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return Supply{}, err
+	}
+	defer tx.Rollback(ctx)
+
+	var supplyID int64
+	var quantity float64
+	if err := tx.QueryRow(ctx, `
+		update supply_purchases set deleted_at = null, deleted_by = ''
+		 where id = $1 and deleted_at is not null
+		returning supply_id, quantity`, id).Scan(&supplyID, &quantity); err != nil {
+		return Supply{}, norm(err)
+	}
+	if _, err := tx.Exec(ctx, `
+		update supplies set quantity = quantity + $2, updated_at = now()
+		 where id = $1`, supplyID, quantity); err != nil {
+		return Supply{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return Supply{}, err
+	}
+	return s.SupplyByID(ctx, supplyID)
 }

@@ -94,7 +94,8 @@ const belongingCols = `b.id, b.name, b.kind, b.brand, b.model, b.year, b.identif
 	b.ownership, b.condition, b.rent_amount, b.rent_cycle, b.rent_due_on, b.status, b.notes,
 	b.created_by, b.updated_by, b.created_at, b.updated_at,
 	(select min(m.next_due) from maintenance_logs m
-	  where m.belonging_id = b.id and m.next_due >= current_date)`
+	  where m.belonging_id = b.id and m.deleted_at is null
+	    and m.next_due >= current_date)`
 
 func scanBelonging(row interface{ Scan(...any) error }) (Belonging, error) {
 	var b Belonging
@@ -248,7 +249,7 @@ func scanMaintenance(row interface{ Scan(...any) error }) (MaintenanceLog, error
 
 func (s *Store) MaintenanceFor(ctx context.Context, belongingID int64) ([]MaintenanceLog, error) {
 	rows, err := s.pool.Query(ctx, `select `+maintenanceCols+`
-		from maintenance_logs where belonging_id = $1
+		from maintenance_logs where belonging_id = $1 and deleted_at is null
 		order by done_on desc, id desc`, belongingID)
 	if err != nil {
 		return nil, err
@@ -285,13 +286,10 @@ func (s *Store) CreateMaintenance(ctx context.Context, belongingID int64, in Mai
 	return m, norm(err)
 }
 
-func (s *Store) DeleteMaintenance(ctx context.Context, id int64) error {
-	tag, err := s.pool.Exec(ctx, `delete from maintenance_logs where id = $1`, id)
-	if err != nil {
-		return err
-	}
-	if tag.RowsAffected() == 0 {
-		return ErrNotFound
-	}
-	return nil
+func (s *Store) DeleteMaintenance(ctx context.Context, id int64, actor string) error {
+	return s.softDeleteByID(ctx, "maintenance_logs", id, actor)
+}
+
+func (s *Store) RestoreMaintenance(ctx context.Context, id int64) error {
+	return s.restoreBare(ctx, "maintenance_logs", "id", id)
 }

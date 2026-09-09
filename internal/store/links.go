@@ -15,7 +15,7 @@ func scanLink(row interface{ Scan(...any) error }) (Link, error) {
 func (s *Store) LinksByProject(ctx context.Context, projectID int64) ([]Link, error) {
 	rows, err := s.pool.Query(ctx, `
 		select `+linkColumns+`
-		from project_links where project_id = $1
+		from project_links where project_id = $1 and deleted_at is null
 		order by category, lower(label)`, projectID)
 	if err != nil {
 		return nil, err
@@ -55,19 +55,16 @@ func (s *Store) UpdateLink(ctx context.Context, id int64, in LinkInput, actor st
 		update project_links
 		   set label = $1, url = $2, category = $3, notes = $4,
 		       updated_by = $5, updated_at = now()
-		 where id = $6
+		 where id = $6 and deleted_at is null
 		returning `+linkColumns,
 		label, in.URL, in.Category, in.Notes, actor, id))
 	return l, norm(err)
 }
 
-func (s *Store) DeleteLink(ctx context.Context, id int64) error {
-	tag, err := s.pool.Exec(ctx, `delete from project_links where id = $1`, id)
-	if err != nil {
-		return err
-	}
-	if tag.RowsAffected() == 0 {
-		return ErrNotFound
-	}
-	return nil
+func (s *Store) DeleteLink(ctx context.Context, id int64, actor string) error {
+	return s.softDeleteByID(ctx, "project_links", id, actor)
+}
+
+func (s *Store) RestoreLink(ctx context.Context, id int64) error {
+	return s.restoreBare(ctx, "project_links", "id", id)
 }

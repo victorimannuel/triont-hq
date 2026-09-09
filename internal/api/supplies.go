@@ -102,7 +102,7 @@ func (s *Server) handleDeletePurchase(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, "id nggak valid")
 		return
 	}
-	item, err := s.store.DeletePurchase(r.Context(), id)
+	item, err := s.store.DeletePurchase(r.Context(), id, actor(r))
 	if err != nil {
 		s.oops(w, err)
 		return

@@ -57,7 +57,8 @@ func (s *Store) uniqueSlug(ctx context.Context, name string, excludeID int64) (s
 
 func (s *Store) ListProjects(ctx context.Context, f ProjectFilter) ([]Project, error) {
 	rows, err := s.pool.Query(ctx, `select `+projectCols+`
-		, (select count(*) from project_links l where l.project_id = p.id)
+		, (select count(*) from project_links l
+	     where l.project_id = p.id and l.deleted_at is null)
 		, (select count(*) from credentials cr where cr.project_id = p.id)`+
 		projectFrom+`
 		where p.deleted_at is null
