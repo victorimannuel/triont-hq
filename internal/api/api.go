@@ -113,6 +113,41 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("DELETE /api/purchases/{id}", s.requireAuth(s.handleDeletePurchase))
 	mux.Handle("DELETE /api/supplies/{id}", s.requireAuth(s.handleDeleteSupply))
 
+	mux.Handle("GET /api/journal", s.requireAuth(s.handleJournal))
+	mux.Handle("GET /api/journal/{on}", s.requireAuth(s.handleJournalDay))
+	mux.Handle("PUT /api/journal/{on}", s.requireAuth(s.handleSetJournalLine))
+
+	mux.Handle("GET /api/habits", s.requireAuth(s.handleListHabits))
+	mux.Handle("POST /api/habits", s.requireAuth(s.handleCreateHabit))
+	mux.Handle("PUT /api/habits/{id}", s.requireAuth(s.handleUpdateHabit))
+	mux.Handle("POST /api/habits/{id}/day", s.requireAuth(s.handleSetHabitDay))
+	mux.Handle("DELETE /api/habits/{id}", s.requireAuth(s.handleDeleteHabit))
+
+	mux.Handle("GET /api/setlists", s.requireAuth(s.handleListSetlists))
+	mux.Handle("POST /api/setlists", s.requireAuth(s.handleCreateSetlist))
+	mux.Handle("GET /api/setlists/{id}", s.requireAuth(s.handleGetSetlist))
+	mux.Handle("PUT /api/setlists/{id}", s.requireAuth(s.handleUpdateSetlist))
+	mux.Handle("DELETE /api/setlists/{id}", s.requireAuth(s.handleDeleteSetlist))
+	mux.Handle("POST /api/setlists/{id}/songs", s.requireAuth(s.handleAddSetlistSong))
+	mux.Handle("POST /api/setlists/{id}/order", s.requireAuth(s.handleReorderSetlist))
+	mux.Handle("PUT /api/setlist-songs/{id}", s.requireAuth(s.handleSetSetlistSongSteps))
+	mux.Handle("DELETE /api/setlist-songs/{id}", s.requireAuth(s.handleRemoveSetlistSong))
+
+	mux.Handle("GET /api/songs", s.requireAuth(s.handleListSongs))
+	mux.Handle("POST /api/songs", s.requireAuth(s.handleCreateSong))
+	mux.Handle("GET /api/songs/{id}", s.requireAuth(s.handleGetSong))
+	mux.Handle("PUT /api/songs/{id}", s.requireAuth(s.handleUpdateSong))
+	mux.Handle("DELETE /api/songs/{id}", s.requireAuth(s.handleDeleteSong))
+
+	// Two lists, one table: ?kind=todo and ?kind=buy. "clear" is a literal
+	// segment, so it never gets read as an id.
+	mux.Handle("GET /api/tasks", s.requireAuth(s.handleListTasks))
+	mux.Handle("POST /api/tasks", s.requireAuth(s.handleCreateTask))
+	mux.Handle("POST /api/tasks/clear", s.requireAuth(s.handleClearDoneTasks))
+	mux.Handle("PUT /api/tasks/{id}", s.requireAuth(s.handleUpdateTask))
+	mux.Handle("POST /api/tasks/{id}/done", s.requireAuth(s.handleSetTaskDone))
+	mux.Handle("DELETE /api/tasks/{id}", s.requireAuth(s.handleDeleteTask))
+
 	mux.Handle("GET /api/push/key", s.requireAuth(s.handlePushKey))
 	mux.Handle("GET /api/push/subscriptions", s.requireAuth(s.handleListSubscriptions))
 	mux.Handle("POST /api/push/subscribe", s.requireAuth(s.handleSubscribe))
@@ -268,6 +303,7 @@ func (s *Server) handleMeta(w http.ResponseWriter, _ *http.Request) {
 		"maintenance_kinds":  maintenanceKinds,
 		"supply_categories":  supplyCategories,
 		"supply_units":       supplyUnits,
+		"song_parts":         songParts,
 	})
 }
 

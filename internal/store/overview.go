@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"slices"
+	"time"
 )
 
 // Totals is every headline number the home page shows. They used to be nine
@@ -61,6 +62,10 @@ type Overview struct {
 	MonthlyIncome  map[string]float64 `json:"monthly_income"`
 	MonthlyExpense map[string]float64 `json:"monthly_expense"`
 	Rates          []FxRate           `json:"rates"`
+	// Today's habits, as a tally rather than a board. Enough for the home page
+	// to say whether the evening's ticking has been done yet.
+	HabitsDone  int `json:"habits_done"`
+	HabitsTotal int `json:"habits_total"`
 }
 
 // How far ahead each kind of deadline is worth worrying about. A domain can be
@@ -129,6 +134,9 @@ func (s *Store) Overview(ctx context.Context) (Overview, error) {
 		return o, err
 	}
 	if o.Rates, err = s.Rates(ctx); err != nil {
+		return o, err
+	}
+	if o.HabitsDone, o.HabitsTotal, err = s.HabitsToday(ctx, startOfDay(time.Now())); err != nil {
 		return o, err
 	}
 	return o, nil

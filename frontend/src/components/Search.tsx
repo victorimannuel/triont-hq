@@ -9,6 +9,8 @@ import {
   FolderGit2,
   KeyRound,
   Link2,
+  ListTodo,
+  NotebookPen,
   Package,
   Receipt,
   Search as SearchIcon,
@@ -39,6 +41,8 @@ const ICONS: Record<string, typeof FolderGit2> = {
   person: UserRound,
   income: Wallet,
   expense: Receipt,
+  task: ListTodo,
+  journal: NotebookPen,
   tag: TagIcon,
   calendar: CalendarDays,
 }

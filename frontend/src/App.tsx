@@ -11,6 +11,8 @@ import {
 import {
   Bell,
   CalendarDays,
+  Eye,
+  EyeOff,
   FileText,
   FolderGit2,
   House,
@@ -19,8 +21,14 @@ import {
   Activity,
   Loader2,
   LogOut,
+  ListTodo,
   Menu,
   Search,
+  ShoppingCart,
+  ListMusic,
+  NotebookPen,
+  Repeat2,
+  Music,
   Monitor as MonitorIcon,
   Moon,
   Package,
@@ -37,6 +45,13 @@ import {
 } from 'lucide-react'
 
 import { api } from '@/api'
+import {
+  applyDisguise,
+  disguisedAll,
+  disguisedAt,
+  setDisguisedAll,
+  useDisguise,
+} from '@/lib/disguise'
 import { applyTheme, readTheme, THEMES, type Theme } from '@/theme'
 import {
   I18nContext,
@@ -98,6 +113,16 @@ const Expenses = lazy(() => import('@/pages/Expenses'))
 const ExpenseForm = lazy(() => import('@/pages/ExpenseForm'))
 const Trash = lazy(() => import('@/pages/Trash'))
 const Notices = lazy(() => import('@/pages/Notices'))
+const Tasks = lazy(() => import('@/pages/Tasks'))
+const Songs = lazy(() => import('@/pages/Songs'))
+const SongSheet = lazy(() => import('@/pages/SongSheet'))
+const SongForm = lazy(() => import('@/pages/SongForm'))
+const Journal = lazy(() => import('@/pages/Journal'))
+const Habits = lazy(() => import('@/pages/Habits'))
+const HabitCheckin = lazy(() => import('@/pages/HabitCheckin'))
+const HabitForm = lazy(() => import('@/pages/HabitForm'))
+const Setlists = lazy(() => import('@/pages/Setlists'))
+const SetlistPlay = lazy(() => import('@/pages/SetlistPlay'))
 const Supplies = lazy(() => import('@/pages/Supplies'))
 const SupplyForm = lazy(() => import('@/pages/SupplyForm'))
 const Monitor = lazy(() => import('@/pages/Monitor'))
@@ -125,6 +150,7 @@ const emptyMeta: Meta = {
   maintenance_kinds: [],
   supply_categories: [],
   supply_units: [],
+  song_parts: [],
 }
 
 const MetaContext = createContext<Meta>(emptyMeta)
@@ -287,6 +313,9 @@ const NAV_GROUPS = [
     label: '',
     items: [
       { to: '/', key: 'home', icon: House, end: true },
+      { to: '/todo', key: 'todo', icon: ListTodo, end: false },
+      { to: '/habits', key: 'habits', icon: Repeat2, end: false },
+      { to: '/journal', key: 'journal', icon: NotebookPen, end: false },
       { to: '/calendar', key: 'calendar', icon: CalendarDays, end: false },
       { to: '/notices', key: 'notices', icon: Bell, end: false },
       { to: '/timer', key: 'timer', icon: TimerIcon, end: false },
@@ -309,8 +338,11 @@ const NAV_GROUPS = [
     items: [
       { to: '/documents', key: 'documents', icon: FileText, end: false },
       { to: '/belongings', key: 'belongings', icon: Package, end: false },
+      { to: '/shopping', key: 'shopping', icon: ShoppingCart, end: false },
       { to: '/supplies', key: 'supplies', icon: ShoppingBasket, end: false },
       { to: '/people', key: 'people', icon: UserRound, end: false },
+      { to: '/songs', key: 'songs', icon: Music, end: false },
+      { to: '/setlists', key: 'setlists', icon: ListMusic, end: false },
     ],
   },
 ]
@@ -341,6 +373,8 @@ function Shell({
   const [drawer, setDrawer] = useState(false)
   const [finder, setFinder] = useState(false)
   const unread = useUnread()
+  useDisguise()
+  const hidden = disguisedAt(location.pathname)
 
   // Re-counted on every page change rather than on a timer: the badge only has
   // to be right when you are looking at it, and you are looking at it whenever
@@ -348,6 +382,12 @@ function Shell({
   useEffect(() => {
     void refreshUnread()
   }, [location.pathname])
+
+  // The frosting on attachments is a stylesheet rule hanging off the root, and
+  // with a switch per page it has to follow the route as well as the switches.
+  useEffect(() => {
+    applyDisguise(location.pathname)
+  }, [location.pathname, hidden])
   useSearchHotkey(useCallback(() => setFinder(true), []))
 
   // The drawer tab lights up when the page you are on lives inside it.
@@ -386,6 +426,20 @@ function Shell({
             <Trash2 className="size-4" />
             {t('nav.trash')}
           </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        {/* The whole app at once; the switch beside each heading does one page.
+            A reload rather than a state flip: every page is already holding the
+            answers it fetched before the switch, and those do not go through
+            the censor a second time. */}
+        <DropdownMenuItem
+          onClick={() => {
+            setDisguisedAll(!disguisedAll())
+            window.location.reload()
+          }}
+        >
+          {disguisedAll() ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+          {disguisedAll() ? t('disguise.off') : t('disguise.on')}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={signOut} variant="destructive">
@@ -510,6 +564,24 @@ function Shell({
               <Route path="/supplies" element={<Supplies />} />
             <Route path="/supplies/new" element={<SupplyForm />} />
             <Route path="/supplies/:id" element={<SupplyForm />} />
+            {/* One page, two lists. The key remounts it on the way across, so
+                the other list never flashes up under this one's heading. */}
+            <Route path="/journal" element={<Journal />} />
+            <Route path="/habits" element={<Habits />} />
+            {/* Where the evening notification lands. A literal segment, so
+                it beats :id and cannot be read as a habit. */}
+            <Route path="/habits/checkin" element={<HabitCheckin />} />
+            <Route path="/habits/:id" element={<HabitForm />} />
+            <Route path="/setlists" element={<Setlists />} />
+            <Route path="/setlists/:id" element={<SetlistPlay />} />
+            <Route path="/songs" element={<Songs />} />
+            <Route path="/songs/new" element={<SongForm />} />
+            {/* The chart is what gets opened; editing it is the rarer trip, so
+                it is the one that takes the longer path. */}
+            <Route path="/songs/:id" element={<SongSheet />} />
+            <Route path="/songs/:id/edit" element={<SongForm />} />
+            <Route path="/todo" element={<Tasks key="todo" kind="todo" />} />
+            <Route path="/shopping" element={<Tasks key="buy" kind="buy" />} />
             <Route path="/monitor" element={<Monitor />} />
             <Route path="/notices" element={<Notices />} />
             <Route path="/security" element={<Security />} />

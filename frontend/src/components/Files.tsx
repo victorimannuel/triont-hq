@@ -22,7 +22,18 @@ const human = (bytes: number) => {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
-export function Files({ entity, id }: { entity: string; id: number }) {
+export function Files({
+  entity,
+  id,
+  title,
+  hint,
+}: {
+  entity: string
+  id: number
+  /** What this card is holding, when "attachments" is not the word for it. */
+  title?: string
+  hint?: string
+}) {
   const { t } = useT()
   const confirm = useConfirm()
   const picker = useRef<HTMLInputElement>(null)
@@ -78,7 +89,7 @@ export function Files({ entity, id }: { entity: string; id: number }) {
 
   return (
     <>
-      <SectionTitle hint={t('file.hint')}>{t('file.title')}</SectionTitle>
+      <SectionTitle hint={hint ?? t('file.hint')}>{title ?? t('file.title')}</SectionTitle>
 
       <Card className="mb-6">
         <CardContent className="space-y-4">
@@ -92,18 +103,17 @@ export function Files({ entity, id }: { entity: string; id: number }) {
               className="hidden"
               onChange={(e) => upload(e.target.files)}
             />
-            {/* The panel is narrow enough that a worded button eats a third of
-                it. An arrow into a tray needs no caption. */}
+            {/* Worded. This is the one thing the card is for, and an arrow
+                into a tray turned out to read as decoration rather than as
+                something you press. */}
             <Button
               type="button"
               variant="outline"
-              size="icon"
               disabled={busy}
               onClick={() => picker.current?.click()}
-              aria-label={busy ? t('file.uploading') : t('file.add')}
-              title={busy ? t('file.uploading') : t('file.add')}
             >
               {busy ? <Spinner /> : <Upload className="size-4" />}
+              {busy ? t('file.uploading') : t('file.add')}
             </Button>
           </div>
 

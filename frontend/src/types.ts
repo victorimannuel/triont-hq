@@ -47,6 +47,105 @@ export type Hit = {
   url: string
 }
 
+/** One line for one day. Days with nothing written have no row at all. */
+export type JournalDay = {
+  /** YYYY-MM-DD. */
+  on: string
+  line: string
+  created_by: string
+  updated_by: string
+  created_at: string
+  updated_at: string
+}
+
+/** Something meant to get done most days, and how it is going. */
+export type Habit = Audit & {
+  id: number
+  name: string
+  notes: string
+  active: boolean
+  /** The days inside the asked-for window that were done, as YYYY-MM-DD. */
+  days: string[]
+  /** Consecutive days up to now. Today not being ticked yet does not break it. */
+  streak: number
+  last_seven: number
+  /** The first image attached, for the check-in to show. Null when there is none. */
+  image_id: number | null
+}
+
+export type HabitInput = {
+  name: string
+  notes: string
+  active: boolean
+}
+
+/** An evening's worth of songs, in the order they get played. */
+export type Setlist = Audit & {
+  id: number
+  name: string
+  plays_on: string | null
+  notes: string
+  song_count: number
+}
+
+/** One place in a running order: the song, plus what this evening does to it.
+ *  The id is the row's own, not the song's — a song can appear twice. */
+export type SetlistSong = {
+  id: number
+  song: Song
+  /** Semitones this evening wants it moved from the key it is written in. */
+  steps: number
+}
+
+export type SetlistInput = {
+  name: string
+  plays_on: string
+  notes: string
+}
+
+/** A chord chart. The body is stored exactly as typed — the column a chord
+ *  sits in says which syllable it lands on, so nothing reformats it. */
+export type Song = Audit & {
+  id: number
+  title: string
+  artist: string
+  /** The key the body is written in. Transposing never rewrites this. */
+  key: string
+  tempo: number
+  /** 'bass', 'piano', or empty when the same chart suits both. */
+  part: string
+  body: string
+  notes: string
+}
+
+export type SongInput = {
+  title: string
+  artist: string
+  key: string
+  tempo: number
+  part: string
+  body: string
+  notes: string
+}
+
+/** A line on one of the two lists. Same row either way; `kind` says which page
+ *  it belongs to. A deadline is a to-do's only, and null until one is set. */
+export type Task = Audit & {
+  id: number
+  kind: 'todo' | 'buy'
+  title: string
+  due_on: string | null
+  /** When it was ticked. Null while it is still open. */
+  done_at: string | null
+}
+
+export type TaskKind = Task['kind']
+
+export type TaskInput = {
+  title: string
+  due_on: string
+}
+
 export type Supply = Audit & {
   id: number
   name: string
@@ -225,6 +324,19 @@ export type TrashEntity =
   | 'person'
   | 'income'
   | 'expense'
+  | 'supply'
+  | 'song'
+  | 'setlist'
+  | 'habit'
+  // Rows that hang off one of the above. A journal day carries its date as
+  // YYYYMMDD for an id, because it has no id of its own.
+  | 'link'
+  | 'maintenance'
+  | 'purchase'
+  | 'setlistsong'
+  | 'file'
+  | 'task'
+  | 'journal'
 
 export type TrashItem = {
   entity: TrashEntity
@@ -256,6 +368,7 @@ export type Meta = {
   maintenance_kinds: Option[]
   supply_categories: Option[]
   supply_units: Option[]
+  song_parts: Option[]
 }
 
 export type Contact = Audit & {
@@ -553,6 +666,9 @@ export type Overview = {
   recent: Project[]
   upcoming: CalendarEntry[]
   total_supplies: number
+  /** Today's ticking, as a tally. The board itself is a page away. */
+  habits_done: number
+  habits_total: number
   low_supplies: Supply[]
   trouble: Check[]
   stale_monitors: MonitorSource[]

@@ -397,6 +397,75 @@ var mcpTools = []mcpTool{
 		},
 	},
 	{
+		Name: "hq_journal",
+		Desc: "The one-line-a-day journal, newest first. Days with nothing " +
+			"written are simply absent. This is what answers \"when did I…\".",
+		Props: map[string]any{
+			"days": number("How far back to read, in days. Thirty by default."),
+		},
+		Run: func(ctx context.Context, s *Server, a mcpArgs) (any, error) {
+			return s.store.Journal(ctx, a.num("days", 30))
+		},
+	},
+	{
+		Name: "hq_habits",
+		Desc: "Habits and how they are going: the run of days up to now, how " +
+			"many of the last seven, and which days inside the window were done.",
+		Props: map[string]any{
+			"days": number("How many recent days to list, up to 90. Seven by default."),
+		},
+		Run: func(ctx context.Context, s *Server, a mcpArgs) (any, error) {
+			return s.store.Habits(ctx, a.num("days", 7))
+		},
+	},
+	{
+		Name: "hq_songs",
+		Desc: "Chord charts: title, artist, the key they are written in, tempo, " +
+			"and the chart itself exactly as typed. Transposing is the app's " +
+			"job, so what comes back here is always the written key.",
+		Props: map[string]any{
+			"query": text("Filter by title, artist or anything in the chart."),
+			"part":  text(`Who it is for: "bass" or "piano". Both when left out.`),
+		},
+		Run: func(ctx context.Context, s *Server, a mcpArgs) (any, error) {
+			return s.store.ListSongs(ctx, store.SongFilter{
+				Query: a.str("query"),
+				Part:  a.str("part"),
+			})
+		},
+	},
+	{
+		Name: "hq_tasks",
+		Desc: "The two open lists: things to do and things to buy. A to-do may " +
+			"carry a deadline; a shopping line never does. Ticked lines are " +
+			"included only when done is asked for.",
+		Props: map[string]any{
+			"kind": text(`Which list: "todo" or "buy". Both when left out.`),
+			"done": boolean("Include lines already ticked off."),
+		},
+		Run: func(ctx context.Context, s *Server, a mcpArgs) (any, error) {
+			kinds := []string{store.TaskTodo, store.TaskBuy}
+			if pick := a.str("kind"); pick == store.TaskTodo || pick == store.TaskBuy {
+				kinds = []string{pick}
+			}
+
+			out := []store.Task{}
+			for _, kind := range kinds {
+				tasks, err := s.store.Tasks(ctx, kind)
+				if err != nil {
+					return nil, err
+				}
+				for _, task := range tasks {
+					if task.DoneAt != nil && !a.flag("done") {
+						continue
+					}
+					out = append(out, task)
+				}
+			}
+			return out, nil
+		},
+	},
+	{
 		Name: "hq_supplies",
 		Desc: "Household stock: how much is left, the level it counts as low at, " +
 			"and when it was last restocked. Set low_only for the shopping list.",

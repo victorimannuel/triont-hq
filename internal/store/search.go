@@ -134,6 +134,33 @@ with hits as (
    where s.deleted_at is null
 
   union all
+  -- Recall is the whole reason a line a day is worth keeping, and search is
+  -- where recall starts. There is no page per day, so it links to the list.
+  select 'journal', 0, j.line, j.on_date::text, '', '/journal',
+         concat_ws(' ', j.line, j.on_date::text)
+    from journal_days j
+
+  union all
+  -- The body is in the haystack but never in the detail: a chord chart is
+  -- lines of "| C | G |", and a slice of one tells you nothing in a result.
+  select 'song', g.id, g.title, g.artist,
+         concat_ws(' · ', nullif(g.song_key, ''), nullif(g.part, '')),
+         '/songs/' || g.id,
+         concat_ws(' ', g.title, g.artist, g.song_key, g.part, g.notes, g.body)
+    from songs g
+   where g.deleted_at is null
+
+  union all
+  -- Only what is still open. A shopping list you have already been through is
+  -- not something you go looking for, and it would crowd out what is.
+  select 'task', k.id, k.title,
+         case when k.kind = 'buy' then 'belanja' else 'to-do' end, '',
+         case when k.kind = 'buy' then '/shopping' else '/todo' end,
+         k.title
+    from tasks k
+   where k.done_at is null
+
+  union all
   select 'tag', t.id, t.name, '', '', '/projects?tag=' || t.slug,
          concat_ws(' ', t.name, t.slug)
     from tags t

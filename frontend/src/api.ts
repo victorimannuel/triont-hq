@@ -20,6 +20,9 @@ import type {
   ExpenseInput,
   ExpenseStream,
   FxRate,
+  Habit,
+  HabitInput,
+  JournalDay,
   IncomeInput,
   IncomeStream,
   MaintenanceInput,
@@ -31,9 +34,17 @@ import type {
   Person,
   PersonInput,
   PurchaseInput,
+  Setlist,
+  SetlistInput,
+  SetlistSong,
+  Song,
+  SongInput,
   Supply,
   SupplyInput,
   SupplyPurchase,
+  Task,
+  TaskInput,
+  TaskKind,
   PushDevice,
   SentNotice,
   Project,
@@ -42,8 +53,11 @@ import type {
   TrashEntity,
   TrashItem,
 } from './types'
+import { toast } from 'sonner'
+
 import type { CreationOptions, RequestOptions } from './webauthn'
 import { currentLang, translate } from './i18n'
+import { disguise, disguisedAt } from './lib/disguise'
 
 export class ApiError extends Error {
   constructor(
@@ -57,6 +71,23 @@ export class ApiError extends Error {
 // The session lives in an HttpOnly cookie, so nothing here touches a token.
 // credentials: 'same-origin' is what carries it on every call.
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const method = (init.method ?? 'GET').toUpperCase()
+
+  /*
+  A censored page is read-only, and it has to happen here rather than by
+  disabling buttons. Every form is filled from a response, so on a covered page
+  the fields hold bullets — and saving one would write those into the real
+  database. Signing in and out is exempt, because being locked out of the
+  switch by the switch is no use to anybody.
+  */
+  if (method !== 'GET' && disguisedAt(window.location.pathname) && !path.startsWith('/auth/')) {
+    // Said here rather than left to the caller: most pages turn a failed save
+    // into their own generic "gagal", and a refusal with no reason attached is
+    // the one thing worse than the refusal.
+    toast.error(translate('disguise.locked'))
+    throw new ApiError(translate('disguise.locked'), 403)
+  }
+
   const response = await fetch(`/api${path}`, {
     ...init,
     credentials: 'same-origin',
@@ -72,7 +103,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!response.ok) {
     throw new ApiError(body.error ?? translate('common.requestFailed'), response.status)
   }
-  return body as T
+  return disguise(path, body) as T
 }
 
 const send = <T,>(method: string, path: string, body?: unknown) =>
@@ -311,6 +342,58 @@ export const api = {
   updateExpense: (id: number, input: ExpenseInput) =>
     send<ExpenseStream>('PUT', `/expenses/${id}`, input),
   deleteExpense: (id: number) => send<void>('DELETE', `/expenses/${id}`),
+
+  journal: (days = 30) => request<{ journal: JournalDay[] }>(`/journal?days=${days}`),
+  journalDay: (on: string) => request<JournalDay>(`/journal/${on}`),
+  // An empty line clears the day, which is the same as never writing one.
+  setJournalLine: (on: string, line: string) =>
+    send<JournalDay>('PUT', `/journal/${on}`, { line }),
+
+  habits: (days = 7) => request<{ habits: Habit[] }>(`/habits?days=${days}`),
+  createHabit: (input: HabitInput) => send<Habit>('POST', '/habits', input),
+  updateHabit: (id: number, input: HabitInput) => send<Habit>('PUT', `/habits/${id}`, input),
+  // The day is the caller's own local date, not the server's: a tick belongs
+  // to the day the person standing there thinks it is.
+  setHabitDay: (id: number, on: string, done: boolean) =>
+    send<void>('POST', `/habits/${id}/day`, { on, done }),
+  deleteHabit: (id: number) => send<void>('DELETE', `/habits/${id}`),
+
+  setlists: () => request<{ setlists: Setlist[] }>('/setlists'),
+  setlist: (id: number) =>
+    request<{ setlist: Setlist; songs: SetlistSong[] }>(`/setlists/${id}`),
+  createSetlist: (input: SetlistInput) => send<Setlist>('POST', '/setlists', input),
+  updateSetlist: (id: number, input: SetlistInput) =>
+    send<Setlist>('PUT', `/setlists/${id}`, input),
+  deleteSetlist: (id: number) => send<void>('DELETE', `/setlists/${id}`),
+  addSetlistSong: (id: number, songId: number) =>
+    send<{ id: number }>('POST', `/setlists/${id}/songs`, { song_id: songId }),
+  reorderSetlist: (id: number, ids: number[]) =>
+    send<void>('POST', `/setlists/${id}/order`, { ids }),
+  setSetlistSteps: (rowId: number, steps: number) =>
+    send<void>('PUT', `/setlist-songs/${rowId}`, { steps }),
+  removeSetlistSong: (rowId: number) => send<void>('DELETE', `/setlist-songs/${rowId}`),
+
+  songs: (query: Record<string, string> = {}) => {
+    const params = new URLSearchParams(
+      Object.entries(query).filter(([, value]) => value !== ''),
+    ).toString()
+    return request<{ songs: Song[] }>(`/songs${params ? `?${params}` : ''}`)
+  },
+  song: (id: number) => request<Song>(`/songs/${id}`),
+  createSong: (input: SongInput) => send<Song>('POST', '/songs', input),
+  updateSong: (id: number, input: SongInput) => send<Song>('PUT', `/songs/${id}`, input),
+  deleteSong: (id: number) => send<void>('DELETE', `/songs/${id}`),
+
+  tasks: (kind: TaskKind) => request<{ tasks: Task[]; open: number }>(`/tasks?kind=${kind}`),
+  createTask: (kind: TaskKind, input: TaskInput) =>
+    send<Task>('POST', `/tasks?kind=${kind}`, input),
+  updateTask: (kind: TaskKind, id: number, input: TaskInput) =>
+    send<Task>('PUT', `/tasks/${id}?kind=${kind}`, input),
+  setTaskDone: (id: number, done: boolean) =>
+    send<Task>('POST', `/tasks/${id}/done`, { done }),
+  deleteTask: (id: number) => send<void>('DELETE', `/tasks/${id}`),
+  clearDoneTasks: (kind: TaskKind) =>
+    send<{ cleared: number }>('POST', `/tasks/clear?kind=${kind}`),
 
   supplies: (query: Record<string, string> = {}) => {
     const params = new URLSearchParams(

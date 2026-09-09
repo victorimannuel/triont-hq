@@ -5,6 +5,7 @@ import {
   FileText,
   Globe,
   Home,
+  ListTodo,
   PartyPopper,
   Receipt,
   ShieldCheck,
@@ -24,6 +25,7 @@ import { cn } from '@/lib/utils'
  * differs.
  */
 export const KIND_ICON = {
+  todo: ListTodo,
   renewal: Globe,
   document: FileText,
   warranty: ShieldCheck,
@@ -39,6 +41,7 @@ export type Kind = keyof typeof KIND_ICON
 
 // One colour per kind, so a month reads at a glance without opening anything.
 const KIND_TONE: Record<Kind, string> = {
+  todo: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300',
   renewal: 'bg-blue-500/15 text-blue-700 dark:text-blue-300',
   document: 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
   warranty: 'bg-violet-500/15 text-violet-700 dark:text-violet-300',

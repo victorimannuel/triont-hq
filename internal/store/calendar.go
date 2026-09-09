@@ -71,6 +71,16 @@ func (s *Store) Calendar(ctx context.Context, from, to time.Time) ([]CalendarEnt
 		   and e.next_due_on between $1 and $2
 
 		union all
+		-- A to-do with a date on it is a deadline like any other, so it gets
+		-- to use the same calendar, the same home page and the same morning
+		-- reminder instead of a second set of all three. There is no page per
+		-- task, so it links back to the list.
+		select due_on, 'todo', title, 'to-do', '/todo', 0
+		  from tasks
+		 where kind = 'todo' and done_at is null
+		   and due_on between $1 and $2
+
+		union all
 		select occurrence, 'birthday', name, 'ulang tahun', '/people/' || id, 0
 		  from (
 		    select c.id, c.name,

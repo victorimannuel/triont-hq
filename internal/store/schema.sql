@@ -551,7 +551,156 @@ alter table event_notices add column if not exists label text not null default '
 -- Read state, so the list of what was sent can be worked through rather than
 -- only looked at. Null means unread, which is what every row starts as.
 alter table event_notices add column if not exists read_at timestamptz;
-alter table push_digests  add column if not exists read_at timestamptz;
 
 create index if not exists event_notices_unread_idx on event_notices (read_at)
     where read_at is null;
+
+-- Two lists that are really one table. A thing to do and a thing to buy get
+-- written down the same way and ticked off the same way; what differs is when
+-- you read them, so they are told apart by a column and shown on separate
+-- pages rather than kept in separate tables.
+create table if not exists tasks (
+    id         bigserial primary key,
+    kind       text not null default 'todo',
+    title      text not null,
+    -- Only a to-do carries one. A shopping list is read standing in a shop,
+    -- not on a date, so a deadline on it would be noise.
+    due_on     date,
+    -- Null until ticked. The moment is kept rather than a flag, because "what
+    -- did I get done today" needs it and a boolean throws it away.
+    done_at    timestamptz,
+    created_by text not null default '',
+    updated_by text not null default '',
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+);
+
+-- Every read is one kind at a time, unticked first.
+create index if not exists tasks_kind_idx on tasks (kind, done_at, due_on);
+
+-- Chord charts, for playing off rather than reading about. The body is stored
+-- exactly as it was typed and is never tidied: where a chord sits above the
+-- syllable it lands on is the whole information, and reformatting would throw
+-- that away. Transposing happens on the way to the screen for the same reason.
+create table if not exists songs (
+    id         bigserial primary key,
+    title      text not null,
+    artist     text not null default '',
+    -- The key the chart below is written in, so a transpose can say what it
+    -- landed on rather than only how far it moved.
+    song_key   text not null default '',
+    tempo      int not null default 0,
+    -- Who is reading it on the night: bass, piano, or both when left empty.
+    part       text not null default '',
+    body       text not null default '',
+    notes      text not null default '',
+    created_by text not null default '',
+    updated_by text not null default '',
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    deleted_at timestamptz,
+    deleted_by text not null default ''
+);
+
+create index if not exists songs_live_idx on songs (deleted_at);
+
+-- An evening's worth of songs, in the order they get played. Its own table
+-- rather than a tag on a song, because the same song turns up in many nights
+-- and the order is the point.
+create table if not exists setlists (
+    id         bigserial primary key,
+    name       text not null,
+    plays_on   date,
+    notes      text not null default '',
+    created_by text not null default '',
+    updated_by text not null default '',
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    deleted_at timestamptz,
+    deleted_by text not null default ''
+);
+
+create index if not exists setlists_live_idx on setlists (deleted_at);
+
+-- One song's place in one evening. It has an id of its own rather than a key
+-- of (setlist, song) so a song can come back for a reprise.
+create table if not exists setlist_songs (
+    id         bigserial primary key,
+    setlist_id bigint not null references setlists (id) on delete cascade,
+    song_id    bigint not null references songs (id) on delete cascade,
+    position   int not null default 0,
+    -- How far this night wants it moved from the key it is written in. The
+    -- song keeps its own key; this is only "tonight, in Bb".
+    steps      int not null default 0
+);
+
+create index if not exists setlist_songs_order_idx on setlist_songs (setlist_id, position);
+
+-- Something you mean to do most days. Kept rather than deleted when you give
+-- up on one: the history is the whole point of having tracked it.
+create table if not exists habits (
+    id         bigserial primary key,
+    name       text not null,
+    notes      text not null default '',
+    active     boolean not null default true,
+    created_by text not null default '',
+    updated_by text not null default '',
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    deleted_at timestamptz,
+    deleted_by text not null default ''
+);
+
+create index if not exists habits_live_idx on habits (deleted_at);
+
+-- One day it got done. The row existing is the fact, so there is no boolean
+-- to disagree with it and unticking is a delete.
+create table if not exists habit_days (
+    habit_id bigint not null references habits (id) on delete cascade,
+    on_date  date not null,
+    primary key (habit_id, on_date)
+);
+
+create index if not exists habit_days_recent_idx on habit_days (on_date);
+
+-- One line a day. Keyed by the date rather than an id: the point of it is that
+-- there is exactly one per day, and an empty line is no row at all rather than
+-- a row that says nothing.
+create table if not exists journal_days (
+    on_date    date primary key,
+    line       text not null,
+    created_by text not null default '',
+    updated_by text not null default '',
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+);
+
+-- Soft delete for the rows that hang off something else, plus the two lists.
+-- Everything here is typed or uploaded by hand, so deleting one by mistake
+-- used to be final: the parent's own bin never covered its children.
+--
+-- habit_days is deliberately absent. A tick existing IS the fact that the day
+-- got done, so a tick that exists but is deleted would be a contradiction, and
+-- the undo for one is ticking it again.
+alter table project_links     add column if not exists deleted_at timestamptz;
+alter table project_links     add column if not exists deleted_by text not null default '';
+alter table maintenance_logs  add column if not exists deleted_at timestamptz;
+alter table maintenance_logs  add column if not exists deleted_by text not null default '';
+alter table supply_purchases  add column if not exists deleted_at timestamptz;
+alter table supply_purchases  add column if not exists deleted_by text not null default '';
+alter table setlist_songs     add column if not exists deleted_at timestamptz;
+alter table setlist_songs     add column if not exists deleted_by text not null default '';
+alter table attachments       add column if not exists deleted_at timestamptz;
+alter table attachments       add column if not exists deleted_by text not null default '';
+alter table tasks             add column if not exists deleted_at timestamptz;
+alter table tasks             add column if not exists deleted_by text not null default '';
+alter table journal_days      add column if not exists deleted_at timestamptz;
+alter table journal_days      add column if not exists deleted_by text not null default '';
+
+create index if not exists project_links_live_idx    on project_links (deleted_at);
+create index if not exists maintenance_logs_live_idx on maintenance_logs (deleted_at);
+create index if not exists supply_purchases_live_idx on supply_purchases (deleted_at);
+create index if not exists setlist_songs_live_idx    on setlist_songs (deleted_at);
+create index if not exists attachments_live_idx      on attachments (deleted_at);
+create index if not exists tasks_live_idx            on tasks (deleted_at);
+create index if not exists journal_days_live_idx     on journal_days (deleted_at);
