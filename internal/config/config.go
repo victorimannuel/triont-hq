@@ -30,6 +30,9 @@ type Config struct {
 	VAPIDSubject string
 	// Hour of the day, local time, the reminder goes out.
 	ReminderHour int
+	// The evening check-in has its own hour. At seven in the morning nothing
+	// has been ticked yet, so asking then would only ever list everything.
+	HabitHour int
 	// Bearer token external monitors use to report in. The only door into
 	// HQ that a session cookie does not open.
 	MonitorToken string
@@ -56,6 +59,7 @@ func Load() (Config, error) {
 		VAPIDPrivate: os.Getenv("HQ_VAPID_PRIVATE"),
 		VAPIDSubject: env("HQ_VAPID_SUBJECT", "mailto:admin@localhost"),
 		ReminderHour: envInt("HQ_REMINDER_HOUR", 7),
+		HabitHour:    envInt("HQ_HABIT_HOUR", 20),
 		// Empty disables the monitor ingest endpoint outright rather than
 		// leaving it open with a guessable secret.
 		MonitorToken: os.Getenv("HQ_MONITOR_TOKEN"),
