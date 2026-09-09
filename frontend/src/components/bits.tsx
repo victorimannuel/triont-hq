@@ -1,7 +1,15 @@
 import { useEffect, useState, type ComponentProps, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
-import { ArrowLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { Link, useLocation } from 'react-router-dom'
+import { ArrowLeft, ChevronRight, Eye, EyeOff, Loader2 } from 'lucide-react'
 
+import {
+  disguisedAll,
+  disguisedPage,
+  pageKey,
+  setDisguisedAll,
+  setDisguisedPage,
+  useDisguise,
+} from '@/lib/disguise'
 import { currentLocale, useT } from '@/i18n'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -69,9 +77,86 @@ export function PageHeader({
           <h1 className="text-2xl font-semibold lowercase tracking-tight">{title}</h1>
           {description && <p className="text-sm text-muted-foreground">{description}</p>}
         </div>
+        <CoverToggle />
       </div>
       {action}
     </div>
+  )
+}
+
+/*
+The switch for one page, sitting where you can see which page it belongs to.
+Every page draws its heading through PageHeader, so putting it here is what
+gets it onto all of them at once.
+
+A reload rather than a state flip: the page is already holding the answers it
+fetched before the switch, and those do not pass through the censor a second
+time.
+*/
+function CoverToggle() {
+  const { t } = useT()
+  const location = useLocation()
+  useDisguise()
+
+  const key = pageKey(location.pathname)
+  const covered = disguisedAll() || disguisedPage(key)
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      // Faint until it is doing something: it is on every page in the app, and
+      // it is not what any of them is for.
+      className={cn('mt-0.5 shrink-0', !covered && 'text-muted-foreground/40')}
+      aria-label={covered ? t('disguise.showAll') : t('disguise.pageOn')}
+      onClick={() => {
+        // Covering is per page, but uncovering is not: whatever is hiding this
+        // screen — the page's own mark or the switch in the user menu — one
+        // press of the visible button puts everything back. Two switches that
+        // can each veto the other is how you end up pressing a button that
+        // looks like it should work and does nothing.
+        if (covered) setDisguisedAll(false)
+        else setDisguisedPage(key, true)
+        window.location.reload()
+      }}
+    >
+      {covered ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+    </Button>
+  )
+}
+
+/*
+A square of colour standing in for a name, so a list is something the eye can
+tell apart before it starts reading — which is most of what a column of plain
+rows was missing. The colour is the name's own, so it stays put when the list
+reorders, and red is left out on purpose: red already means broken everywhere
+else in here.
+
+Decorative, and hidden from screen readers, because the name it stands for is
+always sitting right beside it.
+*/
+const MARKS = [
+  'bg-primary/15 text-primary',
+  'bg-success/15 text-success',
+  'bg-warning/15 text-warning',
+  'bg-foreground/[0.08] text-foreground/70',
+]
+
+export function Mark({ name, className }: { name: string; className?: string }) {
+  let hash = 0
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        'grid size-9 shrink-0 place-items-center rounded-lg text-sm font-semibold uppercase',
+        MARKS[hash % MARKS.length],
+        className,
+      )}
+    >
+      {name.slice(0, 1)}
+    </span>
   )
 }
 

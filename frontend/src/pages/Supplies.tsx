@@ -22,10 +22,34 @@ import {
 } from '@/components/ui/table'
 import { BuyDialog } from '@/components/BuyDialog'
 import { FEATURES } from '@/lib/features'
-import { CardList, Responsive } from '@/components/cards'
+import { Responsive } from '@/components/cards'
 import { ErrorNote, PageHeader } from '@/components/bits'
 import { FileCount } from '@/components/Files'
 import { FilterSelect, SearchInput } from '@/components/filters'
+
+/**
+ * Running low and having run out are not the same news. Nothing left means a
+ * trip to the shop today rather than this week, so it says so and says it in
+ * red instead of amber.
+ */
+function LowBadge({ item }: { item: Supply }) {
+  const { t } = useT()
+  if (!item.low) return null
+
+  const out = item.quantity <= 0
+  return (
+    <Badge
+      variant="outline"
+      className={
+        out
+          ? 'shrink-0 border-transparent bg-destructive/15 text-destructive'
+          : 'shrink-0 border-transparent bg-warning/15 text-warning'
+      }
+    >
+      {t(out ? 'supply.out' : 'supply.low')}
+    </Badge>
+  )
+}
 
 /** "2" not "2.00", but "0.5" stays "0.5" — half a bottle is a real amount. */
 const amount = (n: number) => (Number.isInteger(n) ? String(n) : String(n))
@@ -187,14 +211,7 @@ export default function Supplies() {
                     </TableCell>
                     <TableCell>{buttons(item)}</TableCell>
                     <TableCell>
-                      {item.low && (
-                        <Badge
-                          variant="outline"
-                          className="border-transparent bg-warning/15 text-warning"
-                        >
-                          {t('supply.low')}
-                        </Badge>
-                      )}
+                      <LowBadge item={item} />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -210,33 +227,33 @@ export default function Supplies() {
           </Card>
         }
         cards={
-          <CardList
-            items={supplies}
-            keyOf={(item) => item.id}
-            onPick={(item) => navigate(`/supplies/${item.id}`)}
-            empty={
-              loading ? null : query.low === '1' ? t('supply.noneLow') : t('supply.none')
-            }
-            render={(item) => ({
-              title: item.name,
-              subtitle: item.location || undefined,
-              meta: (
-                <>
-                  <span>{tOpt('supplycat', item.category)}</span>
-                  {item.low && (
-                    <Badge
-                      variant="outline"
-                      className="border-transparent bg-warning/15 text-warning"
-                    >
-                      {t('supply.low')}
-                    </Badge>
-                  )}
-                  {FEATURES.supplyFiles && <FileCount n={fileCounts[item.id]} />}
-                </>
-              ),
-              footer: buttons(item),
-            })}
-          />
+          /* One line each, not a card each. A stock list is read by scrolling
+             it — is there enough of anything — and the shared card put the
+             name, the place, the category and the buttons on four rows apiece,
+             so six items filled a phone screen. What is left is the name, the
+             warning, and the count you came to change. The place and the
+             category are a tap away on the item itself. */
+          supplies.length === 0 ? (
+            !loading && (
+              <div className="rounded-lg border py-10 text-center text-sm text-muted-foreground">
+                {query.low === '1' ? t('supply.noneLow') : t('supply.none')}
+              </div>
+            )
+          ) : (
+            <div className="divide-y overflow-hidden rounded-lg border bg-card">
+              {supplies.map((item) => (
+                <div
+                  key={item.id}
+                  onClick={() => navigate(`/supplies/${item.id}`)}
+                  className="flex items-center gap-2 px-3 py-1.5 active:bg-secondary/40"
+                >
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{item.name}</span>
+                  <LowBadge item={item} />
+                  {buttons(item)}
+                </div>
+              ))}
+            </div>
+          )
         }
       />
 

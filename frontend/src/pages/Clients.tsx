@@ -9,15 +9,7 @@ import type { Client } from '@/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { ErrorNote, PageHeader } from '@/components/bits'
+import { ErrorNote, Mark, PageHeader } from '@/components/bits'
 import { SearchInput, FilterSelect } from '@/components/filters'
 import { CardList, Responsive } from '@/components/cards'
 
@@ -71,59 +63,47 @@ export default function Clients() {
 
       <Responsive
         table={
-          <Card className="py-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('common.name')}</TableHead>
-                  <TableHead>{t('client.kind')}</TableHead>
-                  <TableHead>{t('common.status')}</TableHead>
-                  <TableHead className="text-right">{t('nav.projects')}</TableHead>
-                  <TableHead className="text-right">{t('client.contacts')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {clients.map((client) => (
-                  <TableRow
-                    key={client.id}
-                    onClick={() => navigate(`/clients/${client.slug}`)}
-                    className="cursor-pointer"
-                  >
-                    <TableCell className="font-medium">
-                      <Link
-                        to={`/clients/${client.slug}`}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {client.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{tOpt('clientkind', client.kind)}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="font-medium">
-                        {tOpt('clientstatus', client.status)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {client.project_count}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {client.contact_count}
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {!loading && clients.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
-                      {t('client.none')}{' '}
-                      <Link to="/clients/new" className="text-primary hover:underline">
-                        {t('home.addOne')}
-                      </Link>
-                      .
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+          /* Rows rather than a table. Three of the five columns were a kind and
+             two tallies, which is a lot of ruled lines around very little —
+             and a client is a name first. */
+          <Card className="divide-y overflow-hidden py-0">
+            {clients.map((client) => (
+              <Link
+                key={client.id}
+                to={`/clients/${client.slug}`}
+                className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent"
+              >
+                <Mark name={client.name} />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-medium">{client.name}</div>
+                  <div className="truncate text-xs text-muted-foreground">
+                    {tOpt('clientkind', client.kind)}
+                  </div>
+                </div>
+                {/* The tallies keep their place on a wide screen and drop off a
+                    narrow one, where the name and the status matter more. */}
+                <div className="hidden shrink-0 gap-4 text-xs text-muted-foreground lg:flex">
+                  <span className="tabular-nums">
+                    {client.project_count} {t('nav.projects')}
+                  </span>
+                  <span className="tabular-nums">
+                    {client.contact_count} {t('client.contacts')}
+                  </span>
+                </div>
+                <Badge variant="outline" className="shrink-0 font-medium">
+                  {tOpt('clientstatus', client.status)}
+                </Badge>
+              </Link>
+            ))}
+            {!loading && clients.length === 0 && (
+              <div className="py-10 text-center text-muted-foreground">
+                {t('client.none')}{' '}
+                <Link to="/clients/new" className="text-primary hover:underline">
+                  {t('home.addOne')}
+                </Link>
+                .
+              </div>
+            )}
           </Card>
         }
         cards={
@@ -133,6 +113,7 @@ export default function Clients() {
             onPick={(c) => navigate(`/clients/${c.slug}`)}
             empty={loading ? null : t('client.none')}
             render={(c) => ({
+              leading: <Mark name={c.name} />,
               title: c.name,
               subtitle: tOpt('clientkind', c.kind),
               trailing: <Badge variant="outline">{tOpt('clientstatus', c.status)}</Badge>,

@@ -25,7 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { ErrorNote, formatDate, PageHeader } from '@/components/bits'
+import { ErrorNote, formatDate, Mark, PageHeader } from '@/components/bits'
 import { FileCount } from '@/components/Files'
 import { SearchInput } from '@/components/filters'
 import { CardList, Responsive } from '@/components/cards'
@@ -109,26 +109,34 @@ export default function People() {
                     onClick={() => navigate(`/people/${person.id}`)}
                     className="cursor-pointer"
                   >
+                    {/* This table keeps its columns: a contact's email, phone
+                        and last-talked-to all earn their place. It was only
+                        missing something to aim at, which the mark gives it. */}
                     <TableCell>
-                      <div className="flex items-center gap-2 font-medium">
-                        {person.nickname || person.name}
-                        <FileCount n={fileCounts[person.id]} />
-                        {person.due_to_reach && (
-                          <Badge
-                            variant="outline"
-                            className="border-transparent bg-warning/15 text-[11px] text-warning"
-                          >
-                            {t('people.due')}
-                          </Badge>
-                        )}
-                      </div>
-                      {(person.nickname || person.role) && (
-                        <div className="text-xs text-muted-foreground">
-                          {[person.nickname ? person.name : '', person.role]
-                            .filter(Boolean)
-                            .join(' · ')}
+                      <div className="flex items-center gap-2.5">
+                        <Mark name={person.nickname || person.name} className="size-8" />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 font-medium">
+                            {person.nickname || person.name}
+                            <FileCount n={fileCounts[person.id]} />
+                            {person.due_to_reach && (
+                              <Badge
+                                variant="outline"
+                                className="border-transparent bg-warning/15 text-[11px] text-warning"
+                              >
+                                {t('people.due')}
+                              </Badge>
+                            )}
+                          </div>
+                          {(person.nickname || person.role) && (
+                            <div className="text-xs text-muted-foreground">
+                              {[person.nickname ? person.name : '', person.role]
+                                .filter(Boolean)
+                                .join(' · ')}
+                            </div>
+                          )}
                         </div>
-                      )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {person.client_slug ? (
@@ -211,6 +219,7 @@ export default function People() {
             onPick={(p) => navigate(`/people/${p.id}`)}
             empty={loading ? null : t('people.none')}
             render={(p) => ({
+              leading: <Mark name={p.nickname || p.name} />,
               title: (
                 <span className="flex items-center gap-2">
                   {p.nickname || p.name}

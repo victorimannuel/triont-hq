@@ -17,6 +17,8 @@ export function Responsive({ table, cards }: { table: ReactNode; cards: ReactNod
 }
 
 export type Row = {
+  /** Sits on the left, before the title: a mark, an avatar, an icon. */
+  leading?: ReactNode
   /** What the row is. One line, truncated. */
   title: ReactNode
   /** The thing that tells two similar rows apart. */
@@ -64,6 +66,7 @@ export function CardList<T>({
             )}
           >
             <div className="flex items-start gap-3">
+              {row.leading}
               <div className="min-w-0 flex-1 space-y-0.5">
                 <div className="truncate font-medium">{row.title}</div>
                 {row.subtitle && (
