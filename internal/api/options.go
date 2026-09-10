@@ -46,7 +46,7 @@ var (
 	supplyUnits = []option{
 		{"pcs", "buah"}, {"pack", "pak"}, {"roll", "gulung"},
 		{"bottle", "botol"}, {"box", "kotak"}, {"sachet", "sachet"},
-		{"kg", "kg"}, {"litre", "liter"},
+		{"tablet", "tablet"}, {"kg", "kg"}, {"litre", "liter"},
 	}
 	// Who a chord chart is written for. Empty is a real answer and the common
 	// one — the same chords work for both — so it is not in the list.

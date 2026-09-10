@@ -6,7 +6,6 @@ import { toast } from 'sonner'
 import { api } from '@/api'
 import { useList } from '@/lib/useList'
 import { useFileCounts } from '@/lib/useFileCounts'
-import { useMeta } from '@/App'
 import { useT } from '@/i18n'
 import type { Supply } from '@/types'
 import { Badge } from '@/components/ui/badge'
@@ -25,7 +24,7 @@ import { FEATURES } from '@/lib/features'
 import { Responsive } from '@/components/cards'
 import { ErrorNote, PageHeader } from '@/components/bits'
 import { FileCount } from '@/components/Files'
-import { FilterSelect, SearchInput } from '@/components/filters'
+import { SearchInput } from '@/components/filters'
 
 /**
  * Running low and having run out are not the same news. Nothing left means a
@@ -55,11 +54,10 @@ function LowBadge({ item }: { item: Supply }) {
 const amount = (n: number) => (Number.isInteger(n) ? String(n) : String(n))
 
 export default function Supplies() {
-  const meta = useMeta()
   const { t, tOpt } = useT()
   const navigate = useNavigate()
 
-  const list = useList(['q', 'category', 'low'], api.supplies, {
+  const list = useList(['q', 'low'], api.supplies, {
     supplies: [] as Supply[],
     low: 0,
   })
@@ -145,16 +143,6 @@ export default function Supplies() {
           placeholder={t('supply.search')}
         />
 
-        <FilterSelect
-          label={t('supply.category')}
-          value={query.category}
-          onChange={(v) => update('category', v)}
-          options={meta.supply_categories.map((item) => ({
-            value: item.value,
-            label: tOpt('supplycat', item.value, item.label),
-          }))}
-        />
-
         {/* The shopping list, one tap away. */}
         <Button
           variant={query.low === '1' ? 'default' : 'outline'}
@@ -179,7 +167,6 @@ export default function Supplies() {
               <TableHeader>
                 <TableRow>
                   <TableHead>{t('common.name')}</TableHead>
-                  <TableHead>{t('supply.category')}</TableHead>
                   <TableHead>{t('supply.where')}</TableHead>
                   <TableHead className="w-[13rem]">{t('supply.left')}</TableHead>
                   <TableHead className="w-24" />
@@ -204,9 +191,6 @@ export default function Supplies() {
                       )}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {tOpt('supplycat', item.category)}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
                       {item.location || '—'}
                     </TableCell>
                     <TableCell>{buttons(item)}</TableCell>
@@ -217,7 +201,7 @@ export default function Supplies() {
                 ))}
                 {!loading && supplies.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
+                    <TableCell colSpan={4} className="py-10 text-center text-muted-foreground">
                       {query.low === '1' ? t('supply.noneLow') : t('supply.none')}
                     </TableCell>
                   </TableRow>
@@ -229,10 +213,10 @@ export default function Supplies() {
         cards={
           /* One line each, not a card each. A stock list is read by scrolling
              it — is there enough of anything — and the shared card put the
-             name, the place, the category and the buttons on four rows apiece,
-             so six items filled a phone screen. What is left is the name, the
-             warning, and the count you came to change. The place and the
-             category are a tap away on the item itself. */
+             name, the place and the buttons on three rows apiece, so six items
+             filled a phone screen. What is left is the name, the warning, and
+             the count you came to change. The place is a tap away on the item
+             itself. */
           supplies.length === 0 ? (
             !loading && (
               <div className="rounded-lg border py-10 text-center text-sm text-muted-foreground">

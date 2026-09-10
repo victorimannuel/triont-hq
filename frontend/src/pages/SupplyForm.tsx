@@ -188,31 +188,19 @@ export default function SupplyForm() {
       <Card>
         <CardContent>
           <form className="space-y-5" onSubmit={submit}>
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field label={t('common.name')} htmlFor="name" hint={t('supply.nameHint')}>
-                <NameInput
-                  id="name"
-                  required
-                  autoFocus
-                  value={form.name}
-                  onValue={(v) => set('name', v)}
-                />
-              </Field>
-              <Field label={t('supply.category')}>
-                <Select value={form.category} onValueChange={(v) => set('category', v)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {meta.supply_categories.map((item) => (
-                      <SelectItem key={item.value} value={item.value}>
-                        {tOpt('supplycat', item.value, item.label)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-            </div>
+            {/* No category picker. The list is short enough to read whole, and
+                sorting a bottle of shampoo into a bucket before you can save it
+                is work the page was not giving anything back for. The column is
+                still on the record, so turning this back on is one field. */}
+            <Field label={t('common.name')} htmlFor="name" hint={t('supply.nameHint')}>
+              <NameInput
+                id="name"
+                required
+                autoFocus
+                value={form.name}
+                onValue={(v) => set('name', v)}
+              />
+            </Field>
 
             <div className="grid gap-5 sm:grid-cols-3">
               <Field label={t('supply.quantity')} htmlFor="qty">
