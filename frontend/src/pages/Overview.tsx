@@ -228,7 +228,7 @@ export default function Overview() {
           {t('home.needsActionEmpty', { n: ahead })}
         </Card>
       ) : (
-        <Card className="divide-y overflow-hidden py-0">
+        <Card className="gap-0 divide-y overflow-hidden py-0">
           {trouble.map((check) => (
             <Link
               key={check.id}
@@ -353,7 +353,7 @@ export default function Overview() {
           and two counts that are nearly always zero, which is a lot of ruled
           lines around very little — and the link and credential tallies are on
           the project's own page anyway. */}
-      <Card className="divide-y overflow-hidden py-0">
+      <Card className="gap-0 divide-y overflow-hidden py-0">
         {data.recent.map((project) => (
           <Link
             key={project.id}

@@ -148,14 +148,14 @@ export default function Monitor() {
       {trouble.length > 0 && (
         <>
           <SectionTitle>{t('monitor.trouble')}</SectionTitle>
-          <Card className="mb-6 divide-y py-0">{trouble.map(row)}</Card>
+          <Card className="mb-6 gap-0 divide-y py-0">{trouble.map(row)}</Card>
         </>
       )}
 
       {fine.length > 0 && (
         <>
           <SectionTitle>{t('monitor.fine')}</SectionTitle>
-          <Card className="mb-6 divide-y py-0">{fine.map(row)}</Card>
+          <Card className="mb-6 gap-0 divide-y py-0">{fine.map(row)}</Card>
         </>
       )}
 

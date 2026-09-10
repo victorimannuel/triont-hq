@@ -139,7 +139,7 @@ export default function Calendar() {
             <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               {monthFormat.format(new Date(`${month}-01T00:00:00`))}
             </h2>
-            <Card className="divide-y overflow-hidden py-0">
+            <Card className="gap-0 divide-y overflow-hidden py-0">
               {list.map((entry, index) => (
                 <EntryRow key={`${entry.kind}-${entry.url}-${index}`} entry={entry} />
               ))}
