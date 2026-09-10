@@ -50,11 +50,16 @@ function SelectTrigger({
   )
 }
 
+// Anchored under the field, not over it. Radix's other mode lines the *chosen*
+// item up with the trigger, so picking the last option in a long list throws
+// the whole panel upwards over the fields above — which is what it looked like
+// on the supply form. The viewport also loses its fixed height here: that class
+// pins it to the trigger's own height and leaves one row visible.
 function SelectContent({
   className,
   children,
-  position = "item-aligned",
-  align = "center",
+  position = "popper",
+  align = "start",
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Content>) {
   return (
@@ -76,7 +81,7 @@ function SelectContent({
           className={cn(
             "p-1",
             position === "popper" &&
-              "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)] scroll-my-1"
+              "w-full min-w-[var(--radix-select-trigger-width)] scroll-my-1"
           )}
         >
           {children}
