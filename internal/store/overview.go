@@ -19,10 +19,9 @@ type Overview struct {
 	LowSupplies   []Supply  `json:"low_supplies"`
 	Trouble       []Check   `json:"trouble"`
 	StaleMonitors []Monitor `json:"stale_monitors"`
-	// Today's habits, as a tally rather than a board. Enough for the home page
-	// to say whether the evening's ticking has been done yet.
-	HabitsDone  int `json:"habits_done"`
-	HabitsTotal int `json:"habits_total"`
+	// Today's habits, as a tally rather than a board: enough for the home page
+	// to say whether the evening's ticking has been done yet, and what is left.
+	HabitsToday
 }
 
 // How far ahead each kind of deadline is worth worrying about. A domain can be
@@ -59,7 +58,7 @@ func (s *Store) Overview(ctx context.Context) (Overview, error) {
 	if o.StaleMonitors, err = s.StaleMonitors(ctx); err != nil {
 		return o, err
 	}
-	if o.HabitsDone, o.HabitsTotal, err = s.HabitsToday(ctx, startOfDay(time.Now())); err != nil {
+	if o.HabitsToday, err = s.HabitsToday(ctx, startOfDay(time.Now())); err != nil {
 		return o, err
 	}
 	return o, nil

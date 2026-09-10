@@ -775,6 +775,8 @@ export type Overview = {
   /** Today's ticking, as a tally. The board itself is a page away. */
   habits_done: number
   habits_total: number
+  /** The ones still open today, by name and in the board's order. */
+  habits_left: string[]
   low_supplies: Supply[]
   trouble: Check[]
   stale_monitors: MonitorSource[]

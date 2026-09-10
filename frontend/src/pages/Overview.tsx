@@ -110,6 +110,18 @@ export default function Overview() {
                 ? t('home.habitsAllDone')
                 : t('home.habitsLeft', { n: data.habits_total - data.habits_done })}
             </div>
+            {/* Which ones, not only how many: a glance says what can be done
+                now. Read here, ticked on the check-in — the whole card is the
+                link there, so these are labels and nothing more. */}
+            {data.habits_left.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {data.habits_left.map((name, at) => (
+                  <span key={`${at}-${name}`} className="rounded-full bg-muted px-2 py-0.5 text-xs">
+                    {name}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
           <span className="shrink-0 tabular-nums text-lg font-semibold tracking-tight">
             {data.habits_done}/{data.habits_total}

@@ -247,8 +247,8 @@ var mcpTools = []mcpTool{
 	{
 		Name: "hq_overview",
 		Desc: "The home page in one call: what falls due in the next 30 days, " +
-			"supplies running low, monitors in trouble, and how many of today's " +
-			"habits are ticked.",
+			"supplies running low, monitors in trouble, and today's habits: how " +
+			"many are ticked and which are still open.",
 		Run: func(ctx context.Context, s *Server, _ mcpArgs) (any, error) {
 			return s.store.Overview(ctx)
 		},

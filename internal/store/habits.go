@@ -258,22 +258,52 @@ func (s *Store) HabitsUndone(ctx context.Context, day time.Time) ([]string, erro
 	return out, rows.Err()
 }
 
+// HabitsToday is the day in one line for the home page: how many are ticked,
+// how many there are, and which are still open.
+type HabitsToday struct {
+	Done  int `json:"habits_done"`
+	Total int `json:"habits_total"`
+	// The unticked ones by name, in the board's order, so the page can say
+	// which rather than only how many. Empty rather than null when all are
+	// done, so the page never has to guard against a missing list.
+	Left []string `json:"habits_left"`
+}
+
 /*
-How many of today's habits are ticked, and how many there are. The home page
-wants one line about them rather than the whole board, and a pair of counts is
-cheaper than sending every habit and its window along with everything else the
-overview already carries.
+Today's habits, counted and named. The home page wants one line about them
+rather than the whole board, so this sends a tally and the names still open
+instead of every habit with its window.
 
 Paused habits are left out, the same as everywhere else: a habit you have
 stopped is not a thing you are behind on.
 */
-func (s *Store) HabitsToday(ctx context.Context, day time.Time) (done, total int, err error) {
-	err = s.pool.QueryRow(ctx, `
-		select count(*) filter (where d.habit_id is not null), count(*)
+func (s *Store) HabitsToday(ctx context.Context, day time.Time) (HabitsToday, error) {
+	out := HabitsToday{Left: []string{}}
+	rows, err := s.pool.Query(ctx, `
+		select h.name, d.habit_id is not null
 		  from habits h
 		  left join habit_days d on d.habit_id = h.id and d.on_date = $1
-		 where h.deleted_at is null and h.active`, day).Scan(&done, &total)
-	return done, total, err
+		 where h.deleted_at is null and h.active
+		 order by h.created_at, h.id`, day)
+	if err != nil {
+		return out, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var name string
+		var ticked bool
+		if err := rows.Scan(&name, &ticked); err != nil {
+			return out, err
+		}
+		out.Total++
+		if ticked {
+			out.Done++
+		} else {
+			out.Left = append(out.Left, name)
+		}
+	}
+	return out, rows.Err()
 }
 
 func (s *Store) CreateHabit(ctx context.Context, in HabitInput, actor string) (Habit, error) {
