@@ -1,6 +1,9 @@
-// Rasterises the app icon into the PNG sizes a PWA install needs.
-// Run once after changing the mark: node scripts/make-icons.mjs
-import { mkdir, writeFile } from 'node:fs/promises'
+// Rasterises the app icon into the PNG sizes a PWA install needs, and the
+// launch images iOS wants. Run once after changing the mark:
+//   node scripts/make-icons.mjs
+// It rewrites the block of apple-touch-startup-image links in index.html too,
+// so the tags and the files can never drift apart.
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -8,6 +11,8 @@ import sharp from 'sharp'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const publicDir = resolve(here, '../public')
+const splashDir = resolve(publicDir, 'splash')
+const indexHtml = resolve(here, '../index.html')
 
 // Two treatments, because the places these icons land want opposite things.
 //
@@ -23,6 +28,11 @@ const publicDir = resolve(here, '../public')
 const MARK_INK = '#a35d2e'
 const TILE = '#3a1e0e'
 const TILE_INK = '#ffffff'
+
+// The two grounds a launch image sits on, matching the page's own background
+// in each theme so the splash and the first paint are the same colour.
+const PAPER = '#fcfaf7'
+const NIGHT = '#110f0c'
 
 // The mark in a 32-unit box: the Triont mark, drawn as strokes so the icon is
 // the logo scaled rather than a redraw of it. A ring open on the four axes,
@@ -191,3 +201,105 @@ await writeFile(
   svg({ size: 64, padding: 0, background: null }),
 )
 console.log('favicon.svg')
+
+/*
+The launch images, which only iOS uses.
+
+Android builds its splash from the manifest — the name, the background colour
+and the 512 icon — and needs nothing here. iOS ignores the manifest for this
+entirely and looks for an image whose media query matches the device exactly,
+down to the pixel ratio and the orientation. Miss and it shows a white screen,
+which is what an installed HQ does on an iPhone today.
+
+So every size is spelled out. Portrait and landscape are separate images, and
+each has a dark twin: a page that opens on a dark theme should not flash white
+first. Listing the dark ones after the plain ones is what makes Safari prefer
+them when the phone is in dark mode.
+*/
+const DEVICES = [
+  // width, height in CSS pixels, then the pixel ratio. Several phones share a
+  // line — the comment names one of them, not all.
+  { w: 375, h: 667, dpr: 2, note: 'SE, 8' },
+  { w: 414, h: 736, dpr: 3, note: '8 Plus' },
+  { w: 375, h: 812, dpr: 3, note: 'X, 11 Pro, 13 mini' },
+  { w: 414, h: 896, dpr: 2, note: 'XR, 11' },
+  { w: 414, h: 896, dpr: 3, note: 'XS Max, 11 Pro Max' },
+  { w: 390, h: 844, dpr: 3, note: '12, 13, 14' },
+  { w: 393, h: 852, dpr: 3, note: '14 Pro, 15, 16' },
+  { w: 402, h: 874, dpr: 3, note: '16 Pro' },
+  { w: 428, h: 926, dpr: 3, note: '13 Pro Max, 14 Plus' },
+  { w: 430, h: 932, dpr: 3, note: '15 Pro Max, 16 Plus' },
+  { w: 440, h: 956, dpr: 3, note: '16 Pro Max' },
+  { w: 744, h: 1133, dpr: 2, note: 'iPad mini' },
+  { w: 768, h: 1024, dpr: 2, note: 'iPad 9.7' },
+  { w: 810, h: 1080, dpr: 2, note: 'iPad 10.2' },
+  { w: 820, h: 1180, dpr: 2, note: 'iPad Air 10.9' },
+  { w: 834, h: 1112, dpr: 2, note: 'iPad Air 10.5' },
+  { w: 834, h: 1194, dpr: 2, note: 'iPad Pro 11' },
+  { w: 1024, h: 1366, dpr: 2, note: 'iPad Pro 12.9' },
+]
+
+// The mark alone on a flat ground, centred. A quarter of the short side: big
+// enough to be the point of the screen, small enough that it never crowds a
+// notch or a home indicator.
+function splashSvg(width, height, ground) {
+  const reach = Math.round(Math.min(width, height) * 0.25)
+  const left = Math.round((width - reach) / 2)
+  const top = Math.round((height - reach) / 2)
+  const pt = (v) => (v / 32) * reach
+  const len = pt
+  return Buffer.from(`
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"
+     viewBox="0 0 ${width} ${height}">
+  <rect width="${width}" height="${height}" fill="${ground}"/>
+  <g transform="translate(${left} ${top})">
+    ${mark(pt, len, MARK_INK)}
+  </g>
+</svg>`)
+}
+
+await mkdir(splashDir, { recursive: true })
+
+const links = []
+let splashBytes = 0
+
+for (const theme of [
+  { suffix: '', ground: PAPER, query: '' },
+  { suffix: '-dark', ground: NIGHT, query: ' and (prefers-color-scheme: dark)' },
+]) {
+  for (const device of DEVICES) {
+    for (const orientation of ['portrait', 'landscape']) {
+      const across = orientation === 'portrait' ? device.w * device.dpr : device.h * device.dpr
+      const down = orientation === 'portrait' ? device.h * device.dpr : device.w * device.dpr
+      const file = `splash-${across}x${down}${theme.suffix}.png`
+      const png = await sharp(splashSvg(across, down, theme.ground))
+        .png({ compressionLevel: 9, palette: true })
+        .toBuffer()
+      await writeFile(resolve(splashDir, file), png)
+      splashBytes += png.length
+      links.push(
+        `    <link rel="apple-touch-startup-image" href="/splash/${file}"\n` +
+          `          media="(device-width: ${device.w}px) and (device-height: ${device.h}px)` +
+          ` and (-webkit-device-pixel-ratio: ${device.dpr})` +
+          ` and (orientation: ${orientation})${theme.query}" />`,
+      )
+    }
+  }
+}
+console.log(`splash/                  ${links.length} files  ${splashBytes} B`)
+
+// Written between markers rather than appended, so running this twice does not
+// leave two copies of the block.
+const START = '    <!-- splash:start -->'
+const END = '    <!-- splash:end -->'
+const html = await readFile(indexHtml, 'utf8')
+const from = html.indexOf(START)
+const to = html.indexOf(END)
+if (from === -1 || to === -1) {
+  throw new Error(`index.html is missing the ${START} / ${END} markers`)
+}
+await writeFile(
+  indexHtml,
+  `${html.slice(0, from + START.length)}\n${links.join('\n')}\n${html.slice(to)}`,
+)
+console.log('index.html               startup-image links rewritten')

@@ -69,6 +69,10 @@ export default defineConfig({
       filename: 'sw.ts',
       injectManifest: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
+        // The iOS launch images are megabytes of flat colour that only Safari
+        // ever asks for, and only once. Precaching them would make every
+        // install on every platform pay for them.
+        globIgnores: ['**/splash/**'],
       },
       devOptions: { enabled: false },
     }),
