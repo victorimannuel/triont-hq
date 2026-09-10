@@ -32,6 +32,21 @@ func askedMonth(r *http.Request) (time.Time, bool) {
 	return month, true
 }
 
+// validDay checks the optional day on a row. Empty stays empty — most of a
+// month has no particular date — but anything else has to be a real one, since
+// the column is a date and a bad string would surface as a 500 rather than as
+// something the form could say.
+func validDay(value string) (string, bool) {
+	value = trim(value)
+	if value == "" {
+		return "", true
+	}
+	if _, err := time.Parse("2006-01-02", value); err != nil {
+		return "", false
+	}
+	return value, true
+}
+
 func (s *Server) handleBudget(w http.ResponseWriter, r *http.Request) {
 	month, ok := askedMonth(r)
 	if !ok {
@@ -65,6 +80,11 @@ func (s *Server) readBudgetIncome(r *http.Request) (store.BudgetIncomeInput, str
 	}
 	in.Notes = trim(in.Notes)
 	in.Currency = valid(currencies, in.Currency, "IDR")
+	day, ok := validDay(in.DueOn)
+	if !ok {
+		return in, "tanggalnya harus format YYYY-MM-DD"
+	}
+	in.DueOn = day
 	if in.Amount < 0 {
 		return in, "jumlahnya nggak bisa minus"
 	}
@@ -175,6 +195,11 @@ func (s *Server) readBudgetLine(r *http.Request) (store.BudgetLineInput, string)
 	}
 	in.Notes = trim(in.Notes)
 	in.Bucket = valid(budgetBuckets, in.Bucket, "needs")
+	day, ok := validDay(in.DueOn)
+	if !ok {
+		return in, "tanggalnya harus format YYYY-MM-DD"
+	}
+	in.DueOn = day
 	if in.Percent != nil {
 		if *in.Percent < 0 || *in.Percent > 100 {
 			return in, "persennya harus antara 0 sampai 100"

@@ -56,8 +56,11 @@ type BudgetLine struct {
 	*/
 	Amount float64 `json:"amount"`
 	// Null unless the line was given as a share of income.
-	Percent   *float64  `json:"percent"`
-	Paid      bool      `json:"paid"`
+	Percent *float64 `json:"percent"`
+	Paid    bool     `json:"paid"`
+	// The day it falls due, as YYYY-MM-DD, or empty when it is just "some time
+	// this month".
+	DueOn     string    `json:"due_on"`
 	ExpenseID *int64    `json:"expense_id"`
 	Position  int       `json:"position"`
 	Notes     string    `json:"notes"`
@@ -73,6 +76,7 @@ type BudgetLineInput struct {
 	Bucket    string   `json:"bucket"`
 	Amount    float64  `json:"amount"`
 	Percent   *float64 `json:"percent"`
+	DueOn     string   `json:"due_on"`
 	Notes     string   `json:"notes"`
 }
 
@@ -97,17 +101,19 @@ type BudgetIncome struct {
 	// What the source pays in, which is not always what the month is budgeted
 	// in. Converted is the same money in the month's currency, and is what the
 	// totals and every percentage are built from.
-	Currency    string    `json:"currency"`
-	Converted   float64   `json:"converted"`
-	AccountID   *int64    `json:"account_id"`
-	AccountName string    `json:"account_name"`
-	Received    bool      `json:"received"`
-	Position    int       `json:"position"`
-	Notes       string    `json:"notes"`
-	CreatedBy   string    `json:"created_by"`
-	UpdatedBy   string    `json:"updated_by"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	Currency    string  `json:"currency"`
+	Converted   float64 `json:"converted"`
+	AccountID   *int64  `json:"account_id"`
+	AccountName string  `json:"account_name"`
+	Received    bool    `json:"received"`
+	// The day it is expected, as YYYY-MM-DD, or empty when no day was given.
+	DueOn     string    `json:"due_on"`
+	Position  int       `json:"position"`
+	Notes     string    `json:"notes"`
+	CreatedBy string    `json:"created_by"`
+	UpdatedBy string    `json:"updated_by"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type BudgetIncomeInput struct {
@@ -115,6 +121,7 @@ type BudgetIncomeInput struct {
 	Amount    float64 `json:"amount"`
 	Currency  string  `json:"currency"`
 	AccountID *int64  `json:"account_id"`
+	DueOn     string  `json:"due_on"`
 	Notes     string  `json:"notes"`
 }
 
@@ -352,16 +359,21 @@ func (s *Store) Budget(ctx context.Context, month time.Time, actor string) (Budg
 	return out, nil
 }
 
+// Ordered by the day it falls on, because a budget is read forwards: what is
+// due next is what you are about to do something about. Rows with no day sit
+// at the end rather than at the top, keeping the order they were typed in —
+// they are the ones with nothing pressing about them.
 func (s *Store) budgetLines(ctx context.Context, on time.Time, income float64) ([]BudgetLine, error) {
 	rows, err := s.pool.Query(ctx, `
 		select l.id, to_char(l.on_month, 'YYYY-MM-DD'), l.name, l.account_id,
 		       coalesce(a.name, ''), l.bucket, l.amount, l.percent, l.paid,
+		       coalesce(to_char(l.due_on, 'YYYY-MM-DD'), ''),
 		       l.expense_id, l.position, l.notes,
 		       l.created_by, l.updated_by, l.created_at, l.updated_at
 		  from budget_lines l
 		  left join money_accounts a on a.id = l.account_id
 		 where l.on_month = $1 and l.deleted_at is null
-		 order by l.position, l.id`, on)
+		 order by l.due_on nulls last, l.position, l.id`, on)
 	if err != nil {
 		return nil, err
 	}
@@ -371,7 +383,8 @@ func (s *Store) budgetLines(ctx context.Context, on time.Time, income float64) (
 	for rows.Next() {
 		var l BudgetLine
 		if err := rows.Scan(&l.ID, &l.OnMonth, &l.Name, &l.AccountID, &l.AccountName,
-			&l.Bucket, &l.Amount, &l.Percent, &l.Paid, &l.ExpenseID, &l.Position, &l.Notes,
+			&l.Bucket, &l.Amount, &l.Percent, &l.Paid, &l.DueOn, &l.ExpenseID, &l.Position,
+			&l.Notes,
 			&l.CreatedBy, &l.UpdatedBy, &l.CreatedAt, &l.UpdatedAt); err != nil {
 			return nil, err
 		}
@@ -384,15 +397,18 @@ func (s *Store) budgetLines(ctx context.Context, on time.Time, income float64) (
 	return out, rows.Err()
 }
 
+// Same order as the lines, and for the same reason: the 25th comes before the
+// invoice with no date on it.
 func (s *Store) budgetIncomes(ctx context.Context, on time.Time) ([]BudgetIncome, error) {
 	rows, err := s.pool.Query(ctx, `
 		select i.id, to_char(i.on_month, 'YYYY-MM-DD'), i.name, i.amount, i.currency,
-		       i.account_id, coalesce(a.name, ''), i.received, i.position, i.notes,
+		       i.account_id, coalesce(a.name, ''), i.received,
+		       coalesce(to_char(i.due_on, 'YYYY-MM-DD'), ''), i.position, i.notes,
 		       i.created_by, i.updated_by, i.created_at, i.updated_at
 		  from budget_incomes i
 		  left join money_accounts a on a.id = i.account_id
 		 where i.on_month = $1 and i.deleted_at is null
-		 order by i.position, i.id`, on)
+		 order by i.due_on nulls last, i.position, i.id`, on)
 	if err != nil {
 		return nil, err
 	}
@@ -402,7 +418,7 @@ func (s *Store) budgetIncomes(ctx context.Context, on time.Time) ([]BudgetIncome
 	for rows.Next() {
 		var i BudgetIncome
 		if err := rows.Scan(&i.ID, &i.OnMonth, &i.Name, &i.Amount, &i.Currency,
-			&i.AccountID, &i.AccountName, &i.Received, &i.Position, &i.Notes,
+			&i.AccountID, &i.AccountName, &i.Received, &i.DueOn, &i.Position, &i.Notes,
 			&i.CreatedBy, &i.UpdatedBy, &i.CreatedAt, &i.UpdatedAt); err != nil {
 			return nil, err
 		}
@@ -421,13 +437,14 @@ func (s *Store) CreateBudgetIncome(ctx context.Context, month time.Time, in Budg
 
 	var id int64
 	err := s.pool.QueryRow(ctx, `
-		insert into budget_incomes (on_month, name, amount, currency, account_id, notes,
-		                            position, created_by, updated_by)
-		values ($1, $2, $3, $4, $5, $6,
+		insert into budget_incomes (on_month, name, amount, currency, account_id, due_on,
+		                            notes, position, created_by, updated_by)
+		values ($1, $2, $3, $4, $5, nullif($6, '')::date, $7,
 		        coalesce((select max(position) + 1 from budget_incomes
 		                   where on_month = $1 and deleted_at is null), 0),
-		        $7, $7)
-		returning id`, on, in.Name, in.Amount, in.Currency, in.AccountID, in.Notes, actor).Scan(&id)
+		        $8, $8)
+		returning id`, on, in.Name, in.Amount, in.Currency, in.AccountID, in.DueOn,
+		in.Notes, actor).Scan(&id)
 	if err != nil {
 		return BudgetIncome{}, norm(err)
 	}
@@ -437,10 +454,11 @@ func (s *Store) CreateBudgetIncome(ctx context.Context, month time.Time, in Budg
 func (s *Store) UpdateBudgetIncome(ctx context.Context, id int64, in BudgetIncomeInput, actor string) (BudgetIncome, error) {
 	tag, err := s.pool.Exec(ctx, `
 		update budget_incomes
-		   set name = $1, amount = $2, currency = $3, account_id = $4, notes = $5,
-		       updated_by = $6, updated_at = now()
-		 where id = $7 and deleted_at is null`,
-		in.Name, in.Amount, in.Currency, in.AccountID, in.Notes, actor, id)
+		   set name = $1, amount = $2, currency = $3, account_id = $4,
+		       due_on = nullif($5, '')::date, notes = $6,
+		       updated_by = $7, updated_at = now()
+		 where id = $8 and deleted_at is null`,
+		in.Name, in.Amount, in.Currency, in.AccountID, in.DueOn, in.Notes, actor, id)
 	if err != nil {
 		return BudgetIncome{}, norm(err)
 	}
@@ -476,13 +494,14 @@ func (s *Store) budgetIncome(ctx context.Context, id int64) (BudgetIncome, error
 	var i BudgetIncome
 	err := s.pool.QueryRow(ctx, `
 		select i.id, to_char(i.on_month, 'YYYY-MM-DD'), i.name, i.amount, i.currency,
-		       i.account_id, coalesce(a.name, ''), i.received, i.position, i.notes,
+		       i.account_id, coalesce(a.name, ''), i.received,
+		       coalesce(to_char(i.due_on, 'YYYY-MM-DD'), ''), i.position, i.notes,
 		       i.created_by, i.updated_by, i.created_at, i.updated_at
 		  from budget_incomes i
 		  left join money_accounts a on a.id = i.account_id
 		 where i.id = $1 and i.deleted_at is null`, id).
 		Scan(&i.ID, &i.OnMonth, &i.Name, &i.Amount, &i.Currency,
-			&i.AccountID, &i.AccountName, &i.Received, &i.Position, &i.Notes,
+			&i.AccountID, &i.AccountName, &i.Received, &i.DueOn, &i.Position, &i.Notes,
 			&i.CreatedBy, &i.UpdatedBy, &i.CreatedAt, &i.UpdatedAt)
 	return i, norm(err)
 }
@@ -541,10 +560,13 @@ func (s *Store) SeedBudget(ctx context.Context, month time.Time, actor string) (
 		back to 1, which leaves the figure alone rather than zeroing it.
 	*/
 	tag, err := tx.Exec(ctx, `
-		insert into budget_lines (on_month, name, bucket, amount, expense_id, position,
-		                          created_by, updated_by)
+		insert into budget_lines (on_month, name, bucket, amount, expense_id, due_on,
+		                          position, created_by, updated_by)
 		select $1, e.name, 'needs',
 		       e.amount * coalesce(fr.rate, 1) / coalesce(mr.rate, 1), e.id,
+		       case when e.next_due_on >= $1
+		             and e.next_due_on < ($1::date + interval '1 month')
+		            then e.next_due_on end,
 		       row_number() over (order by e.name),
 		       $2, $2
 		  from expense_streams e
@@ -564,8 +586,9 @@ func (s *Store) SeedBudget(ctx context.Context, month time.Time, actor string) (
 	// Last month's own lines, the ones somebody typed rather than generated.
 	tag, err = tx.Exec(ctx, `
 		insert into budget_lines (on_month, name, account_id, bucket, amount, percent,
-		                          position, notes, created_by, updated_by)
+		                          due_on, position, notes, created_by, updated_by)
 		select $1, l.name, l.account_id, l.bucket, l.amount, l.percent,
+		       (l.due_on + interval '1 month')::date,
 		       $3 + row_number() over (order by l.position, l.id), l.notes, $2, $2
 		  from budget_lines l
 		 where l.on_month = ($1::date - interval '1 month')
@@ -579,9 +602,10 @@ func (s *Store) SeedBudget(ctx context.Context, month time.Time, actor string) (
 	// The income side too. A salary and a retainer come round every month, and
 	// nothing arrives already received.
 	tag, err = tx.Exec(ctx, `
-		insert into budget_incomes (on_month, name, amount, currency, account_id, position,
-		                            notes, created_by, updated_by)
+		insert into budget_incomes (on_month, name, amount, currency, account_id, due_on,
+		                            position, notes, created_by, updated_by)
 		select $1, i.name, i.amount, i.currency, i.account_id,
+		       (i.due_on + interval '1 month')::date,
 		       row_number() over (order by i.position, i.id), i.notes, $2, $2
 		  from budget_incomes i
 		 where i.on_month = ($1::date - interval '1 month') and i.deleted_at is null`,
@@ -605,14 +629,15 @@ func (s *Store) CreateBudgetLine(ctx context.Context, month time.Time, in Budget
 
 	var id int64
 	err := s.pool.QueryRow(ctx, `
-		insert into budget_lines (on_month, name, account_id, bucket, amount, percent, notes,
-		                          position, created_by, updated_by)
-		values ($1, $2, $3, $4, $5, $6, $7,
+		insert into budget_lines (on_month, name, account_id, bucket, amount, percent,
+		                          due_on, notes, position, created_by, updated_by)
+		values ($1, $2, $3, $4, $5, $6, nullif($7, '')::date, $8,
 		        coalesce((select max(position) + 1 from budget_lines
 		                   where on_month = $1 and deleted_at is null), 0),
-		        $8, $8)
+		        $9, $9)
 		returning id`,
-		on, in.Name, in.AccountID, in.Bucket, in.Amount, in.Percent, in.Notes, actor).Scan(&id)
+		on, in.Name, in.AccountID, in.Bucket, in.Amount, in.Percent, in.DueOn,
+		in.Notes, actor).Scan(&id)
 	if err != nil {
 		return BudgetLine{}, norm(err)
 	}
@@ -623,9 +648,11 @@ func (s *Store) UpdateBudgetLine(ctx context.Context, id int64, in BudgetLineInp
 	tag, err := s.pool.Exec(ctx, `
 		update budget_lines
 		   set name = $1, account_id = $2, bucket = $3, amount = $4, percent = $5,
-		       notes = $6, updated_by = $7, updated_at = now()
-		 where id = $8 and deleted_at is null`,
-		in.Name, in.AccountID, in.Bucket, in.Amount, in.Percent, in.Notes, actor, id)
+		       due_on = nullif($6, '')::date, notes = $7,
+		       updated_by = $8, updated_at = now()
+		 where id = $9 and deleted_at is null`,
+		in.Name, in.AccountID, in.Bucket, in.Amount, in.Percent, in.DueOn,
+		in.Notes, actor, id)
 	if err != nil {
 		return BudgetLine{}, norm(err)
 	}
@@ -704,13 +731,15 @@ func (s *Store) budgetLine(ctx context.Context, id int64) (BudgetLine, error) {
 	err := s.pool.QueryRow(ctx, `
 		select l.id, to_char(l.on_month, 'YYYY-MM-DD'), l.name, l.account_id,
 		       coalesce(a.name, ''), l.bucket, l.amount, l.percent, l.paid,
+		       coalesce(to_char(l.due_on, 'YYYY-MM-DD'), ''),
 		       l.expense_id, l.position, l.notes,
 		       l.created_by, l.updated_by, l.created_at, l.updated_at
 		  from budget_lines l
 		  left join money_accounts a on a.id = l.account_id
 		 where l.id = $1 and l.deleted_at is null`, id).
 		Scan(&l.ID, &l.OnMonth, &l.Name, &l.AccountID, &l.AccountName,
-			&l.Bucket, &l.Amount, &l.Percent, &l.Paid, &l.ExpenseID, &l.Position, &l.Notes,
+			&l.Bucket, &l.Amount, &l.Percent, &l.Paid, &l.DueOn, &l.ExpenseID, &l.Position,
+			&l.Notes,
 			&l.CreatedBy, &l.UpdatedBy, &l.CreatedAt, &l.UpdatedAt)
 	if err != nil {
 		return l, norm(err)

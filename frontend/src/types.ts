@@ -350,6 +350,8 @@ export type BudgetLine = Audit & {
   amount: number
   percent: number | null
   paid: boolean
+  /** The day it falls due, or '' when it is just some time this month. */
+  due_on: string
   expense_id: number | null
   position: number
   notes: string
@@ -361,6 +363,7 @@ export type BudgetLineInput = {
   bucket: string
   amount: number
   percent: number | null
+  due_on: string
   notes: string
 }
 
@@ -370,13 +373,15 @@ export type BudgetIncome = Audit & {
   on_month: string
   name: string
   amount: number
-  /** What the source pays in.  is the same money in the month's
+  /** What the source pays in. `converted` is the same money in the month's
    *  currency, which is what every total and percentage is built from. */
   currency: string
   converted: number
   account_id: number | null
   account_name: string
   received: boolean
+  /** The day it is expected, or '' when no day was given. */
+  due_on: string
   position: number
   notes: string
 }
@@ -386,6 +391,7 @@ export type BudgetIncomeInput = {
   amount: number
   currency: string
   account_id: number | null
+  due_on: string
   notes: string
 }
 

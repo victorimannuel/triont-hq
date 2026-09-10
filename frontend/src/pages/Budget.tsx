@@ -4,7 +4,7 @@ import { toast } from 'sonner'
 
 import { api } from '@/api'
 import { useMeta } from '@/App'
-import { useT } from '@/i18n'
+import { currentLocale, useT } from '@/i18n'
 import type { BudgetMonth, MoneyAccount } from '@/types'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
@@ -42,6 +42,35 @@ function monthKey(date = new Date()) {
 function shift(month: string, by: number) {
   const [year, index] = month.split('-').map(Number)
   return monthKey(new Date(year, index - 1 + by, 1))
+}
+
+// Day nought of the next month is the last day of this one, which saves
+// knowing which months are short and which February it is.
+function lastDay(month: string) {
+  const [year, index] = month.split('-').map(Number)
+  const end = new Date(year, index, 0)
+  return `${month}-${String(end.getDate()).padStart(2, '0')}`
+}
+
+/*
+What sits under a row's name: the day it falls on, then the account.
+
+The month and the year are already at the top of the page, so a full date would
+be three quarters repetition — but the month name stays, because "25 Sep" is
+read at a glance where a bare 25 has to be worked out.
+*/
+function beneath(due: string, account: string) {
+  let day = ''
+  if (due) {
+    const date = new Date(due)
+    if (!Number.isNaN(date.getTime())) {
+      day = new Intl.DateTimeFormat(currentLocale(), {
+        day: 'numeric',
+        month: 'short',
+      }).format(date)
+    }
+  }
+  return [day, account].filter(Boolean).join(' · ')
 }
 
 // The colour a bucket carries wherever it appears, so the bar and the badge
@@ -277,6 +306,7 @@ export default function Budget() {
           editing === `income-${income.id}` ? (
             <RowForm
               key={income.id}
+              month={month}
               accounts={accounts}
               currencies={meta.currencies ?? []}
               busy={busy}
@@ -289,6 +319,7 @@ export default function Budget() {
                 currency: income.currency,
                 amount: income.amount,
                 percent: null,
+                dueOn: income.due_on,
               }}
               onCancel={() => setEditing(null)}
               onAdd={(got) => {
@@ -299,6 +330,7 @@ export default function Budget() {
                     amount: got.amount,
                     currency: got.currency ?? 'IDR',
                     account_id: got.accountID,
+                    due_on: got.dueOn,
                     notes: income.notes,
                   }),
                 )
@@ -309,7 +341,7 @@ export default function Budget() {
             key={income.id}
             ticked={income.received}
             name={income.name}
-            under={income.account_name}
+            under={beneath(income.due_on, income.account_name)}
             right={
               <>
                 {formatMoney(Math.round(income.amount), income.currency)}
@@ -331,6 +363,7 @@ export default function Budget() {
           ),
         )}
         <RowForm
+          month={month}
           accounts={accounts}
           currencies={meta.currencies ?? []}
           busy={busy}
@@ -344,6 +377,7 @@ export default function Budget() {
                 amount: got.amount,
                 currency: got.currency ?? 'IDR',
                 account_id: got.accountID,
+                due_on: got.dueOn,
                 notes: '',
               }),
             )
@@ -360,6 +394,7 @@ export default function Budget() {
           editing === `line-${line.id}` ? (
             <RowForm
               key={line.id}
+              month={month}
               accounts={accounts}
               buckets={meta.budget_buckets ?? []}
               busy={busy}
@@ -372,6 +407,7 @@ export default function Budget() {
                 bucket: line.bucket,
                 amount: line.amount,
                 percent: line.percent,
+                dueOn: line.due_on,
               }}
               onCancel={() => setEditing(null)}
               onAdd={(got) => {
@@ -383,6 +419,7 @@ export default function Budget() {
                     bucket: got.bucket ?? 'needs',
                     amount: got.amount,
                     percent: got.percent,
+                    due_on: got.dueOn,
                     notes: line.notes,
                   }),
                 )
@@ -393,7 +430,7 @@ export default function Budget() {
             key={line.id}
             ticked={line.paid}
             name={line.name}
-            under={line.account_name}
+            under={beneath(line.due_on, line.account_name)}
             badge={tOpt('bucket', line.bucket)}
             right={
               <>
@@ -412,6 +449,7 @@ export default function Budget() {
           ),
         )}
         <RowForm
+          month={month}
           accounts={accounts}
           buckets={meta.budget_buckets ?? []}
           busy={busy}
@@ -426,6 +464,7 @@ export default function Budget() {
                 bucket: got.bucket ?? 'needs',
                 amount: got.amount,
                 percent: got.percent,
+                due_on: got.dueOn,
                 notes: '',
               }),
             )
@@ -547,6 +586,7 @@ export type RowValues = {
   currency?: string
   amount: number
   percent: number | null
+  dueOn: string
 }
 
 /*
@@ -562,6 +602,7 @@ form for anything phrased as "5% of salary", because it then follows a raise on
 its own instead of being retyped every time.
 */
 function RowForm({
+  month,
   accounts,
   buckets,
   currencies,
@@ -573,6 +614,8 @@ function RowForm({
   onCancel,
   onAdd,
 }: {
+  /** The month on screen, as YYYY-MM. Only the date box uses it. */
+  month: string
   accounts: MoneyAccount[]
   buckets?: { value: string; label: string }[]
   /** Offered on the income side only: what a source pays in varies, what a
@@ -587,7 +630,7 @@ function RowForm({
   onCancel?: () => void
   onAdd: (got: RowValues) => void
 }) {
-  const { tOpt } = useT()
+  const { t, tOpt } = useT()
   const [name, setName] = useState(initial?.name ?? '')
   const [bucket, setBucket] = useState(initial?.bucket ?? 'needs')
   const [currency, setCurrency] = useState(initial?.currency ?? 'IDR')
@@ -598,6 +641,7 @@ function RowForm({
   const [percent, setPercent] = useState(
     initial?.percent != null ? String(initial.percent) : '',
   )
+  const [dueOn, setDueOn] = useState(initial?.dueOn ?? '')
 
   function submit(event: FormEvent) {
     event.preventDefault()
@@ -609,11 +653,13 @@ function RowForm({
       currency: currencies ? currency : undefined,
       amount: Number(amount) || 0,
       percent: percent ? Number(percent) : null,
+      dueOn,
     })
     if (initial) return
     setName('')
     setAmount('')
     setPercent('')
+    setDueOn('')
   }
 
   return (
@@ -690,6 +736,19 @@ function RowForm({
           className="w-20 tabular-nums"
         />
       )}
+      {/* Last, and optional, because most rows have no particular day: the rent
+          falls on the 3rd and the salary lands on the 25th, but "some time this
+          month" is the usual answer. Held inside the month on screen — a row
+          belongs to one month, and a date outside it would only be a typo. */}
+      <Input
+        type="date"
+        value={dueOn}
+        min={`${month}-01`}
+        max={lastDay(month)}
+        onChange={(event) => setDueOn(event.target.value)}
+        aria-label={t('budget.due')}
+        className="w-[9.5rem]"
+      />
       <Button type="submit" size="icon" disabled={busy || !name.trim()} aria-label={addLabel}>
         {initial ? <Check className="size-4" /> : <Plus className="size-4" />}
       </Button>

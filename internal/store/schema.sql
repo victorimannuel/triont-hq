@@ -827,6 +827,13 @@ alter table budget_incomes add column if not exists currency text not null defau
 create index if not exists budget_incomes_month_idx on budget_incomes (on_month, position, id);
 create index if not exists budget_incomes_live_idx  on budget_incomes (deleted_at);
 
+-- The day the money is expected, and the day the line falls due. Both optional:
+-- a salary lands on the 25th and the rent is due on the 3rd, but plenty of a
+-- month is just "some time this month", and making up a date for those would be
+-- inventing information the page then has to be trusted on.
+alter table budget_incomes add column if not exists due_on date;
+alter table budget_lines   add column if not exists due_on date;
+
 -- What share of a month each bucket is meant to take. One row per bucket, so
 -- "normally 5%" stops being a note in a name and becomes something the page
 -- can hold the real figure up against.
