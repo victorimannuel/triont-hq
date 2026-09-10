@@ -9,19 +9,10 @@ import { useMeta } from '@/App'
 import { useT } from '@/i18n'
 import type { Client, Project, Tag } from '@/types'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { ErrorNote, PageHeader, StatusBadge } from '@/components/bits'
+import { ErrorNote, Mark, PageHeader, StatusBadge } from '@/components/bits'
 import { FileCount } from '@/components/Files'
 import { SearchInput, FilterSelect } from '@/components/filters'
-import { CardList, Responsive } from '@/components/cards'
+import { RowList } from '@/components/cards'
 
 export default function Projects() {
   const meta = useMeta()
@@ -103,120 +94,35 @@ export default function Projects() {
         )}
       </div>
 
-      <Responsive
-        table={
-          <Card className="py-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('common.name')}</TableHead>
-                  <TableHead>{t('project.client')}</TableHead>
-                  <TableHead>{t('common.kind')}</TableHead>
-                  <TableHead>{t('common.status')}</TableHead>
-                  <TableHead>{t('project.deploy')}</TableHead>
-                  <TableHead className="text-right">{t('link.title')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {projects.map((project) => (
-                  <TableRow
-                    key={project.id}
-                    onClick={() => navigate(`/projects/${project.slug}`)}
-                    className="cursor-pointer"
-                  >
-                    <TableCell>
-                      {/* No underline: the whole row is the link already. */}
-                      <div className="flex items-center gap-2 font-medium">
-                        {project.name}
-                        <FileCount n={fileCounts[project.id]} />
-                      </div>
-                      {project.local_path && (
-                        <div className="mt-0.5 font-mono text-xs text-muted-foreground">
-                          {project.local_path}
-                        </div>
-                      )}
-                      {(project.tags ?? []).length > 0 && (
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {project.tags.map((tag) => (
-                            <span
-                              key={tag.id}
-                              className="rounded-full border bg-secondary/60 px-2 py-0.5 text-[11px] text-muted-foreground"
-                            >
-                              {tag.name}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {project.client_slug ? (
-                        <Link
-                          to={`/clients/${project.client_slug}`}
-                          className="hover:underline"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {project.client}
-                        </Link>
-                      ) : (
-                        '—'
-                      )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {tOpt('kind', project.kind)}
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={project.status} label={tOpt('status', project.status)} />
-                    </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      {project.deploy_target || '—'}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {project.link_count}
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {!loading && projects.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
-                      {t('project.noMatch')}
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </Card>
-        }
-        cards={
-          <CardList
-            items={projects}
-            keyOf={(p) => p.id}
-            onPick={(p) => navigate(`/projects/${p.slug}`)}
-            empty={loading ? null : t('project.noMatch')}
-            render={(p) => ({
-              title: p.name,
-              subtitle: p.client || undefined,
-              trailing: <StatusBadge status={p.status} label={tOpt('status', p.status)} />,
-              meta: (
-                <>
-                  <span>{tOpt('kind', p.kind)}</span>
-                  {p.deploy_target && <span className="font-mono">{p.deploy_target}</span>}
-                  <span>
-                    {p.link_count} {t('link.title')}
-                  </span>
-                  {(p.tags ?? []).map((tag) => (
-                    <span
-                      key={tag.id}
-                      className="rounded-full border bg-secondary/60 px-2 py-0.5 text-[11px]"
-                    >
-                      {tag.name}
-                    </span>
-                  ))}
-                  <FileCount n={fileCounts[p.id]} />
-                </>
-              ),
-            })}
-          />
-        }
+      <RowList
+        items={projects}
+        keyOf={(p) => p.id}
+        onPick={(p) => navigate(`/projects/${p.slug}`)}
+        empty={loading ? null : t('project.noMatch')}
+        render={(p) => ({
+          leading: <Mark name={p.name} />,
+          title: p.name,
+          subtitle: p.client || undefined,
+          trailing: <StatusBadge status={p.status} label={tOpt('status', p.status)} />,
+          meta: (
+            <>
+              <span>{tOpt('kind', p.kind)}</span>
+              {p.deploy_target && <span className="font-mono">{p.deploy_target}</span>}
+              <span>
+                {p.link_count} {t('link.title')}
+              </span>
+              {(p.tags ?? []).map((tag) => (
+                <span
+                  key={tag.id}
+                  className="rounded-full border bg-secondary/60 px-2 py-0.5 text-[11px]"
+                >
+                  {tag.name}
+                </span>
+              ))}
+              <FileCount n={fileCounts[p.id]} />
+            </>
+          ),
+        })}
       />
     </>
   )

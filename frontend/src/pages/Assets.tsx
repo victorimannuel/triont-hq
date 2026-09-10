@@ -9,19 +9,10 @@ import { useMeta } from '@/App'
 import type { Asset } from '@/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { ErrorNote, formatMoney, PageHeader, RenewalBadge } from '@/components/bits'
+import { ErrorNote, formatMoney, Mark, PageHeader, RenewalBadge } from '@/components/bits'
 import { FileCount } from '@/components/Files'
 import { SearchInput, FilterSelect } from '@/components/filters'
-import { CardList, Responsive } from '@/components/cards'
+import { RowList } from '@/components/cards'
 
 export default function Assets() {
   const meta = useMeta()
@@ -98,130 +89,48 @@ export default function Assets() {
         )}
       </div>
 
-      <Responsive
-        table={
-          <Card className="py-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('common.name')}</TableHead>
-                  <TableHead>{t('common.kind')}</TableHead>
-                  <TableHead>{t('asset.provider')}</TableHead>
-                  <TableHead>{t('asset.cost')}</TableHead>
-                  <TableHead>{t('asset.renewal')}</TableHead>
-                  <TableHead className="text-right">{t('nav.projects')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {assets.map((asset) => (
-                  <TableRow
-                    key={asset.id}
-                    onClick={() => navigate(`/assets/${asset.id}`)}
-                    className="cursor-pointer"
-                  >
-                    <TableCell>
-                      <div className="flex items-center gap-2 font-medium">
-                        {asset.name}
-                        <FileCount n={fileCounts[asset.id]} />
-                      </div>
-                      {asset.identifier && (
-                        <div className="mt-0.5 font-mono text-xs text-muted-foreground">
-                          {asset.identifier}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {tOpt('assetkind', asset.kind)}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                  <div>{asset.provider || '—'}</div>
-                  {asset.credential_label && (
-                    <div className="mt-0.5 text-xs">
-                      {asset.credential_user || asset.credential_label}
-                    </div>
-                  )}
-                </TableCell>
-                    <TableCell>
-                      <div className="tabular-nums">
-                        {formatMoney(asset.cost_amount, asset.cost_currency)}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {tOpt('cycle', asset.billing_cycle)}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {asset.status === 'active' ? (
-                        <RenewalBadge renewsOn={asset.renews_on} />
-                      ) : (
-                        <Badge variant="outline" className="text-muted-foreground">
-                          {tOpt('assetstatus', asset.status)}
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {asset.project_count}
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {!loading && assets.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
-                      {t('asset.none')}{' '}
-                      <Link to="/assets/new" className="text-primary hover:underline">
-                        {t('home.addOne')}
-                      </Link>
-                      .
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </Card>
-        }
-        cards={
-          <CardList
-            items={assets}
-            keyOf={(a) => a.id}
-            onPick={(a) => navigate(`/assets/${a.id}`)}
-            empty={loading ? null : t('asset.none')}
-            render={(a) => ({
-              title: a.name,
-              subtitle: a.identifier || undefined,
-              meta: (
-                <>
-                  <span>{tOpt('assetkind', a.kind)}</span>
-                  {a.provider && <span>{a.provider}</span>}
-                  {a.credential_label && (
-                    <span className="font-mono">
-                      {a.credential_user || a.credential_label}
-                    </span>
-                  )}
-                  <span>
-                    {a.project_count} {t('nav.projects')}
-                  </span>
-                  <FileCount n={fileCounts[a.id]} />
-                </>
-              ),
-              trailing: (
-                <>
-                  <span className="tabular-nums text-sm">
-                    {formatMoney(a.cost_amount, a.cost_currency)}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {tOpt('cycle', a.billing_cycle)}
-                  </span>
-                  {a.status === 'active' ? (
-                    <RenewalBadge renewsOn={a.renews_on} />
-                  ) : (
-                    <Badge variant="outline" className="text-muted-foreground">
-                      {tOpt('assetstatus', a.status)}
-                    </Badge>
-                  )}
-                </>
-              ),
-            })}
-          />
-        }
+      <RowList
+        items={assets}
+        keyOf={(a) => a.id}
+        onPick={(a) => navigate(`/assets/${a.id}`)}
+        empty={loading ? null : t('asset.none')}
+        render={(a) => ({
+          leading: <Mark name={a.name} />,
+          title: a.name,
+          subtitle: a.identifier || undefined,
+          meta: (
+            <>
+              <span>{tOpt('assetkind', a.kind)}</span>
+              {a.provider && <span>{a.provider}</span>}
+              {a.credential_label && (
+                <span className="font-mono">
+                  {a.credential_user || a.credential_label}
+                </span>
+              )}
+              <span>
+                {a.project_count} {t('nav.projects')}
+              </span>
+              <FileCount n={fileCounts[a.id]} />
+            </>
+          ),
+          trailing: (
+            <>
+              <span className="tabular-nums text-sm">
+                {formatMoney(a.cost_amount, a.cost_currency)}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {tOpt('cycle', a.billing_cycle)}
+              </span>
+              {a.status === 'active' ? (
+                <RenewalBadge renewsOn={a.renews_on} />
+              ) : (
+                <Badge variant="outline" className="text-muted-foreground">
+                  {tOpt('assetstatus', a.status)}
+                </Badge>
+              )}
+            </>
+          ),
+        })}
       />
     </>
   )

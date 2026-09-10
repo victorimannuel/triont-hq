@@ -18,9 +18,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { ErrorNote, PageHeader } from '@/components/bits'
+import { ErrorNote, Mark, PageHeader } from '@/components/bits'
 import { FilterSelect, SearchInput } from '@/components/filters'
-import { CardList, Responsive } from '@/components/cards'
+import { Responsive, RowList } from '@/components/cards'
 
 // A revealed secret hides itself again, so a tab left open on a second monitor
 // does not keep showing it.
@@ -192,12 +192,13 @@ export default function Credentials() {
           </Card>
         }
         cards={
-          <CardList
+          <RowList
             items={credentials}
             keyOf={(c) => c.id}
             onPick={(c) => navigate(`/credentials/${c.id}`)}
             empty={t('credential.none')}
             render={(c) => ({
+              leading: <Mark name={c.label} />,
               title: c.label,
               subtitle: c.host || undefined,
               meta: (

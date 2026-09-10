@@ -17,8 +17,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useConfirm } from '@/components/confirm'
-import { ErrorNote, formatDate, Loading, PageHeader } from '@/components/bits'
-import { CardList, Responsive } from '@/components/cards'
+import { ErrorNote, formatDate, Loading, Mark, PageHeader } from '@/components/bits'
+import { Responsive, RowList } from '@/components/cards'
 
 export default function Trash() {
   const { t } = useT()
@@ -146,11 +146,12 @@ export default function Trash() {
           </Card>
         }
         cards={
-          <CardList
+          <RowList
             items={items}
             keyOf={(item) => `${item.entity}-${item.id}`}
             empty={t('trash.empty')}
             render={(item) => ({
+              leading: <Mark name={item.label} />,
               title: item.label,
               subtitle: item.detail || undefined,
               meta: (

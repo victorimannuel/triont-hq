@@ -28,7 +28,7 @@ import {
 import { ErrorNote, formatDate, Mark, PageHeader } from '@/components/bits'
 import { FileCount } from '@/components/Files'
 import { SearchInput } from '@/components/filters'
-import { CardList, Responsive } from '@/components/cards'
+import { Responsive, RowList } from '@/components/cards'
 
 export default function People() {
   const { t } = useT()
@@ -213,7 +213,7 @@ export default function People() {
           </Card>
         }
         cards={
-          <CardList
+          <RowList
             items={people}
             keyOf={(p) => p.id}
             onPick={(p) => navigate(`/people/${p.id}`)}
