@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ErrorNote, formatMoney, Loading, PageHeader } from '@/components/bits'
+import { ErrorNote, formatMoney, Loading, PageHeader, Segmented } from '@/components/bits'
 import { useConfirm } from '@/components/confirm'
 
 /*
@@ -105,6 +105,16 @@ export default function Budget() {
   // The target percentages while they are being typed, keyed by bucket. Null
   // when nobody is editing them, which is what puts the figures back.
   const [targets, setTargets] = useState<Record<string, string> | null>(null)
+  /*
+  Which list is on screen. Allocation opens first: income is three rows typed
+  once at the start of the month, and the allocations are what the rest of it
+  is spent adding to and ticking off.
+
+  Only the lists are behind this. Every figure the page is read for — income,
+  allocated, left — sits above the strip and stays put, so switching tabs never
+  hides the number the other tab is measured against.
+  */
+  const [tab, setTab] = useState<'incomes' | 'lines'>('lines')
 
   const load = useCallback(() => {
     api
@@ -311,186 +321,208 @@ export default function Budget() {
         </Card>
       )}
 
-      <Section title={t('budget.incomes')}>
-        {data.incomes.map((income) =>
-          editing === `income-${income.id}` ? (
+      <Section
+        title={
+          <Segmented
+            value={tab}
+            onChange={setTab}
+            options={[
+              { value: 'incomes', label: `${t('budget.incomes')} ${data.incomes.length}` },
+              { value: 'lines', label: `${t('budget.lines')} ${data.lines.length}` },
+            ]}
+          />
+        }
+      >
+        {tab === 'incomes' && (
+          <>
+            <p className="px-3 py-2 text-xs text-muted-foreground sm:px-4">
+              {t('budget.incomeNote')}
+            </p>
+            {data.incomes.map((income) =>
+              editing === `income-${income.id}` ? (
+                <RowForm
+                  key={income.id}
+                  month={month}
+                  accounts={accounts}
+                  currencies={meta.currencies ?? []}
+                  busy={busy}
+                  namePlaceholder={t('budget.incomePlaceholder')}
+                  amountPlaceholder={t('budget.amount')}
+                  addLabel={t('common.save')}
+                  initial={{
+                    name: income.name,
+                    accountID: income.account_id,
+                    currency: income.currency,
+                    amount: income.amount,
+                    percent: null,
+                    dueOn: income.due_on,
+                  }}
+                  onCancel={() => setEditing(null)}
+                  onAdd={(got) => {
+                    setEditing(null)
+                    void run(() =>
+                      api.updateBudgetIncome(income.id, {
+                        name: got.name,
+                        amount: got.amount,
+                        currency: got.currency ?? 'IDR',
+                        account_id: got.accountID,
+                        due_on: got.dueOn,
+                        notes: income.notes,
+                      }),
+                    )
+                  }}
+                />
+              ) : (
+              <Row
+                key={income.id}
+                ticked={income.received}
+                name={income.name}
+                under={beneath(income.due_on, income.account_name)}
+                right={
+                  <>
+                    {formatMoney(Math.round(income.amount), income.currency)}
+                    {/* What it comes to in the month's own money, but only when
+                        that is a different question. */}
+                    {income.currency !== data.currency && (
+                      <div className="text-xs text-muted-foreground">
+                        ≈ {money(income.converted)}
+                      </div>
+                    )}
+                  </>
+                }
+                busy={busy}
+                onTick={(next) => run(() => api.setBudgetIncomeReceived(income.id, next))}
+                onEdit={() => setEditing(`income-${income.id}`)}
+                onRemove={() => remove(income.name, () => api.deleteBudgetIncome(income.id))}
+                deleteLabel={t('common.delete')}
+              />
+              ),
+            )}
             <RowForm
-              key={income.id}
               month={month}
               accounts={accounts}
               currencies={meta.currencies ?? []}
               busy={busy}
               namePlaceholder={t('budget.incomePlaceholder')}
               amountPlaceholder={t('budget.amount')}
-              addLabel={t('common.save')}
-              initial={{
-                name: income.name,
-                accountID: income.account_id,
-                currency: income.currency,
-                amount: income.amount,
-                percent: null,
-                dueOn: income.due_on,
-              }}
-              onCancel={() => setEditing(null)}
-              onAdd={(got) => {
-                setEditing(null)
-                void run(() =>
-                  api.updateBudgetIncome(income.id, {
+              addLabel={t('common.add')}
+              onAdd={(got) =>
+                run(() =>
+                  api.createBudgetIncome(month, {
                     name: got.name,
                     amount: got.amount,
                     currency: got.currency ?? 'IDR',
                     account_id: got.accountID,
                     due_on: got.dueOn,
-                    notes: income.notes,
+                    notes: '',
                   }),
                 )
-              }}
+              }
             />
-          ) : (
-          <Row
-            key={income.id}
-            ticked={income.received}
-            name={income.name}
-            under={beneath(income.due_on, income.account_name)}
-            right={
-              <>
-                {formatMoney(Math.round(income.amount), income.currency)}
-                {/* What it comes to in the month's own money, but only when
-                    that is a different question. */}
-                {income.currency !== data.currency && (
-                  <div className="text-xs text-muted-foreground">
-                    ≈ {money(income.converted)}
-                  </div>
-                )}
-              </>
-            }
-            busy={busy}
-            onTick={(next) => run(() => api.setBudgetIncomeReceived(income.id, next))}
-            onEdit={() => setEditing(`income-${income.id}`)}
-            onRemove={() => remove(income.name, () => api.deleteBudgetIncome(income.id))}
-            deleteLabel={t('common.delete')}
-          />
-          ),
+          </>
         )}
-        <RowForm
-          month={month}
-          accounts={accounts}
-          currencies={meta.currencies ?? []}
-          busy={busy}
-          namePlaceholder={t('budget.incomePlaceholder')}
-          amountPlaceholder={t('budget.amount')}
-          addLabel={t('common.add')}
-          onAdd={(got) =>
-            run(() =>
-              api.createBudgetIncome(month, {
-                name: got.name,
-                amount: got.amount,
-                currency: got.currency ?? 'IDR',
-                account_id: got.accountID,
-                due_on: got.dueOn,
-                notes: '',
-              }),
-            )
-          }
-        />
-      </Section>
 
-      {data.missing && (
-        <p className="mt-2 text-xs text-muted-foreground">{t('budget.missingRate')}</p>
-      )}
-
-      <Section title={t('budget.lines')}>
-        {data.lines.map((line) =>
-          editing === `line-${line.id}` ? (
+        {tab === 'lines' && (
+          <>
+            {data.lines.map((line) =>
+              editing === `line-${line.id}` ? (
+                <RowForm
+                  key={line.id}
+                  month={month}
+                  accounts={accounts}
+                  buckets={meta.budget_buckets ?? []}
+                  busy={busy}
+                  namePlaceholder={t('budget.linePlaceholder')}
+                  amountPlaceholder={t('budget.amount')}
+                  addLabel={t('common.save')}
+                  initial={{
+                    name: line.name,
+                    accountID: line.account_id,
+                    bucket: line.bucket,
+                    amount: line.amount,
+                    percent: line.percent,
+                    dueOn: line.due_on,
+                  }}
+                  onCancel={() => setEditing(null)}
+                  onAdd={(got) => {
+                    setEditing(null)
+                    void run(() =>
+                      api.updateBudgetLine(line.id, {
+                        name: got.name,
+                        account_id: got.accountID,
+                        bucket: got.bucket ?? 'needs',
+                        amount: got.amount,
+                        percent: got.percent,
+                        due_on: got.dueOn,
+                        notes: line.notes,
+                      }),
+                    )
+                  }}
+                />
+              ) : (
+              <Row
+                key={line.id}
+                ticked={line.paid}
+                name={line.name}
+                under={beneath(line.due_on, line.account_name)}
+                badge={tOpt('bucket', line.bucket)}
+                right={
+                  <>
+                    {money(line.amount)}
+                    {line.percent !== null && (
+                      <span className="ml-1 text-xs text-muted-foreground">{line.percent}%</span>
+                    )}
+                  </>
+                }
+                busy={busy}
+                onTick={(next) => run(() => api.setBudgetLinePaid(line.id, next))}
+                onEdit={() => setEditing(`line-${line.id}`)}
+                onRemove={() => remove(line.name, () => api.deleteBudgetLine(line.id))}
+                deleteLabel={t('common.delete')}
+              />
+              ),
+            )}
             <RowForm
-              key={line.id}
               month={month}
               accounts={accounts}
               buckets={meta.budget_buckets ?? []}
               busy={busy}
               namePlaceholder={t('budget.linePlaceholder')}
               amountPlaceholder={t('budget.amount')}
-              addLabel={t('common.save')}
-              initial={{
-                name: line.name,
-                accountID: line.account_id,
-                bucket: line.bucket,
-                amount: line.amount,
-                percent: line.percent,
-                dueOn: line.due_on,
-              }}
-              onCancel={() => setEditing(null)}
-              onAdd={(got) => {
-                setEditing(null)
-                void run(() =>
-                  api.updateBudgetLine(line.id, {
+              addLabel={t('common.add')}
+              onAdd={(got) =>
+                run(() =>
+                  api.createBudgetLine(month, {
                     name: got.name,
                     account_id: got.accountID,
                     bucket: got.bucket ?? 'needs',
                     amount: got.amount,
                     percent: got.percent,
                     due_on: got.dueOn,
-                    notes: line.notes,
+                    notes: '',
                   }),
                 )
-              }}
+              }
             />
-          ) : (
-          <Row
-            key={line.id}
-            ticked={line.paid}
-            name={line.name}
-            under={beneath(line.due_on, line.account_name)}
-            badge={tOpt('bucket', line.bucket)}
-            right={
-              <>
-                {money(line.amount)}
-                {line.percent !== null && (
-                  <span className="ml-1 text-xs text-muted-foreground">{line.percent}%</span>
-                )}
-              </>
-            }
-            busy={busy}
-            onTick={(next) => run(() => api.setBudgetLinePaid(line.id, next))}
-            onEdit={() => setEditing(`line-${line.id}`)}
-            onRemove={() => remove(line.name, () => api.deleteBudgetLine(line.id))}
-            deleteLabel={t('common.delete')}
-          />
-          ),
+          </>
         )}
-        <RowForm
-          month={month}
-          accounts={accounts}
-          buckets={meta.budget_buckets ?? []}
-          busy={busy}
-          namePlaceholder={t('budget.linePlaceholder')}
-          amountPlaceholder={t('budget.amount')}
-          addLabel={t('common.add')}
-          onAdd={(got) =>
-            run(() =>
-              api.createBudgetLine(month, {
-                name: got.name,
-                account_id: got.accountID,
-                bucket: got.bucket ?? 'needs',
-                amount: got.amount,
-                percent: got.percent,
-                due_on: got.dueOn,
-                notes: '',
-              }),
-            )
-          }
-        />
       </Section>
+
+      {tab === 'incomes' && data.missing && (
+        <p className="mt-2 text-xs text-muted-foreground">{t('budget.missingRate')}</p>
+      )}
     </>
   )
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+// The heading is a node rather than a string because on this page it is the
+// tab strip that names the section.
+function Section({ title, children }: { title: ReactNode; children: ReactNode }) {
   return (
     <>
-      <h2 className="mb-2 mt-6 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+      <div className="mb-2 mt-6 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
         {title}
-      </h2>
+      </div>
       <Card className="overflow-hidden py-0">
         <CardContent className="divide-y px-0">{children}</CardContent>
       </Card>
