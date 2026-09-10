@@ -24,52 +24,102 @@ const MARK_INK = '#a35d2e'
 const TILE = '#3a1e0e'
 const TILE_INK = '#ffffff'
 
-// The mark in a 32-unit box: two rings broken at the foot, closing on a solid
-// core. Every number is the artwork's own proportion — outer radius 0.3875 of
-// the box, stroke 0.075 — so the icon is the logo scaled, not a redraw of it.
+// The mark in a 32-unit box: the Triont mark, drawn as strokes so the icon is
+// the logo scaled rather than a redraw of it. A ring open on the four axes,
+// and inside it two stems, each with an arm reaching up and outward — one
+// from the foot of the upper stem, one from the head of the lower. The
+// proportions were measured off the original artwork; the stems sit a little
+// further apart than there and the figure is a touch smaller, so nothing
+// touches at favicon size.
 const MARK = {
   centre: 16,
-  outerRadius: 12.4,
-  innerRadius: 7.2,
-  stroke: 2.4,
-  // How much of each ring is missing at the bottom, in degrees. The inner one
-  // opens wider so the two breaks read as one gap rather than a slot.
-  outerGap: 26,
-  innerGap: 48,
-  core: 5.4,
-  coreRadius: 1.05,
+  ring: { radius: 12.4, stroke: 2 },
+  // Openings in the ring, as chords between the ends of the arcs. The top and
+  // bottom ones span the two stems; the side ones are a little narrower.
+  gaps: { top: 4.2, side: 3.6 },
+  figure: {
+    stroke: 2.4,
+    // Half the distance between the two stems.
+    stem: 2.1,
+    // Ends of the stems and the corners where the arms leave them, as
+    // distances from the centre: above it for the upper piece, below it for
+    // the lower.
+    top: 8.75,
+    upperCorner: 1.4,
+    lowerCorner: 3.2,
+    bottom: 8.78,
+    // How far each arm reaches, and the angle it climbs at from horizontal.
+    upperArm: 6,
+    lowerArm: 7.4,
+    angle: 33,
+  },
 }
 
-// Furthest the mark reaches from the centre, round caps included. It sets both
-// the badge's frame and how much room the mark needs inside the icon box.
-const MARK_REACH = MARK.outerRadius + MARK.stroke / 2
+// Furthest the mark reaches from the centre, stroke included. It sets both the
+// badge's frame and how much room the mark needs inside the icon box.
+const MARK_REACH = MARK.ring.radius + MARK.ring.stroke / 2
 
 // Sub-pixel precision no rasteriser can use, and it makes favicon.svg unreadable.
 const round = (v) => Number(v.toFixed(3))
 
-// One ring, drawn the long way round so the break lands at the bottom. `pt`
-// places a point in the target box and `len` scales a bare length.
-function ring(radius, gapDegrees, pt, len, ink) {
-  const half = ((gapDegrees / 2) * Math.PI) / 180
-  // Measured from the foot of the circle, which is where the break is centred.
-  const dx = radius * Math.sin(half)
-  const dy = radius * Math.cos(half)
-  const foot = round(pt(MARK.centre + dy))
-  const from = `${round(pt(MARK.centre - dx))} ${foot}`
-  const to = `${round(pt(MARK.centre + dx))} ${foot}`
+// The ring as four arcs. Angles run clockwise from the top; each opening is
+// centred on an axis and sized by its chord. `pt` places a point in the target
+// box and `len` scales a bare length.
+function ring(pt, len, ink) {
+  const { radius, stroke } = MARK.ring
+  const half = (chord) => (Math.asin(chord / 2 / radius) * 180) / Math.PI
+  const top = half(MARK.gaps.top)
+  const side = half(MARK.gaps.side)
+  const spans = [
+    [top, 90 - side],
+    [90 + side, 180 - top],
+    [180 + top, 270 - side],
+    [270 + side, 360 - top],
+  ]
+  const at = (degrees) => {
+    const a = (degrees * Math.PI) / 180
+    const x = round(pt(MARK.centre + radius * Math.sin(a)))
+    const y = round(pt(MARK.centre - radius * Math.cos(a)))
+    return `${x} ${y}`
+  }
   const r = round(len(radius))
-  // large-arc and sweep both set: the long way, clockwise, over the top.
-  return `<path d="M${from} A${r} ${r} 0 1 1 ${to}"
-        fill="none" stroke="${ink}" stroke-width="${round(len(MARK.stroke))}" stroke-linecap="round"/>`
+  return spans
+    .map(
+      ([from, to]) => `<path d="M${at(from)} A${r} ${r} 0 0 1 ${at(to)}"
+        fill="none" stroke="${ink}" stroke-width="${round(len(stroke))}" stroke-linecap="round"/>`,
+    )
+    .join('\n  ')
+}
+
+// The stems with their arms, drawn for one side and mirrored: the upper piece
+// is a V whose straight leg is the stem, the lower one a stem with the arm
+// leaving its head.
+function figure(pt, len, ink) {
+  const f = MARK.figure
+  const c = MARK.centre
+  const rise = Math.sin((f.angle * Math.PI) / 180)
+  const run = Math.cos((f.angle * Math.PI) / 180)
+  const pieces = (side) => {
+    const x = c + side * f.stem
+    const out = (length) => x + side * length * run
+    const p = (px, py) => `${round(pt(px))} ${round(pt(py))}`
+    return [
+      `M${p(x, c - f.top)} L${p(x, c - f.upperCorner)} L${p(out(f.upperArm), c - f.upperCorner - f.upperArm * rise)}`,
+      `M${p(out(f.lowerArm), c + f.lowerCorner - f.lowerArm * rise)} L${p(x, c + f.lowerCorner)} L${p(x, c + f.bottom)}`,
+    ]
+  }
+  return [...pieces(-1), ...pieces(1)]
+    .map(
+      (d) => `<path d="${d}"
+        fill="none" stroke="${ink}" stroke-width="${round(len(f.stroke))}"
+        stroke-linecap="round" stroke-linejoin="round"/>`,
+    )
+    .join('\n  ')
 }
 
 function mark(pt, len, ink) {
-  const corner = round(pt(MARK.centre - MARK.core / 2))
-  const side = round(len(MARK.core))
-  return `${ring(MARK.outerRadius, MARK.outerGap, pt, len, ink)}
-  ${ring(MARK.innerRadius, MARK.innerGap, pt, len, ink)}
-  <rect x="${corner}" y="${corner}" width="${side}" height="${side}"
-        rx="${round(len(MARK.coreRadius))}" fill="${ink}"/>`
+  return `${ring(pt, len, ink)}
+  ${figure(pt, len, ink)}`
 }
 
 // `padding` leaves the safe area a maskable icon needs: Android may crop the
