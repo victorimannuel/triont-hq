@@ -10,7 +10,7 @@ import {
 } from 'react-router-dom'
 import {
   Bell,
-  CalendarDays,
+  Calendar as CalendarIcon,
   Eye,
   EyeOff,
   FileText,
@@ -319,7 +319,7 @@ const NAV_GROUPS = [
       { to: '/todo', key: 'todo', icon: ListTodo, end: false },
       { to: '/habits', key: 'habits', icon: Repeat2, end: false },
       { to: '/journal', key: 'journal', icon: NotebookPen, end: false },
-      { to: '/calendar', key: 'calendar', icon: CalendarDays, end: false },
+      { to: '/calendar', key: 'calendar', icon: CalendarIcon, end: false },
       { to: '/notices', key: 'notices', icon: Bell, end: false },
       { to: '/timer', key: 'timer', icon: TimerIcon, end: false },
     ],
@@ -358,9 +358,9 @@ const NAV = NAV_GROUPS.flatMap((group) => group.items)
 // are one tap away in a drawer. Search earns the centre because it is the only
 // one that does something rather than going somewhere — and it reaches every
 // module anyway, which is why credentials no longer needs a tab of its own.
-const PRIMARY = ['home', 'calendar', 'projects']
+const PRIMARY = ['home', 'calendar', 'habits']
 const TABS_LEFT = NAV.filter((item) => item.key === 'home' || item.key === 'calendar')
-const TABS_RIGHT = NAV.filter((item) => item.key === 'projects')
+const TABS_RIGHT = NAV.filter((item) => item.key === 'habits')
 
 function Shell({
   email,
