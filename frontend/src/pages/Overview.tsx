@@ -7,7 +7,7 @@ import { useT } from '@/i18n'
 import type { Overview as OverviewData } from '@/types'
 import { Card } from '@/components/ui/card'
 import { EntryRow } from '@/components/EntryRow'
-import { daysUntil, ErrorNote, Loading, PageHeader, Segmented } from '@/components/bits'
+import { daysUntil, ErrorNote, Loading, PageHeader, Segmented, since } from '@/components/bits'
 import { useRemembered } from '@/lib/useRemembered'
 
 // How far ahead the upcoming list looks. The server sends a month; this is
@@ -40,6 +40,7 @@ export default function Overview() {
 
   const low = data.low_supplies ?? []
   const trouble = data.trouble ?? []
+  const quiet = data.stale_monitors ?? []
   const ahead = Number(range)
   const overdue = (data.upcoming ?? []).filter((e) => (daysUntil(e.date) ?? 0) < 0)
   const soon = (data.upcoming ?? []).filter((e) => {
@@ -62,12 +63,32 @@ export default function Overview() {
           {t('home.seeCalendar')}
         </Link>
       </div>
-      {trouble.length + overdue.length + soon.length === 0 ? (
+      {quiet.length + trouble.length + overdue.length + soon.length === 0 ? (
         <Card className="px-4 py-3 text-sm text-muted-foreground">
           {t('home.needsActionEmpty', { n: ahead })}
         </Card>
       ) : (
         <Card className="gap-0 divide-y overflow-hidden py-0">
+          {/* A checker that has gone quiet comes first, above whatever it last
+              managed to report: it cannot report its own death, so silence is
+              the one failure nothing else on this page would ever mention.
+              Amber rather than red — it is not known to be broken, it is
+              unknown, which is a different thing to walk into. */}
+          {quiet.map((monitor) => (
+            <Link
+              key={monitor.source}
+              to="/monitor"
+              className="flex items-center gap-3 border-l-2 border-l-warning px-4 py-3 transition-colors hover:bg-accent"
+            >
+              <span className="size-2 shrink-0 rounded-full bg-warning ring-3 ring-warning/20" />
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-medium">{monitor.source}</div>
+                <div className="truncate text-xs text-muted-foreground">
+                  {t('monitor.silent', { for: since(monitor.last_seen_at, t) })}
+                </div>
+              </div>
+            </Link>
+          ))}
           {trouble.map((check) => (
             <Link
               key={check.id}

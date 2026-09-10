@@ -13,7 +13,7 @@ import type { Check, MonitorSource } from '@/types'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
-import { ErrorNote, Loading, PageHeader, SectionTitle } from '@/components/bits'
+import { ErrorNote, Loading, PageHeader, SectionTitle, since } from '@/components/bits'
 
 /**
  * Things watched by something outside HQ. The checkers report in; HQ never
@@ -31,17 +31,6 @@ const ICON: Record<string, typeof CheckCircle2> = {
   ok: CheckCircle2,
   warn: AlertTriangle,
   down: CircleSlash,
-}
-
-/** "3 hari", "4 jam", "baru aja" — how long this has been the case. */
-function since(iso: string, t: (k: string, v?: Record<string, string | number>) => string) {
-  const ms = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(ms / 60000)
-  if (mins < 2) return t('monitor.justNow')
-  if (mins < 60) return t('monitor.forMinutes', { n: mins })
-  const hours = Math.floor(mins / 60)
-  if (hours < 48) return t('monitor.forHours', { n: hours })
-  return t('monitor.forDays', { n: Math.floor(hours / 24) })
 }
 
 export default function Monitor() {

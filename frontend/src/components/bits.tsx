@@ -281,6 +281,25 @@ export function daysUntil(value?: string | null) {
   return Math.round((target.getTime() - start.getTime()) / 86_400_000)
 }
 
+/**
+ * "3 hari", "4 jam", "baru aja" — how long this has been the case.
+ *
+ * Takes `t` rather than calling the hook, because it is used inside `.map`
+ * callbacks and from more than one page.
+ */
+export function since(
+  iso: string,
+  t: (key: string, values?: Record<string, string | number>) => string,
+) {
+  const ms = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(ms / 60000)
+  if (mins < 2) return t('monitor.justNow')
+  if (mins < 60) return t('monitor.forMinutes', { n: mins })
+  const hours = Math.floor(mins / 60)
+  if (hours < 48) return t('monitor.forHours', { n: hours })
+  return t('monitor.forDays', { n: Math.floor(hours / 24) })
+}
+
 export function RenewalBadge({ renewsOn }: { renewsOn?: string | null }) {
   const { t } = useT()
   const days = daysUntil(renewsOn)
