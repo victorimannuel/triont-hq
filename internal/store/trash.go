@@ -31,7 +31,7 @@ var softTables = map[string]bool{
 	// its own, which used to be final.
 	"project_links": true, "maintenance_logs": true, "supply_purchases": true,
 	"setlist_songs": true, "attachments": true, "tasks": true,
-	"journal_days": true,
+	"journal_days":   true,
 	"money_accounts": true, "budget_lines": true, "budget_incomes": true,
 }
 
