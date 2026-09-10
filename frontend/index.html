@@ -174,9 +174,113 @@
         if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t)
       } catch (e) {}
     </script>
+
+    <!--
+      The launch screen the app draws for itself, in the same colours and with
+      the same mark as the one the operating system shows. The OS splash goes
+      the moment the page exists, which is a beat before React has rendered
+      anything — this covers that beat, so the two read as one movement rather
+      than a flash of empty page between them.
+
+      Inline rather than in the stylesheet: it has to paint before the bundle
+      and the CSS have been fetched, which is the whole point of it.
+    -->
+    <style>
+      #boot {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        display: grid;
+        place-items: center;
+        background: #fcfaf7;
+        transition: opacity 260ms ease;
+      }
+      /* Roughly the size the mark has on the iOS launch image, so it does not
+         jump when one hands over to the other. */
+      #boot svg {
+        width: min(25vmin, 96px);
+        height: auto;
+        color: #a35d2e;
+        transition: transform 280ms ease;
+      }
+      /* The mark draws itself: the ring first, then the figure inside it.
+         Every path carries pathLength="1", so one dash length covers any
+         stroke however long it really is and the timings below are the same
+         for all of them. */
+      #boot path {
+        stroke-dasharray: 1;
+        stroke-dashoffset: 1;
+        animation: boot-draw 420ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+      }
+      #boot g:nth-of-type(1) path:nth-child(2) { animation-delay: 45ms; }
+      #boot g:nth-of-type(1) path:nth-child(3) { animation-delay: 90ms; }
+      #boot g:nth-of-type(1) path:nth-child(4) { animation-delay: 135ms; }
+      #boot g:nth-of-type(2) path:nth-child(1) { animation-delay: 120ms; }
+      #boot g:nth-of-type(2) path:nth-child(2) { animation-delay: 165ms; }
+      #boot g:nth-of-type(2) path:nth-child(3) { animation-delay: 210ms; }
+      #boot g:nth-of-type(2) path:nth-child(4) { animation-delay: 255ms; }
+      @keyframes boot-draw {
+        to {
+          stroke-dashoffset: 0;
+        }
+      }
+      /* On the way out the mark grows a little as the ground fades, so the
+         page underneath reads as coming forward rather than the cover simply
+         switching off. */
+      #boot[data-going] {
+        opacity: 0;
+      }
+      #boot[data-going] svg {
+        transform: scale(1.08);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']) #boot {
+          background: #110f0c;
+        }
+      }
+      :root[data-theme='dark'] #boot {
+        background: #110f0c;
+      }
+      /* Asked for no animation: the mark is simply there, whole, and the cover
+         is taken away without a fade. */
+      @media (prefers-reduced-motion: reduce) {
+        #boot,
+        #boot svg {
+          transition: none;
+        }
+        #boot path {
+          animation: none;
+          stroke-dashoffset: 0;
+        }
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <div id="boot">
+      <svg
+        viewBox="0 0 32 32"
+        role="img"
+        aria-label="HQ"
+        fill="none"
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <g stroke-width="2">
+          <path pathLength="1" d="M18.1 3.78 A12.4 12.4 0 0 1 28.27 14.2" />
+          <path pathLength="1" d="M28.27 17.8 A12.4 12.4 0 0 1 18.1 28.22" />
+          <path pathLength="1" d="M13.9 28.22 A12.4 12.4 0 0 1 3.73 17.8" />
+          <path pathLength="1" d="M3.73 14.2 A12.4 12.4 0 0 1 13.9 3.78" />
+        </g>
+        <g stroke-width="2.4">
+          <path pathLength="1" d="M13.9 7.25 L13.9 14.6 L8.87 11.33" />
+          <path pathLength="1" d="M7.69 15.17 L13.9 19.2 L13.9 24.78" />
+          <path pathLength="1" d="M18.1 7.25 L18.1 14.6 L23.13 11.33" />
+          <path pathLength="1" d="M24.31 15.17 L18.1 19.2 L18.1 24.78" />
+        </g>
+      </svg>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
