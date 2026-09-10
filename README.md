@@ -6,10 +6,15 @@ into the binary.
 <details open>
 <summary><b>English</b></summary>
 
-Personal management tooling. The first module is a list of projects with their
-links and credentials. A Go backend that only speaks JSON, and a React
-front-end compiled to static files and embedded in the binary — so a deploy is
-one file, and a phone app later would eat exactly the same API.
+One place for the things a person has to keep track of: projects with the
+credentials, assets and documents hanging off them; money, as income, expenses
+and a month planned out beforehand; habits and a journal; supplies, belongings
+and people; a calendar that gathers everything with a date on it; and a monitor
+for the things that are supposed to report in.
+
+A Go backend that only speaks JSON, and a React front-end compiled to static
+files and embedded in the binary — so a deploy is one file, and a phone app
+later would eat exactly the same API.
 
 ## Layout
 
@@ -139,15 +144,24 @@ Set `HQ_RP_ID` and `HQ_ORIGIN` to the host it is served from. WebAuthn is bound
 to exactly one origin and the browser refuses any other, so the defaults
 (`localhost`) are for local runs only.
 
+## License
+
+MIT — see [LICENSE](LICENSE).
+
 </details>
 
 <details>
 <summary><b>Bahasa Indonesia</b></summary>
 
-Alat manajemen pribadi. Modul pertama: daftar project beserta link dan
-credential-nya. Backend Go yang cuma ngeluarin JSON, front-end React yang
-di-build jadi file statis dan ditempel ke dalam binary — jadi yang di-deploy
-satu file, dan kalau nanti ada app HP, dia makan API yang sama persis.
+Satu tempat buat hal-hal yang harus diinget: project beserta credential, aset
+dan dokumen yang nempel di situ; duit, dalam bentuk pemasukan, pengeluaran, dan
+rencana sebulan yang disusun di depan; kebiasaan dan jurnal; stok, barang, dan
+orang; kalender yang ngumpulin semua yang punya tanggal; plus monitor buat
+hal-hal yang mestinya lapor.
+
+Backend Go yang cuma ngeluarin JSON, front-end React yang di-build jadi file
+statis dan ditempel ke dalam binary — jadi yang di-deploy satu file, dan kalau
+nanti ada app HP, dia makan API yang sama persis.
 
 ## Bentuknya
 
@@ -277,5 +291,9 @@ Batas memori sudah dipasang di compose: app 96 MB, postgres 192 MB.
 Set `HQ_RP_ID` dan `HQ_ORIGIN` ke host tempat dia disajikan. WebAuthn diikat ke
 satu origin saja dan browser menolak yang lain, jadi nilai default-nya
 (`localhost`) cuma buat jalan di lokal.
+
+## Lisensi
+
+MIT — lihat [LICENSE](LICENSE).
 
 </details>
