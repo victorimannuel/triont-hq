@@ -257,7 +257,7 @@ const dict: Record<Lang, Record<string, string>> = {
     'home.inPerMonth': 'masuk / bulan',
     'home.needsAction': 'perlu ditindak',
     'home.needsActionEmpty': 'aman. nggak ada yang rusak, nggak ada yang jatuh tempo dalam {n} hari ke depan.',
-    'home.money': 'duit bulan ini',
+    'home.money': 'duit rutin bulan ini',
     'home.counts': 'jumlah data',
     'home.seeCalendar': 'kalender',
     'home.outPerMonth': 'keluar / bulan',
@@ -357,7 +357,6 @@ const dict: Record<Lang, Record<string, string>> = {
     'expense.subtitle': 'gaji, langganan, cicilan, listrik — yang keluar rutin dan bukan aset.',
     'cal.kind.expense': 'pengeluaran',
     'trash.entity.expense': 'pengeluaran',
-    'home.net': 'sisa per bulan',
 
     'fx.asOf': 'kurs {date}',
     'fx.never': 'kurs belum pernah diambil',
@@ -1077,7 +1076,7 @@ const dict: Record<Lang, Record<string, string>> = {
     'home.inPerMonth': 'in per month',
     'home.needsAction': 'needs doing',
     'home.needsActionEmpty': 'nothing broken, nothing due in the next {n} days.',
-    'home.money': 'this month',
+    'home.money': 'recurring this month',
     'home.counts': 'record counts',
     'home.seeCalendar': 'calendar',
     'home.outPerMonth': 'out per month',
@@ -1181,7 +1180,6 @@ const dict: Record<Lang, Record<string, string>> = {
     'expense.subtitle': 'salaries, subscriptions, instalments, bills — what goes out on a schedule and is not an asset.',
     'cal.kind.expense': 'expense',
     'trash.entity.expense': 'expense',
-    'home.net': 'left per month',
 
     'fx.asOf': 'rate as of {date}',
     'fx.never': 'no rate fetched yet',

@@ -8,7 +8,6 @@ import {
   Package,
   Receipt,
   Repeat2,
-  Scale,
   Server,
   ShoppingBasket,
   TrendingDown,
@@ -90,10 +89,8 @@ function Tile({
   )
 }
 
-
-// Money in, money out, and what is left. Colour carries the meaning here —
-// green earns, red spends — so the label takes the tone and the figure stays
-// plain, which keeps a negative "sisa" readable rather than alarming.
+// Money in and money out. Colour carries the meaning here, green earns and red
+// spends, so the label takes the tone and the figure stays plain.
 const MONEY_TONE = {
   in: { wash: 'bg-success/[0.07]', label: 'text-success', chip: 'bg-success/15 text-success' },
   out: {
@@ -101,7 +98,6 @@ const MONEY_TONE = {
     label: 'text-destructive',
     chip: 'bg-destructive/15 text-destructive',
   },
-  net: { wash: 'bg-primary/[0.07]', label: 'text-primary', chip: 'bg-primary/15 text-primary' },
 } as const
 
 function MoneyTile({
@@ -208,15 +204,6 @@ export default function Overview() {
   const income = convert(data.monthly_income, rates, currency)
   const expense = convert(data.monthly_expense, rates, currency)
   const stamp = latestFetch(rates)
-  // What is left over, currency by currency, for the reading that does not
-  // convert. A negative figure is the point here, so it is kept.
-  const net: Record<string, number> = {}
-  for (const currency of new Set([
-    ...Object.keys(data.monthly_income ?? {}),
-    ...Object.keys(data.monthly_expense ?? {}),
-  ])) {
-    net[currency] = (data.monthly_income?.[currency] ?? 0) - (data.monthly_expense?.[currency] ?? 0)
-  }
   // Rupiah has no useful cents; a dollar figure does.
   const money = (amount: number) =>
     formatMoney(currency === 'IDR' ? Math.round(amount) : amount, currency)
@@ -306,7 +293,7 @@ export default function Overview() {
           </span>
         )}
       </div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
         <MoneyTile
           to="/income"
           tone="in"
@@ -323,14 +310,11 @@ export default function Overview() {
           label={t('home.outPerMonth')}
           value={converting ? money(expense.total) : eachCurrency(data.monthly_expense)}
         />
-        <MoneyTile
-          tone="net"
-          icon={Scale}
-          big={converting}
-          label={t('home.net')}
-          value={converting ? money(income.total - expense.total) : eachCurrency(net)}
-          className="col-span-2 sm:col-span-1"
-        />
+        {/* No third card subtracting one from the other. HQ only knows the
+            recurring half of what goes out, so any figure it called a balance
+            would be one the spreadsheet keeps properly, wrong by whatever was
+            spent on food and fuel that month. Two honest numbers beat three
+            with a made-up one at the end. */}
       </div>
       {converting && (income.missing || expense.missing) && (
         <p className="mt-2 text-xs text-muted-foreground">{t('fx.missing')}</p>
