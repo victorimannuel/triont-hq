@@ -13,6 +13,13 @@ import type {
   Overview,
   Belonging,
   BelongingInput,
+  BudgetIncome,
+  BudgetIncomeInput,
+  BudgetLine,
+  BudgetLineInput,
+  BudgetMonth,
+  MoneyAccount,
+  MoneyAccountInput,
   CalendarEntry,
   Document,
   DocumentInput,
@@ -359,6 +366,35 @@ export const api = {
   setHabitDay: (id: number, on: string, done: boolean, amount?: number) =>
     send<void>('POST', `/habits/${id}/day`, { on, done, amount: amount ?? 0 }),
   deleteHabit: (id: number) => send<void>('DELETE', `/habits/${id}`),
+
+  // Budgeting. The month is a query string on every one of these, so they are
+  // all the same URL with a different ?month=YYYY-MM.
+  budget: (month: string) =>
+    request<{ budget: BudgetMonth; accounts: MoneyAccount[] }>(`/budget?month=${month}`),
+  createBudgetIncome: (month: string, input: BudgetIncomeInput) =>
+    send<BudgetIncome>('POST', `/budget/incomes?month=${month}`, input),
+  updateBudgetIncome: (id: number, input: BudgetIncomeInput) =>
+    send<BudgetIncome>('PUT', `/budget/incomes/${id}`, input),
+  setBudgetIncomeReceived: (id: number, received: boolean) =>
+    send<{ status: string }>('POST', `/budget/incomes/${id}/received`, { received }),
+  deleteBudgetIncome: (id: number) => send<void>('DELETE', `/budget/incomes/${id}`),
+  seedBudget: (month: string) =>
+    send<{ added: number }>('POST', `/budget/seed?month=${month}`, {}),
+  setBudgetTargets: (targets: Record<string, number>) =>
+    send<Record<string, number>>('PUT', '/budget/targets', targets),
+  createBudgetLine: (month: string, input: BudgetLineInput) =>
+    send<BudgetLine>('POST', `/budget/lines?month=${month}`, input),
+  updateBudgetLine: (id: number, input: BudgetLineInput) =>
+    send<BudgetLine>('PUT', `/budget/lines/${id}`, input),
+  setBudgetLinePaid: (id: number, paid: boolean) =>
+    send<{ status: string }>('POST', `/budget/lines/${id}/paid`, { paid }),
+  deleteBudgetLine: (id: number) => send<void>('DELETE', `/budget/lines/${id}`),
+
+  accounts: () => request<{ accounts: MoneyAccount[] }>('/accounts'),
+  createAccount: (input: MoneyAccountInput) => send<MoneyAccount>('POST', '/accounts', input),
+  updateAccount: (id: number, input: MoneyAccountInput) =>
+    send<MoneyAccount>('PUT', `/accounts/${id}`, input),
+  deleteAccount: (id: number) => send<void>('DELETE', `/accounts/${id}`),
 
   setlists: () => request<{ setlists: Setlist[] }>('/setlists'),
   setlist: (id: number) =>

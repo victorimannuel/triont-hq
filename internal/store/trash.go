@@ -32,6 +32,7 @@ var softTables = map[string]bool{
 	"project_links": true, "maintenance_logs": true, "supply_purchases": true,
 	"setlist_songs": true, "attachments": true, "tasks": true,
 	"journal_days": true,
+	"money_accounts": true, "budget_lines": true, "budget_incomes": true,
 }
 
 func (s *Store) softDelete(ctx context.Context, table, column, value, actor string) error {
@@ -185,6 +186,17 @@ func (s *Store) ListTrash(ctx context.Context) ([]TrashItem, error) {
 		select 'task', id, title, kind, deleted_by, deleted_at
 		  from tasks where deleted_at is not null
 		union all
+		select 'account', id, name, currency, deleted_by, deleted_at
+		  from money_accounts where deleted_at is not null
+		union all
+		-- A budget line says which month it was promised for, which is the
+		-- only thing that tells two "Monthly Eats" apart.
+		select 'budgetline', id, name, to_char(on_month, 'YYYY-MM'), deleted_by, deleted_at
+		  from budget_lines where deleted_at is not null
+		union all
+		select 'budgetincome', id, name, to_char(on_month, 'YYYY-MM'), deleted_by, deleted_at
+		  from budget_incomes where deleted_at is not null
+		union all
 		-- A journal day is keyed by its date, and the bin can only carry an
 		-- id. YYYYMMDD as a number is reversible, which is the whole ask.
 		select 'journal', to_char(on_date, 'YYYYMMDD')::bigint, line,
@@ -229,6 +241,8 @@ func (s *Store) PurgeTrash(ctx context.Context, entity string, id int64) error {
 		"link": "project_links", "maintenance": "maintenance_logs",
 		"purchase": "supply_purchases", "setlistsong": "setlist_songs",
 		"file": "attachments", "task": "tasks",
+		"account": "money_accounts", "budgetline": "budget_lines",
+		"budgetincome": "budget_incomes",
 	}[entity]
 
 	if entity == "journal" {

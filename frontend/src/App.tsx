@@ -32,6 +32,7 @@ import {
   Monitor as MonitorIcon,
   Moon,
   Package,
+  PiggyBank,
   Receipt,
   Server,
   Sun,
@@ -110,6 +111,7 @@ const Calendar = lazy(() => import('@/pages/Calendar'))
 const Income = lazy(() => import('@/pages/Income'))
 const IncomeForm = lazy(() => import('@/pages/IncomeForm'))
 const Expenses = lazy(() => import('@/pages/Expenses'))
+const Budget = lazy(() => import('@/pages/Budget'))
 const ExpenseForm = lazy(() => import('@/pages/ExpenseForm'))
 const Trash = lazy(() => import('@/pages/Trash'))
 const Notices = lazy(() => import('@/pages/Notices'))
@@ -151,6 +153,7 @@ const emptyMeta: Meta = {
   supply_categories: [],
   supply_units: [],
   song_parts: [],
+  budget_buckets: [],
 }
 
 const MetaContext = createContext<Meta>(emptyMeta)
@@ -336,6 +339,7 @@ const NAV_GROUPS = [
   {
     label: 'nav.group.personal',
     items: [
+      { to: '/budget', key: 'budget', icon: PiggyBank, end: false },
       { to: '/documents', key: 'documents', icon: FileText, end: false },
       { to: '/belongings', key: 'belongings', icon: Package, end: false },
       { to: '/shopping', key: 'shopping', icon: ShoppingCart, end: false },
@@ -558,6 +562,7 @@ function Shell({
               <Route path="/income" element={<Income />} />
               <Route path="/income/new" element={<IncomeForm />} />
               <Route path="/income/:id" element={<IncomeForm />} />
+              <Route path="/budget" element={<Budget />} />
               <Route path="/expenses" element={<Expenses />} />
               <Route path="/expenses/new" element={<ExpenseForm />} />
               <Route path="/expenses/:id" element={<ExpenseForm />} />

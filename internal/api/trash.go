@@ -63,6 +63,12 @@ func (s *Server) handleRestore(w http.ResponseWriter, r *http.Request) {
 		err = s.store.RestoreTask(r.Context(), id)
 	case "journal":
 		err = s.store.RestoreJournalDay(r.Context(), id)
+	case "account":
+		err = s.store.RestoreMoneyAccount(r.Context(), id, who)
+	case "budgetline":
+		err = s.store.RestoreBudgetLine(r.Context(), id, who)
+	case "budgetincome":
+		err = s.store.RestoreBudgetIncome(r.Context(), id, who)
 	default:
 		fail(w, http.StatusBadRequest, "jenis nggak dikenal")
 		return

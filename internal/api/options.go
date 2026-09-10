@@ -102,6 +102,13 @@ var (
 		{"active", "Aktif"}, {"prospect", "Calon"},
 		{"paused", "Vakum"}, {"past", "Sudah selesai"},
 	}
+	// The four things a month's money can be for. Deliberately not editable:
+	// the split only means anything because it does not move, and a fifth
+	// bucket is almost always a Want being argued with.
+	budgetBuckets = []option{
+		{"needs", "Kebutuhan"}, {"wants", "Keinginan"},
+		{"savings", "Tabungan"}, {"debt", "Utang"},
+	}
 )
 
 // valid returns value when the list allows it and fallback otherwise, so a

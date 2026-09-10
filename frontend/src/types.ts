@@ -316,6 +316,105 @@ export type ExpenseInput = {
   notes: string
 }
 
+/** Where money sits. The balance is typed in and trusted as typed. */
+export type MoneyAccount = Audit & {
+  id: number
+  name: string
+  balance: number
+  currency: string
+  position: number
+  notes: string
+}
+
+export type MoneyAccountInput = {
+  name: string
+  balance: number
+  currency: string
+  notes: string
+}
+
+/** One allocation inside a month: a thing the money is promised to, and
+ *  whether that has happened yet. */
+export type BudgetLine = Audit & {
+  id: number
+  on_month: string
+  name: string
+  account_id: number | null
+  account_name: string
+  bucket: string
+  /** What it is worth this month. Worked out from income when `percent` is
+   *  set, so a raise moves every share without any of them being edited. */
+  amount: number
+  percent: number | null
+  paid: boolean
+  expense_id: number | null
+  position: number
+  notes: string
+}
+
+export type BudgetLineInput = {
+  name: string
+  account_id: number | null
+  bucket: string
+  amount: number
+  percent: number | null
+  notes: string
+}
+
+/** One thing expected to come in this month: a salary, an invoice, a fee. */
+export type BudgetIncome = Audit & {
+  id: number
+  on_month: string
+  name: string
+  amount: number
+  /** What the source pays in.  is the same money in the month's
+   *  currency, which is what every total and percentage is built from. */
+  currency: string
+  converted: number
+  account_id: number | null
+  account_name: string
+  received: boolean
+  position: number
+  notes: string
+}
+
+export type BudgetIncomeInput = {
+  name: string
+  amount: number
+  currency: string
+  account_id: number | null
+  notes: string
+}
+
+export type BucketRoll = {
+  bucket: string
+  amount: number
+  percent: number
+  /** Zero means no opinion has been set, not "should be nothing". */
+  target: number
+  unpaid: number
+}
+
+export type BudgetMonth = {
+  /** The first of the month, as YYYY-MM-DD. */
+  on_month: string
+  /** Everything expected in, added up from `incomes`. Shares are worked out
+   *  against this; `received` is what has actually landed. */
+  income: number
+  received: number
+  incomes: BudgetIncome[]
+  /** A source is in a currency with no stored rate, so the total is short. */
+  missing: boolean
+  currency: string
+  notes: string
+  lines: BudgetLine[]
+  buckets: BucketRoll[]
+  allocated: number
+  /** Income minus everything promised. Negative is the point. */
+  left: number
+  unpaid: number
+}
+
 export type FxRate = {
   currency: string
   rate: number
@@ -377,6 +476,7 @@ export type Meta = {
   supply_categories: Option[]
   supply_units: Option[]
   song_parts: Option[]
+  budget_buckets: Option[]
 }
 
 export type Contact = Audit & {

@@ -713,3 +713,124 @@ create index if not exists setlist_songs_live_idx    on setlist_songs (deleted_a
 create index if not exists attachments_live_idx      on attachments (deleted_at);
 create index if not exists tasks_live_idx            on tasks (deleted_at);
 create index if not exists journal_days_live_idx     on journal_days (deleted_at);
+
+/*
+Budgeting: deciding at the start of a month where the money is going, and
+ticking it off as it goes.
+
+This is not expense tracking and there is no row here for a cup of coffee. The
+unit is an allocation — "Monthly Eats, 600k, Wants" — decided once and then
+either done or not. That is how the spreadsheet this replaces worked, and it is
+the honest shape: a line item per purchase is a habit nobody keeps.
+*/
+
+-- Where money sits. Typed in by hand and trusted as typed: no bank reachable
+-- from here has an API worth the trouble, and a stale number you entered beats
+-- a missing one.
+create table if not exists money_accounts (
+    id         bigserial primary key,
+    name       text not null,
+    balance    numeric not null default 0,
+    currency   text not null default 'IDR',
+    position   integer not null default 0,
+    notes      text not null default '',
+    created_by text not null default '',
+    updated_by text not null default '',
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    deleted_at timestamptz,
+    deleted_by text not null default ''
+);
+
+create index if not exists money_accounts_live_idx on money_accounts (deleted_at);
+
+-- One month of allocating, keyed by its first day. Income is the figure every
+-- percentage below is a percentage of, and it is entered rather than derived:
+-- what lands in the account is known before the allocating starts.
+create table if not exists budget_months (
+    on_month   date primary key,
+    income     numeric not null default 0,
+    currency   text not null default 'IDR',
+    notes      text not null default '',
+    created_by text not null default '',
+    updated_by text not null default '',
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    deleted_at timestamptz,
+    deleted_by text not null default ''
+);
+
+/*
+One allocation inside a month.
+
+An amount can be given outright or as a share of the month's income; `percent`
+being null is what says which. A share is the useful form for anything phrased
+as "5% of salary", because the number then follows a raise without being
+edited.
+*/
+create table if not exists budget_lines (
+    id         bigserial primary key,
+    on_month   date not null references budget_months (on_month) on delete cascade,
+    name       text not null,
+    account_id bigint references money_accounts (id) on delete set null,
+    -- needs, wants, savings or debt.
+    bucket     text not null default 'needs',
+    amount     numeric not null default 0,
+    percent    numeric,
+    paid       boolean not null default false,
+    -- The recurring expense this was generated from, so next month knows not
+    -- to add it twice.
+    expense_id bigint references expense_streams (id) on delete set null,
+    position   integer not null default 0,
+    notes      text not null default '',
+    created_by text not null default '',
+    updated_by text not null default '',
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    deleted_at timestamptz,
+    deleted_by text not null default ''
+);
+
+create index if not exists budget_lines_month_idx on budget_lines (on_month, position, id);
+create index if not exists budget_lines_live_idx  on budget_lines (deleted_at);
+
+/*
+What is expected to come in this month, one row per source.
+
+A month's income is the sum of these rather than a single figure typed at the
+top: it arrives as a salary and three invoices and a handful of small fees, and
+a lone number would mean adding them up somewhere else first. `received` is the
+tick, so the page can also say how much has actually landed.
+*/
+create table if not exists budget_incomes (
+    id         bigserial primary key,
+    on_month   date not null references budget_months (on_month) on delete cascade,
+    name       text not null,
+    amount     numeric not null default 0,
+    account_id bigint references money_accounts (id) on delete set null,
+    received   boolean not null default false,
+    position   integer not null default 0,
+    notes      text not null default '',
+    created_by text not null default '',
+    updated_by text not null default '',
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    deleted_at timestamptz,
+    deleted_by text not null default ''
+);
+
+-- What the source pays in. Freelance work does not always pay in rupiah, and
+-- converting it by hand before typing it in is the sort of arithmetic that
+-- ends up wrong in a spreadsheet.
+alter table budget_incomes add column if not exists currency text not null default 'IDR';
+
+create index if not exists budget_incomes_month_idx on budget_incomes (on_month, position, id);
+create index if not exists budget_incomes_live_idx  on budget_incomes (deleted_at);
+
+-- What share of a month each bucket is meant to take. One row per bucket, so
+-- "normally 5%" stops being a note in a name and becomes something the page
+-- can hold the real figure up against.
+create table if not exists budget_targets (
+    bucket  text primary key,
+    percent numeric not null default 0
+);

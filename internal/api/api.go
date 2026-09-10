@@ -123,6 +123,25 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("POST /api/habits/{id}/day", s.requireAuth(s.handleSetHabitDay))
 	mux.Handle("DELETE /api/habits/{id}", s.requireAuth(s.handleDeleteHabit))
 
+	// Budgeting. The month rides in the query string rather than the path, so
+	// every one of these is the same URL with a different ?month=.
+	mux.Handle("GET /api/budget", s.requireAuth(s.handleBudget))
+	mux.Handle("POST /api/budget/incomes", s.requireAuth(s.handleCreateBudgetIncome))
+	mux.Handle("PUT /api/budget/incomes/{id}", s.requireAuth(s.handleUpdateBudgetIncome))
+	mux.Handle("POST /api/budget/incomes/{id}/received", s.requireAuth(s.handleSetBudgetIncomeReceived))
+	mux.Handle("DELETE /api/budget/incomes/{id}", s.requireAuth(s.handleDeleteBudgetIncome))
+	mux.Handle("POST /api/budget/seed", s.requireAuth(s.handleSeedBudget))
+	mux.Handle("PUT /api/budget/targets", s.requireAuth(s.handleSetBudgetTargets))
+	mux.Handle("POST /api/budget/lines", s.requireAuth(s.handleCreateBudgetLine))
+	mux.Handle("PUT /api/budget/lines/{id}", s.requireAuth(s.handleUpdateBudgetLine))
+	mux.Handle("POST /api/budget/lines/{id}/paid", s.requireAuth(s.handleSetBudgetLinePaid))
+	mux.Handle("DELETE /api/budget/lines/{id}", s.requireAuth(s.handleDeleteBudgetLine))
+
+	mux.Handle("GET /api/accounts", s.requireAuth(s.handleListAccounts))
+	mux.Handle("POST /api/accounts", s.requireAuth(s.handleCreateAccount))
+	mux.Handle("PUT /api/accounts/{id}", s.requireAuth(s.handleUpdateAccount))
+	mux.Handle("DELETE /api/accounts/{id}", s.requireAuth(s.handleDeleteAccount))
+
 	mux.Handle("GET /api/setlists", s.requireAuth(s.handleListSetlists))
 	mux.Handle("POST /api/setlists", s.requireAuth(s.handleCreateSetlist))
 	mux.Handle("GET /api/setlists/{id}", s.requireAuth(s.handleGetSetlist))
@@ -304,6 +323,7 @@ func (s *Server) handleMeta(w http.ResponseWriter, _ *http.Request) {
 		"supply_categories":  supplyCategories,
 		"supply_units":       supplyUnits,
 		"song_parts":         songParts,
+		"budget_buckets":     budgetBuckets,
 	})
 }
 
