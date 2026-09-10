@@ -134,8 +134,9 @@ const HIDE = new Set([
   'email', 'phone', 'host', 'deploy_target', 'identifier', 'local_path',
   'ip', 'last_used_ip', 'location', 'last_used_location', 'device',
   'user_agent', 'created_by', 'updated_by', 'deleted_by',
-  // Free-typed text.
-  'notes', 'summary', 'detail', 'description', 'subtitle', 'line',
+  // Free-typed text, including the unit he types on a habit: "pasal" says
+  // what the habit is as plainly as its name does.
+  'notes', 'summary', 'detail', 'description', 'subtitle', 'line', 'unit',
 ])
 
 /*
@@ -154,35 +155,20 @@ turn every link into a 404.
 const link = (value: string) => (value.startsWith('/') ? value : 'https://••••••••')
 
 /*
-Money is scaled rather than covered, by one factor for the whole app. A number
-cannot hold bullets without breaking every formatter that reads it, and scaling
-keeps each amount in proportion to the others, so the totals still add up to
-their parts and the charts keep the shape that makes them worth showing.
+Amounts are not touched here. They used to be scaled by a fixed factor, which
+kept every total consistent with its parts but put wrong numbers on the screen —
+and a wrong number reads as a broken app, not as a covered one. Covering them is
+the formatter's job instead: formatMoney prints the symbol and bullets, so what
+is on the screen is plainly hidden rather than quietly false.
 */
-const FACTOR = 0.7734
-const MONEY = new Set(['amount', 'price', 'cost', 'cost_amount', 'rent_amount'])
-// Same idea, one level down: { IDR: 12500000, USD: 40 }. The income and
-// expense pages call theirs plain `monthly`; the overview qualifies both.
-const MONEY_MAPS = new Set(['monthly', 'monthly_income', 'monthly_expense'])
-
-const money = (n: number) =>
-  n === 0 ? 0 : Math.round((n * FACTOR) / 1000) * 1000 || Math.round(n * FACTOR)
-
 function walk(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(walk)
   if (value === null || typeof value !== 'object') return value
 
   const out: Record<string, unknown> = {}
   for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
-    if (MONEY_MAPS.has(key) && item && typeof item === 'object') {
-      out[key] = Object.fromEntries(
-        Object.entries(item as Record<string, number>).map(([k, n]) => [
-          k,
-          typeof n === 'number' ? money(n) : n,
-        ]),
-      )
-    } else if (typeof item === 'number') {
-      out[key] = MONEY.has(key) ? money(item) : item
+    if (typeof item === 'number') {
+      out[key] = item
     } else if (typeof item === 'string') {
       // An empty field stays empty: a row with nothing written in it should
       // still read as a row with nothing written in it.

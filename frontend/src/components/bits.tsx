@@ -4,6 +4,7 @@ import { ArrowLeft, ChevronRight, Eye, EyeOff, Loader2 } from 'lucide-react'
 
 import {
   disguisedAll,
+  disguisedAt,
   disguisedPage,
   pageKey,
   setDisguisedAll,
@@ -230,17 +231,36 @@ export function formatDate(value?: string | null) {
 
 // An amount that carries decimals shows them, whatever the currency; a round
 // rupiah figure still prints as "Rp 750.000" rather than "Rp 750.000,00".
+//
+// This is also where screenshot mode covers an amount. Every digit becomes a
+// bullet and the symbol and separators stay, so the figure is unreadable but
+// still shaped like money and still the width the column was built for.
 export function formatMoney(amount: number, currency: string) {
   if (!amount) return '—'
+  const covered = disguisedAt(window.location.pathname)
   try {
-    return new Intl.NumberFormat(currentLocale(), {
+    const format = new Intl.NumberFormat(currentLocale(), {
       style: 'currency',
       currency,
       minimumFractionDigits: Number.isInteger(amount) && currency === 'IDR' ? 0 : 2,
       maximumFractionDigits: 2,
-    }).format(amount)
+    })
+    if (!covered) return format.format(amount)
+    // Symbol and spacing kept, the figure itself gone in one run rather than
+    // digit for digit: a bullet per digit still said whether he earns hundreds
+    // of thousands or tens of millions.
+    let put = false
+    return format
+      .formatToParts(amount)
+      .map((part) => {
+        if (part.type === 'currency' || part.type === 'literal') return part.value
+        if (put) return ''
+        put = true
+        return '••••'
+      })
+      .join('')
   } catch {
-    return `${currency} ${amount}`
+    return `${currency} ${covered ? '••••' : amount}`
   }
 }
 
