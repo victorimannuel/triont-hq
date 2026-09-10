@@ -73,6 +73,13 @@ function beneath(due: string, account: string) {
   return [day, account].filter(Boolean).join(' · ')
 }
 
+function monthName(month: string) {
+  if (!month) return ''
+  return new Date(`${month}-01T00:00:00`).toLocaleDateString(currentLocale(), {
+    month: 'long',
+  })
+}
+
 // The colour a bucket carries wherever it appears, so the bar and the badge
 // agree without anybody having to read the label twice.
 const BUCKET_TONE: Record<string, string> = {
@@ -183,7 +190,10 @@ export default function Budget() {
       {/* Four figures, two across on a phone. They were on one flex line and
           collided with each other the moment the screen got narrow. */}
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <Figure label={t('budget.income')} value={money(data.income)} />
+        <Figure
+          label={t('budget.income', { month: monthName(data.pool_from) })}
+          value={money(data.income)}
+        />
         <Figure label={t('budget.received')} value={money(data.received)} />
         <Figure label={t('budget.allocated')} value={money(data.allocated)} />
         {/* The one the page exists for. Below zero means more has been promised

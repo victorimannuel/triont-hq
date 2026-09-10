@@ -155,13 +155,18 @@ func convertMoney(amount float64, from, to string, rates []FxRate) (float64, boo
 type BudgetMonth struct {
 	OnMonth string `json:"on_month"`
 	/*
-		Everything expected in, added up from the sources below. Budgeting
-		happens before the money lands, so this is what the shares are worked
-		out against; Received is what has actually turned up.
+		What there is to divide up, and how much of it has actually landed.
+
+		Both are last month's sources rather than this month's: the money that
+		came in during September is what October gets spent out of. Incomes
+		below is still this month's own list, which is next month's pool.
 	*/
 	Income   float64        `json:"income"`
 	Received float64        `json:"received"`
 	Incomes  []BudgetIncome `json:"incomes"`
+	// Which month the pool came from, as YYYY-MM, so the page can say so
+	// rather than leaving a figure nobody can trace.
+	PoolFrom string `json:"pool_from"`
 	// A source is in a currency with no stored rate, so the total is short by
 	// at least that much. Better said out loud than silently rounded away.
 	Missing  bool         `json:"missing"`
@@ -178,6 +183,9 @@ type BudgetMonth struct {
 }
 
 const monthLayout = "2006-01-02"
+
+// The month on its own, for saying which one a figure came from.
+const monthOnly = "2006-01"
 
 // firstOf drops the day, so any date inside a month names that month.
 func firstOf(t time.Time) time.Time {
@@ -303,6 +311,8 @@ func (s *Store) Budget(ctx context.Context, month time.Time, actor string) (Budg
 	if err != nil {
 		return out, err
 	}
+	// This month's own sources are converted for display only. They are next
+	// month's pool, not this one's.
 	for at := range out.Incomes {
 		income := &out.Incomes[at]
 		converted, ok := convertMoney(income.Amount, income.Currency, out.Currency, rates)
@@ -310,6 +320,20 @@ func (s *Store) Budget(ctx context.Context, month time.Time, actor string) (Budg
 			out.Missing = true
 		}
 		income.Converted = converted
+	}
+
+	// What this month actually has to divide up: last month's sources.
+	prev := on.AddDate(0, -1, 0)
+	out.PoolFrom = prev.Format(monthOnly)
+	pool, err := s.budgetIncomes(ctx, prev)
+	if err != nil {
+		return out, err
+	}
+	for _, income := range pool {
+		converted, ok := convertMoney(income.Amount, income.Currency, out.Currency, rates)
+		if !ok {
+			out.Missing = true
+		}
 		out.Income += converted
 		if income.Received {
 			out.Received += converted
@@ -686,7 +710,8 @@ func (s *Store) RestoreBudgetLine(ctx context.Context, id int64, actor string) e
 }
 
 /*
-monthIncome adds a month's sources up in that month's own currency.
+monthIncome is what the given month has to spend, in that month's own
+currency — which is the month before it adding up.
 
 It exists because a line given as a share has to be worked out against
 something, and after income became a list there is no single figure sitting on
@@ -707,7 +732,7 @@ func (s *Store) monthIncome(ctx context.Context, on time.Time) (float64, error) 
 
 	rows, err := s.pool.Query(ctx, `
 		select amount, currency from budget_incomes
-		 where on_month = $1 and deleted_at is null`, on)
+		 where on_month = $1 and deleted_at is null`, on.AddDate(0, -1, 0))
 	if err != nil {
 		return 0, err
 	}

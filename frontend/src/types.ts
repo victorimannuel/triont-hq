@@ -405,6 +405,9 @@ export type BucketRoll = {
 }
 
 export type BudgetMonth = {
+  /** Which month the pool came from, as YYYY-MM: a month spends what the one
+   *  before it earned. */
+  pool_from: string
   /** The first of the month, as YYYY-MM-DD. */
   on_month: string
   /** Everything expected in, added up from `incomes`. Shares are worked out
