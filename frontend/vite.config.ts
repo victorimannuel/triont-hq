@@ -37,8 +37,12 @@ export default defineConfig({
         display: 'standalone',
         // No orientation lock: this is installed on a laptop as often as a
         // phone, and locking it to portrait is a mobile-only assumption.
-        background_color: '#f6f7f9',
-        theme_color: '#2f5fd8',
+        // Both the page's own warm off-white rather than the accent. A
+        // coloured title bar over a quiet page reads as a browser that has
+        // wandered in; matching it makes the installed app look like one
+        // surface from the top of the screen down.
+        background_color: '#fcfaf7',
+        theme_color: '#fcfaf7',
         icons: [
           // Exact sizes rather than two big ones: Windows picks from this list
           // to build the shortcut icon, and picking beats downscaling.

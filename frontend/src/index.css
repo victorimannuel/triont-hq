@@ -7,32 +7,32 @@
    sistem" — so removing the attribute always lands somewhere valid. */
 :root {
   --radius: 0.625rem;
-  --background: oklch(0.985 0.002 247);
-  --foreground: oklch(0.21 0.006 285);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.21 0.006 285);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.21 0.006 285);
-  --primary: oklch(0.51 0.17 264);
-  --primary-foreground: oklch(0.98 0.005 264);
-  --secondary: oklch(0.967 0.001 286);
-  --secondary-foreground: oklch(0.21 0.006 285);
-  --muted: oklch(0.967 0.001 286);
-  --muted-foreground: oklch(0.552 0.014 285);
-  --accent: oklch(0.967 0.001 286);
-  --accent-foreground: oklch(0.21 0.006 285);
-  --destructive: oklch(0.577 0.245 27);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.92 0.004 286);
-  --input: oklch(0.92 0.004 286);
-  --ring: oklch(0.51 0.17 264);
-  /* Darker than they look like they should be, and darker than their dark-mode
-     twins below. These two are used as text as often as as fill — a badge, a
-     label, a chip — and amber at 0.75 on a white card is about 2:1, which is
-     not a reading contrast. On the dark ground the bright versions are the
-     correct ones, so only this half moves. */
-  --success: oklch(0.54 0.14 155);
-  --warning: oklch(0.58 0.13 85);
+  --background: oklch(0.985 0.004 75);
+  --foreground: oklch(0.22 0.008 65);
+  --card: oklch(0.997 0.002 75);
+  --card-foreground: oklch(0.22 0.008 65);
+  --popover: oklch(0.997 0.002 75);
+  --popover-foreground: oklch(0.22 0.008 65);
+  --primary: oklch(0.5 0.1 52);
+  --primary-foreground: oklch(0.985 0.004 75);
+  --secondary: oklch(0.955 0.006 75);
+  --secondary-foreground: oklch(0.22 0.008 65);
+  --muted: oklch(0.955 0.006 75);
+  --muted-foreground: oklch(0.53 0.014 68);
+  --accent: oklch(0.955 0.006 75);
+  --accent-foreground: oklch(0.22 0.008 65);
+  --destructive: oklch(0.53 0.17 25);
+  --destructive-foreground: oklch(0.985 0.004 75);
+  --border: oklch(0.905 0.008 75);
+  --input: oklch(0.905 0.008 75);
+  --ring: oklch(0.5 0.1 52);
+  /* Darker than their dark-mode twins below, and darker than they look like
+     they should be. Both are used as text as often as as fill — a badge, a
+     label, a chip — and a bright ochre on a white card is about 2:1, which is
+     not a reading contrast. On the dark ground the light versions are the
+     correct ones, so the two halves are set apart on purpose. */
+  --success: oklch(0.5 0.08 135);
+  --warning: oklch(0.57 0.09 78);
   /* What separates a card from the page. A shadow and nothing else: a card
      lit from the top was the house style of about 2010, and it dates the
      whole app faster than any other single thing. */
@@ -41,27 +41,27 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --background: oklch(0.17 0.005 285);
-    --foreground: oklch(0.95 0.002 286);
-    --card: oklch(0.21 0.006 285);
-    --card-foreground: oklch(0.95 0.002 286);
-    --popover: oklch(0.21 0.006 285);
-    --popover-foreground: oklch(0.95 0.002 286);
-    --primary: oklch(0.7 0.14 264);
-    --primary-foreground: oklch(0.17 0.005 285);
-    --secondary: oklch(0.27 0.007 286);
-    --secondary-foreground: oklch(0.95 0.002 286);
-    --muted: oklch(0.27 0.007 286);
-    --muted-foreground: oklch(0.68 0.012 286);
-    --accent: oklch(0.27 0.007 286);
-    --accent-foreground: oklch(0.95 0.002 286);
-    --destructive: oklch(0.68 0.19 24);
+    --background: oklch(0.17 0.007 68);
+    --foreground: oklch(0.95 0.004 75);
+    --card: oklch(0.215 0.008 68);
+    --card-foreground: oklch(0.95 0.004 75);
+    --popover: oklch(0.215 0.008 68);
+    --popover-foreground: oklch(0.95 0.004 75);
+    --primary: oklch(0.72 0.09 55);
+    --primary-foreground: oklch(0.17 0.007 68);
+    --secondary: oklch(0.275 0.009 68);
+    --secondary-foreground: oklch(0.95 0.004 75);
+    --muted: oklch(0.275 0.009 68);
+    --muted-foreground: oklch(0.68 0.014 70);
+    --accent: oklch(0.275 0.009 68);
+    --accent-foreground: oklch(0.95 0.004 75);
+    --destructive: oklch(0.66 0.15 25);
     --destructive-foreground: oklch(0.98 0 0);
     --border: oklch(1 0 0 / 12%);
     --input: oklch(1 0 0 / 16%);
-    --ring: oklch(0.7 0.14 264);
-    --success: oklch(0.7 0.13 155);
-    --warning: oklch(0.79 0.13 85);
+    --ring: oklch(0.72 0.09 55);
+    --success: oklch(0.68 0.09 135);
+    --warning: oklch(0.76 0.09 78);
     /* On a dark ground a shadow barely shows, so the separation is the card
        being lighter than the page and the border being lighter again. */
     --card-shadow: 0 1px 2px oklch(0 0 0 / 40%), 0 8px 24px -12px oklch(0 0 0 / 60%);
@@ -69,27 +69,27 @@
 }
 
 :root[data-theme='dark'] {
-  --background: oklch(0.17 0.005 285);
-  --foreground: oklch(0.95 0.002 286);
-  --card: oklch(0.21 0.006 285);
-  --card-foreground: oklch(0.95 0.002 286);
-  --popover: oklch(0.21 0.006 285);
-  --popover-foreground: oklch(0.95 0.002 286);
-  --primary: oklch(0.7 0.14 264);
-  --primary-foreground: oklch(0.17 0.005 285);
-  --secondary: oklch(0.27 0.007 286);
-  --secondary-foreground: oklch(0.95 0.002 286);
-  --muted: oklch(0.27 0.007 286);
-  --muted-foreground: oklch(0.68 0.012 286);
-  --accent: oklch(0.27 0.007 286);
-  --accent-foreground: oklch(0.95 0.002 286);
-  --destructive: oklch(0.68 0.19 24);
+  --background: oklch(0.17 0.007 68);
+  --foreground: oklch(0.95 0.004 75);
+  --card: oklch(0.215 0.008 68);
+  --card-foreground: oklch(0.95 0.004 75);
+  --popover: oklch(0.215 0.008 68);
+  --popover-foreground: oklch(0.95 0.004 75);
+  --primary: oklch(0.72 0.09 55);
+  --primary-foreground: oklch(0.17 0.007 68);
+  --secondary: oklch(0.275 0.009 68);
+  --secondary-foreground: oklch(0.95 0.004 75);
+  --muted: oklch(0.275 0.009 68);
+  --muted-foreground: oklch(0.68 0.014 70);
+  --accent: oklch(0.275 0.009 68);
+  --accent-foreground: oklch(0.95 0.004 75);
+  --destructive: oklch(0.66 0.15 25);
   --destructive-foreground: oklch(0.98 0 0);
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 16%);
-  --ring: oklch(0.7 0.14 264);
-  --success: oklch(0.7 0.13 155);
-  --warning: oklch(0.79 0.13 85);
+  --ring: oklch(0.72 0.09 55);
+  --success: oklch(0.68 0.09 135);
+  --warning: oklch(0.76 0.09 78);
   --card-shadow: 0 1px 2px oklch(0 0 0 / 40%), 0 8px 24px -12px oklch(0 0 0 / 60%);
 }
 

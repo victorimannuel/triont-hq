@@ -13,7 +13,7 @@ export function Logo({ className }: { className?: string }) {
       className={cn('size-7 shrink-0', className)}
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.6"
+      strokeWidth="2.4"
       strokeLinecap="round"
     >
       <path d="M13.21 28.08 A12.4 12.4 0 1 1 18.79 28.08" />

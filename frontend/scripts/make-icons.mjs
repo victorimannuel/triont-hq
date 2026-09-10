@@ -12,26 +12,26 @@ const publicDir = resolve(here, '../public')
 // Two treatments, because the places these icons land want opposite things.
 //
 // A taskbar or a browser tab sits the icon on whatever colour the user's theme
-// happens to be, so those get the bare mark on nothing — the same blue the app
-// draws its own logo in, light enough to survive a dark bar and dark enough to
-// survive a light one. The artwork's navy cannot: on a dark taskbar it
-// disappears.
+// happens to be, so those get the bare mark on nothing — the same clay the app
+// draws its own logo in, but a shade lighter than the token: light enough to
+// survive a dark bar and dark enough to survive a light one. The tile's umber
+// cannot do both; on a dark taskbar it disappears.
 //
 // A home-screen tile is the opposite. Android crops the maskable icon to its
 // own shape and iOS composites a transparent icon onto black, so both need the
-// square filled — and there the navy is the background and the mark is white.
-const MARK_INK = '#2f5fd8'
-const TILE = '#0a3072'
+// square filled — and there the umber is the background and the mark is white.
+const MARK_INK = '#a35d2e'
+const TILE = '#3a1e0e'
 const TILE_INK = '#ffffff'
 
 // The mark in a 32-unit box: two rings broken at the foot, closing on a solid
 // core. Every number is the artwork's own proportion — outer radius 0.3875 of
-// the box, stroke 0.05 — so the icon is the logo scaled, not a redraw of it.
+// the box, stroke 0.075 — so the icon is the logo scaled, not a redraw of it.
 const MARK = {
   centre: 16,
   outerRadius: 12.4,
   innerRadius: 7.2,
-  stroke: 1.6,
+  stroke: 2.4,
   // How much of each ring is missing at the bottom, in degrees. The inner one
   // opens wider so the two breaks read as one gap rather than a slot.
   outerGap: 26,
