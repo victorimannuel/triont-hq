@@ -197,22 +197,3 @@ func (s *Store) DeleteProject(ctx context.Context, slug, actor string) error {
 func (s *Store) RestoreProject(ctx context.Context, id int64, actor string) error {
 	return s.restore(ctx, "projects", id, actor)
 }
-
-func (s *Store) StatusCounts(ctx context.Context) (map[string]int, error) {
-	rows, err := s.pool.Query(ctx, `select status, count(*) from projects where deleted_at is null group by status`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	out := map[string]int{}
-	for rows.Next() {
-		var status string
-		var n int
-		if err := rows.Scan(&status, &n); err != nil {
-			return nil, err
-		}
-		out[status] = n
-	}
-	return out, rows.Err()
-}

@@ -6,8 +6,7 @@ import { api } from '@/api'
 import { useT } from '@/i18n'
 import type { FxRate } from '@/types'
 import { Button } from '@/components/ui/button'
-import { formatDate, formatMoney, Segmented } from '@/components/bits'
-import { useRemembered } from '@/lib/useRemembered'
+import { formatDate, formatMoney } from '@/components/bits'
 
 /** Rupiah per unit, for every currency with a rate on file. Rupiah itself is
  *  always in there — it is what the rates are quoted in. */
@@ -42,36 +41,6 @@ export function latestFetch(rates: FxRate[]) {
     .filter(Boolean)
     .sort()
   return stamps.length ? stamps[stamps.length - 1] : ''
-}
-
-/** "all" is the reading with no conversion in it at all: one figure per
- *  currency, which is the only honest answer when no rate has been fetched. */
-export const CURRENCIES = ['IDR', 'USD', 'all'] as const
-export type DisplayCurrency = (typeof CURRENCIES)[number]
-
-/** Which currency totals are shown in, remembered between visits. */
-export function useDisplayCurrency() {
-  return useRemembered<DisplayCurrency>('hq.currency', CURRENCIES, 'IDR')
-}
-
-export function CurrencyToggle({
-  value,
-  onChange,
-}: {
-  value: DisplayCurrency
-  onChange: (value: DisplayCurrency) => void
-}) {
-  const { t } = useT()
-  return (
-    <Segmented
-      value={value}
-      onChange={onChange}
-      options={CURRENCIES.map((currency) => ({
-        value: currency,
-        label: currency === 'all' ? t('fx.all') : currency,
-      }))}
-    />
-  )
 }
 
 /** "Rp 750.000 + US$1.200" — one figure per currency, never a fake total. */

@@ -771,21 +771,7 @@ export type CalendarEntry = {
 }
 
 export type Overview = {
-  total_projects: number
-  total_credentials: number
-  total_assets: number
-  total_clients: number
-  total_documents: number
-  total_belongings: number
-  total_people: number
-  total_income: number
-  monthly_income: Record<string, number>
-  total_expenses: number
-  monthly_expense: Record<string, number>
-  rates: FxRate[]
-  recent: Project[]
   upcoming: CalendarEntry[]
-  total_supplies: number
   /** Today's ticking, as a tally. The board itself is a page away. */
   habits_done: number
   habits_total: number
