@@ -48,6 +48,10 @@ type Habit struct {
 	// only number that means anything.
 	Total float64 `json:"total"`
 	Today float64 `json:"today"`
+	// What each day inside the window came to, keyed the same way as Days.
+	// Only filled in for a habit that has a unit: without one every entry
+	// would read 1, which is what Days already says.
+	Amounts map[string]float64 `json:"amounts"`
 	// The first image attached, if any. Carried on the row so the check-in can
 	// show a picture per question without a request per habit.
 	ImageID   *int64    `json:"image_id"`
@@ -107,6 +111,7 @@ func (s *Store) Habits(ctx context.Context, days int) ([]Habit, error) {
 			return nil, err
 		}
 		habit.Days = []string{}
+		habit.Amounts = map[string]float64{}
 		index[habit.ID] = len(out)
 		out = append(out, habit)
 	}
@@ -166,8 +171,12 @@ func (s *Store) Habits(ctx context.Context, days int) ([]Habit, error) {
 		for _, t := range done {
 			since := int(today.Sub(startOfDay(t.day)).Hours() / 24)
 			if since >= 0 && since < days {
-				habit.Days = append(habit.Days, t.day.Format("2006-01-02"))
+				key := t.day.Format("2006-01-02")
+				habit.Days = append(habit.Days, key)
 				habit.Total += t.amount
+				if habit.Unit != "" {
+					habit.Amounts[key] = t.amount
+				}
 			}
 			if since == 0 {
 				habit.Today = t.amount
@@ -276,6 +285,7 @@ func (s *Store) CreateHabit(ctx context.Context, in HabitInput, actor string) (H
 		return habit, norm(err)
 	}
 	habit.Days = []string{}
+	habit.Amounts = map[string]float64{}
 	return habit, nil
 }
 
@@ -289,6 +299,7 @@ func (s *Store) UpdateHabit(ctx context.Context, id int64, in HabitInput, actor 
 		return habit, norm(err)
 	}
 	habit.Days = []string{}
+	habit.Amounts = map[string]float64{}
 	return habit, nil
 }
 

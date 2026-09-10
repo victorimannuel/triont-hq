@@ -137,6 +137,20 @@
   box-shadow: var(--card-shadow);
 }
 
+/* The little arrows a browser puts on a number field are a fourth way to
+   change a number, next to typing, tapping and the app's own buttons. They are
+   two pixels tall, they only exist on a desktop mouse, and next to a real pair
+   of + and − buttons they read as clutter. Gone everywhere, not just where the
+   buttons are, so a number field looks like one thing in this app. */
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
+}
+
 /* Screenshot mode frosts photographs. Every other field gets a plausible
    stand-in on the way out of the fetch wrapper, but an attachment is bytes
    rather than a field and there is nothing to swap it for — so this is the one

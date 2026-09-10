@@ -157,7 +157,17 @@ export default function Habits() {
     setHabits((list) =>
       (list ?? []).map((row) =>
         row.id === habit.id
-          ? { ...row, days: done ? [...row.days, day] : row.days.filter((d) => d !== day) }
+          ? {
+              ...row,
+              days: done ? [...row.days, day] : row.days.filter((d) => d !== day),
+              // A tap on the board is worth one. Anything else is typed at the
+              // check-in, and load() below replaces this with what was stored.
+              amounts: done
+                ? { ...row.amounts, [day]: 1 }
+                : Object.fromEntries(
+                    Object.entries(row.amounts).filter(([key]) => key !== day),
+                  ),
+            }
           : row,
       ),
     )
@@ -333,7 +343,19 @@ export default function Habits() {
                                 'border-foreground/40',
                             )}
                           >
-                            {habit.days.includes(day.key) && <Check className="size-4" />}
+                            {/* The number when there is one, the tick when
+                                there is not. A habit that counts something
+                                has already answered "did you" by being
+                                filled in, so the cell can spend itself on
+                                the part you cannot see otherwise. */}
+                            {habit.days.includes(day.key) &&
+                              (habit.amounts[day.key] ? (
+                                <span className="text-xs font-semibold tabular-nums">
+                                  {habit.amounts[day.key]}
+                                </span>
+                              ) : (
+                                <Check className="size-4" />
+                              ))}
                           </button>
                         ))}
                       </span>

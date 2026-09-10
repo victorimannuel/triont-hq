@@ -62,11 +62,18 @@ export default function HabitCheckin() {
 
   useEffect(load, [load])
 
-  // Each question starts on what that habit already recorded today, so a
-  // second pass through corrects a number instead of asking for it again.
+  /*
+  Each question starts on what that habit already recorded today, so a second
+  pass through corrects a number instead of asking for it again. A day with
+  nothing on it starts at one, which is the answer most nights.
+
+  It has to be a real value and not a placeholder: a greyed-out 1 that is
+  really an empty field means the first press of + moves the number from
+  nothing to one and looks like it did nothing at all.
+  */
   useEffect(() => {
     const current = habits?.[at]
-    setCount(current && current.today > 0 ? String(current.today) : '')
+    setCount(current && current.today > 0 ? String(current.today) : '1')
   }, [at, habits])
 
   // Never below nought, and an empty field counts as nought on the way up, so
@@ -310,7 +317,9 @@ export default function HabitCheckin() {
                   variant="outline"
                   size="icon"
                   className="size-12 shrink-0"
-                  disabled={busy || (Number(count) || 0) <= 0}
+                  // Stops at one. Nought of something is what the "tidak"
+                  // button is for, and it says so more clearly.
+                  disabled={busy || (Number(count) || 0) <= 1}
                   onClick={() => bump(-1)}
                   aria-label="−1"
                 >
@@ -323,7 +332,6 @@ export default function HabitCheckin() {
                   step="any"
                   value={count}
                   onChange={(event) => setCount(event.target.value)}
-                  placeholder="1"
                   className="h-16 w-28 text-center text-2xl font-semibold tabular-nums"
                   aria-label={habit.unit}
                 />

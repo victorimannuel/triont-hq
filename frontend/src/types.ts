@@ -76,6 +76,9 @@ export type Habit = Audit & {
    *  Both are meaningless without a unit. */
   total: number
   today: number
+  /** What each day inside the window came to, keyed as YYYY-MM-DD. Empty for a
+   *  habit with no unit, where every entry would just read 1. */
+  amounts: Record<string, number>
   /** The first image attached, for the check-in to show. Null when there is none. */
   image_id: number | null
 }
