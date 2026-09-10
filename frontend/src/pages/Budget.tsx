@@ -89,6 +89,16 @@ const BUCKET_TONE: Record<string, string> = {
   debt: 'bg-destructive',
 }
 
+// The same four as text on their own wash, for the badge on a row. Tinted
+// rather than solid: a row is mostly reading, and four saturated blocks down
+// the side of a list is a lot of shouting for something you glance at.
+const BUCKET_BADGE: Record<string, string> = {
+  needs: 'bg-primary/15 text-primary',
+  wants: 'bg-warning/15 text-warning',
+  savings: 'bg-success/15 text-success',
+  debt: 'bg-destructive/15 text-destructive',
+}
+
 export default function Budget() {
   const { t, tOpt } = useT()
   const meta = useMeta()
@@ -466,6 +476,8 @@ export default function Budget() {
                 name={line.name}
                 under={beneath(line.due_on, line.account_name)}
                 badge={tOpt('bucket', line.bucket)}
+                badgeTone={BUCKET_BADGE[line.bucket]}
+                dotTone={BUCKET_TONE[line.bucket]}
                 right={
                   <>
                     {money(line.amount)}
@@ -553,6 +565,8 @@ function Row({
   name,
   under,
   badge,
+  badgeTone,
+  dotTone,
   right,
   busy,
   onTick,
@@ -564,6 +578,9 @@ function Row({
   name: string
   under?: string
   badge?: string
+  /** The badge's own colours, and the solid one for the phone-sized dot. */
+  badgeTone?: string
+  dotTone?: string
   right: ReactNode
   busy: boolean
   onTick: (next: boolean) => void
@@ -595,9 +612,22 @@ function Row({
         {under && <div className="truncate text-xs text-muted-foreground">{under}</div>}
       </button>
       {badge && (
-        <Badge variant="outline" className="hidden shrink-0 sm:inline-flex">
-          {badge}
-        </Badge>
+        <>
+          <span
+            role="img"
+            aria-label={badge}
+            className={cn(
+              'size-2 shrink-0 rounded-full sm:hidden',
+              dotTone ?? 'bg-foreground/40',
+            )}
+          />
+          <Badge
+            variant="outline"
+            className={cn('hidden shrink-0 border-transparent font-medium sm:inline-flex', badgeTone)}
+          >
+            {badge}
+          </Badge>
+        </>
       )}
       <span className="shrink-0 whitespace-nowrap text-right text-sm tabular-nums">{right}</span>
       <Button
