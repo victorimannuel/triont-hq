@@ -144,6 +144,11 @@ export default function Habits() {
   */
   async function toggle(habit: Habit, day: string) {
     const done = !habit.days.includes(day)
+    // A habit that counts something is asked how many rather than whether: the
+    // tick is already implied by there being a number. Unticking asks nothing
+    // extra, and a habit without a unit is worth one as it always was.
+    const counted = done && habit.unit !== ''
+    let typed = String(habit.amounts[day] ?? 1)
     const ok = await ask({
       title: t(done ? 'habit.confirmTick' : 'habit.confirmUntick', {
         name: habit.name,
@@ -151,8 +156,21 @@ export default function Habits() {
       }),
       confirmLabel: t(done ? 'habit.yesTick' : 'habit.yesUntick'),
       danger: !done,
+      input: counted
+        ? {
+            label: t('habit.howMany', { unit: habit.unit }),
+            initial: typed,
+            onValue: (value) => {
+              typed = value
+            },
+          }
+        : undefined,
     })
     if (!ok) return
+
+    // An emptied box means the same as leaving it alone: once, which is what
+    // the tick would have meant anyway.
+    const amount = counted ? Number(typed) || 1 : 1
 
     setHabits((list) =>
       (list ?? []).map((row) =>
@@ -160,19 +178,22 @@ export default function Habits() {
           ? {
               ...row,
               days: done ? [...row.days, day] : row.days.filter((d) => d !== day),
-              // A tap on the board is worth one. Anything else is typed at the
-              // check-in, and load() below replaces this with what was stored.
-              amounts: done
-                ? { ...row.amounts, [day]: 1 }
-                : Object.fromEntries(
-                    Object.entries(row.amounts).filter(([key]) => key !== day),
-                  ),
+              // load() below replaces this with what was stored; it is here so
+              // the cell fills in with the right number under the finger. Only
+              // for a counted habit: the others draw a tick, and a stray 1 here
+              // would flash a number in a column that never shows one.
+              amounts:
+                done && counted
+                  ? { ...row.amounts, [day]: amount }
+                  : Object.fromEntries(
+                      Object.entries(row.amounts).filter(([key]) => key !== day),
+                    ),
             }
           : row,
       ),
     )
     try {
-      await api.setHabitDay(habit.id, day, done)
+      await api.setHabitDay(habit.id, day, done, amount)
       load()
     } catch {
       toast.error(t('habit.failed'))

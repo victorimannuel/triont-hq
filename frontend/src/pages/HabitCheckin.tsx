@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, Check, Minus, NotebookPen, PartyPopper, Plus, Repeat2, X } from 'lucide-react'
+import { ArrowLeft, Check, NotebookPen, PartyPopper, Repeat2, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { api } from '@/api'
@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { ErrorNote, Loading, PageHeader } from '@/components/bits'
+import { ErrorNote, Loading, PageHeader, Stepper } from '@/components/bits'
 
 /**
  * The evening check-in, which is where the notification lands. One habit at a
@@ -75,11 +75,6 @@ export default function HabitCheckin() {
     const current = habits?.[at]
     setCount(current && current.today > 0 ? String(current.today) : '1')
   }, [at, habits])
-
-  // Never below nought, and an empty field counts as nought on the way up, so
-  // the first tap on + reads 1 rather than doing nothing.
-  const bump = (delta: number) =>
-    setCount((n) => String(Math.max(0, (Number(n) || 0) + delta)))
 
   async function answer(habit: Habit, done: boolean, amount = 0) {
     if (busy) return
@@ -307,48 +302,14 @@ export default function HabitCheckin() {
               once — the point of the evening run is that it can be got through
               without deciding anything twice. */}
           {habit.unit !== '' && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-center gap-2">
-                {/* Most nights the answer is a small number a couple of taps
-                    away, and the keyboard is the slow way to say it. Typing
-                    still works for the night it was fourteen. */}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="size-12 shrink-0"
-                  // Stops at one. Nought of something is what the "tidak"
-                  // button is for, and it says so more clearly.
-                  disabled={busy || (Number(count) || 0) <= 1}
-                  onClick={() => bump(-1)}
-                  aria-label="−1"
-                >
-                  <Minus className="size-5" />
-                </Button>
-                <Input
-                  type="number"
-                  inputMode="decimal"
-                  min="0"
-                  step="any"
-                  value={count}
-                  onChange={(event) => setCount(event.target.value)}
-                  className="h-16 w-28 text-center text-2xl font-semibold tabular-nums"
-                  aria-label={habit.unit}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="size-12 shrink-0"
-                  disabled={busy}
-                  onClick={() => bump(1)}
-                  aria-label="+1"
-                >
-                  <Plus className="size-5" />
-                </Button>
-              </div>
-              <p className="text-center text-sm text-muted-foreground">{habit.unit}</p>
-            </div>
+            <Stepper
+              big
+              value={count}
+              onValue={setCount}
+              label={habit.unit}
+              caption={habit.unit}
+              disabled={busy}
+            />
           )}
 
           <div className="flex gap-3">

@@ -12,6 +12,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { buttonVariants } from '@/components/ui/button'
+import { Stepper } from '@/components/bits'
 import { cn } from '@/lib/utils'
 
 export type ConfirmOptions = {
@@ -24,6 +25,17 @@ export type ConfirmOptions = {
   doubleTitle?: string
   doubleBody?: ReactNode
   doubleLabel?: string
+  /*
+  One number to type before confirming, for a question that is really "how
+  many" rather than "are you sure". The answer comes back through onValue
+  rather than through the promise, so every other caller keeps its plain
+  boolean and its `if (!ok) return`.
+  */
+  input?: {
+    label: string
+    initial?: string
+    onValue: (value: string) => void
+  }
 }
 
 type Ask = (options: ConfirmOptions) => Promise<boolean>
@@ -36,11 +48,14 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   const { t } = useT()
   const [options, setOptions] = useState<ConfirmOptions | null>(null)
   const [step, setStep] = useState<1 | 2>(1)
+  const [typed, setTyped] = useState('')
   const resolver = useRef<((value: boolean) => void) | null>(null)
+  const confirmButton = useRef<HTMLButtonElement>(null)
 
   const ask = useCallback<Ask>((next) => {
     setOptions(next)
     setStep(1)
+    setTyped(next.input?.initial ?? '')
     return new Promise<boolean>((resolve) => {
       resolver.current = resolve
     })
@@ -60,6 +75,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       setStep(2)
       return
     }
+    options?.input?.onValue(typed)
     settle(true)
   }
 
@@ -74,11 +90,32 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     <ConfirmContext.Provider value={ask}>
       {children}
       <AlertDialog open={options !== null} onOpenChange={(open) => !open && settle(false)}>
-        <AlertDialogContent>
+        {/* A question with a number in it lands on its confirm button rather
+            than on Cancel, so enter says yes and the phone keyboard stays down.
+            Focusing the box would be the obvious move and is the wrong one: it
+            throws a keyboard over half the screen for a number that is two taps
+            away, and the box is still there to tap when it really is fourteen. */}
+        <AlertDialogContent
+          onOpenAutoFocus={(event) => {
+            if (!options?.input) return
+            event.preventDefault()
+            confirmButton.current?.focus()
+          }}
+        >
           <AlertDialogHeader>
             <AlertDialogTitle className="lowercase">{title}</AlertDialogTitle>
             {body && <AlertDialogDescription asChild><div>{body}</div></AlertDialogDescription>}
           </AlertDialogHeader>
+          {options?.input && (
+            <Stepper
+              value={typed}
+              onValue={setTyped}
+              label={options.input.label}
+              caption={options.input.label}
+              // Enter still saves for anyone who did tap in to type.
+              onEnter={accept}
+            />
+          )}
           {/* Step two swaps the buttons around. A second click landing on the
               same spot would otherwise sail straight through both stages. The
               phone needs its own swap: there the footer stacks rather than sits
@@ -94,6 +131,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
           >
             <AlertDialogCancel onClick={() => settle(false)}>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
+              ref={confirmButton}
               onClick={(event) => {
                 // Stage one must not close the dialog; it swaps the copy.
                 if (options?.double && step === 1) event.preventDefault()

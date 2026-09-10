@@ -1,6 +1,6 @@
 import { useEffect, useState, type ComponentProps, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { ArrowLeft, ChevronRight, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Eye, EyeOff, Loader2, Minus, Plus } from 'lucide-react'
 
 import {
   disguisedAll,
@@ -460,6 +460,89 @@ export function MoneyInput({
       }}
       {...rest}
     />
+  )
+}
+
+/**
+ * How many, asked with the thumb. A bare number field means the keyboard for
+ * an answer that is almost always one or two, so the buttons carry the common
+ * case and typing stays there for the night it was fourteen.
+ *
+ * Minus stops at one. None of something is a different answer, and the places
+ * this is used have their own, plainer way of saying it.
+ *
+ * The value is text rather than a number so a half-typed box can be empty:
+ * "0" appearing the moment the field is cleared is the sort of thing that
+ * makes a field feel like it is arguing.
+ */
+export function Stepper({
+  value,
+  onValue,
+  label,
+  caption,
+  disabled,
+  big,
+  onEnter,
+}: {
+  value: string
+  onValue: (value: string) => void
+  /** Names the field for a screen reader; not drawn. */
+  label?: string
+  /** The line under the box, usually the unit. */
+  caption?: string
+  disabled?: boolean
+  /** Thumb-sized, for a page that is nothing but this question. */
+  big?: boolean
+  onEnter?: () => void
+}) {
+  const bump = (delta: number) => onValue(String(Math.max(0, (Number(value) || 0) + delta)))
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className={cn('shrink-0', big ? 'size-12' : 'size-10')}
+          disabled={disabled || (Number(value) || 0) <= 1}
+          onClick={() => bump(-1)}
+          aria-label="−1"
+        >
+          <Minus className={big ? 'size-5' : 'size-4'} />
+        </Button>
+        <Input
+          type="number"
+          inputMode="decimal"
+          min="0"
+          step="any"
+          value={value}
+          onChange={(event) => onValue(event.target.value)}
+          onKeyDown={(event) => {
+            if (!onEnter || event.key !== 'Enter') return
+            event.preventDefault()
+            onEnter()
+          }}
+          className={cn(
+            'text-center font-semibold tabular-nums',
+            big ? 'h-16 w-28 text-2xl' : 'h-12 w-24 text-lg',
+          )}
+          aria-label={label}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className={cn('shrink-0', big ? 'size-12' : 'size-10')}
+          disabled={disabled}
+          onClick={() => bump(1)}
+          aria-label="+1"
+        >
+          <Plus className={big ? 'size-5' : 'size-4'} />
+        </Button>
+      </div>
+      {caption && <p className="text-center text-sm text-muted-foreground">{caption}</p>}
+    </div>
   )
 }
 
