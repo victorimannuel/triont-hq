@@ -488,6 +488,8 @@ export const api = {
   // A plain link: the browser fetches it with the session cookie, and the
   // response is never cached because it is decrypted personal data.
   downloadUrl: (id: number) => `/api/files/${id}/download`,
+  reorderAttachments: (entity: string, id: number, ids: number[]) =>
+    send<void>('PUT', `/files/${entity}/${id}/order`, { ids }),
   deleteAttachment: (id: number) => send<void>('DELETE', `/files/${id}`),
 
   rates: () => request<{ rates: FxRate[] }>('/fx'),

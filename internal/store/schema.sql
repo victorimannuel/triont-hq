@@ -512,6 +512,11 @@ create table if not exists attachments (
 
 create index if not exists attachments_owner_idx on attachments (entity, entity_id);
 
+-- Which file comes first. It matters because the first image is the one a
+-- gallery puts on the front of a card, and the order things happened to be
+-- uploaded in is not the order you would choose to be seen in.
+alter table attachments add column if not exists position int not null default 0;
+
 -- The morning digest is written on the server, so each device records the
 -- language it was subscribed from. Rows that predate the column keep the
 -- Indonesian the digest already spoke.

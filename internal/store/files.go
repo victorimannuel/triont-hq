@@ -57,7 +57,7 @@ func (s *Store) Attachments(ctx context.Context, entity string, entityID int64) 
 	rows, err := s.pool.Query(ctx, `select `+attachmentCols+`
 		  from attachments
 		 where entity = $1 and entity_id = $2 and deleted_at is null
-		 order by created_at`, entity, entityID)
+		 order by position, created_at, id`, entity, entityID)
 	if err != nil {
 		return nil, err
 	}
@@ -99,6 +99,31 @@ func (s *Store) AttachmentContent(ctx context.Context, id int64) (Attachment, []
 		return a, nil, norm(err)
 	}
 	return a, sealed, nil
+}
+
+/*
+ReorderAttachments writes the order the files were dragged into.
+
+Only rows that belong to the record are touched, so an id from somewhere else
+in the list cannot quietly move a file that is not on this page. Anything left
+out keeps the position it had, which puts it after everything renumbered here.
+*/
+func (s *Store) ReorderAttachments(ctx context.Context, entity string, entityID int64, ids []int64) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	for at, id := range ids {
+		if _, err := tx.Exec(ctx, `
+			update attachments set position = $1
+			 where id = $2 and entity = $3 and entity_id = $4 and deleted_at is null`,
+			at, id, entity, entityID); err != nil {
+			return norm(err)
+		}
+	}
+	return tx.Commit(ctx)
 }
 
 func (s *Store) DeleteAttachment(ctx context.Context, id int64, actor string) error {

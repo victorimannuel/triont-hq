@@ -101,6 +101,7 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("GET /api/files/{entity}/counts", s.requireAuth(s.handleAttachmentCounts))
 	mux.Handle("GET /api/files/{entity}/{id}", s.requireAuth(s.handleListAttachments))
 	mux.Handle("POST /api/files/{entity}/{id}", s.requireAuth(s.handleUpload))
+	mux.Handle("PUT /api/files/{entity}/{id}/order", s.requireAuth(s.handleReorderAttachments))
 	mux.Handle("GET /api/files/{id}/download", s.requireAuth(s.handleDownload))
 	mux.Handle("DELETE /api/files/{id}", s.requireAuth(s.handleDeleteAttachment))
 

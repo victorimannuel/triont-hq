@@ -41,6 +41,32 @@ func (s *Server) handleListAttachments(w http.ResponseWriter, r *http.Request) {
 
 // The counts are keyed by id, which JSON turns into strings; the caller reads
 // them back with the same string keys.
+// handleReorderAttachments takes the ids in the order they should appear.
+func (s *Server) handleReorderAttachments(w http.ResponseWriter, r *http.Request) {
+	entity := r.PathValue("entity")
+	if !store.FileEntityOK(entity) {
+		fail(w, http.StatusBadRequest, "jenis record nggak dikenal")
+		return
+	}
+	id, err := pathID(r, "id")
+	if err != nil {
+		fail(w, http.StatusBadRequest, "id nggak valid")
+		return
+	}
+	var in struct {
+		IDs []int64 `json:"ids"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		fail(w, http.StatusBadRequest, "isian nggak kebaca")
+		return
+	}
+	if err := s.store.ReorderAttachments(r.Context(), entity, id, in.IDs); err != nil {
+		s.oops(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s *Server) handleAttachmentCounts(w http.ResponseWriter, r *http.Request) {
 	entity := r.PathValue("entity")
 	if !store.FileEntityOK(entity) {
