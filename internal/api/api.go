@@ -203,6 +203,8 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("DELETE /api/income/{id}", s.requireAuth(s.handleDeleteIncome))
 
 	mux.Handle("GET /api/calendar", s.requireAuth(s.handleCalendar))
+	mux.Handle("GET /api/calendar/marks", s.requireAuth(s.handleCalendarMarks))
+	mux.Handle("POST /api/calendar/mark", s.requireAuth(s.handleMarkCalendarEntry))
 
 	mux.Handle("GET /api/belongings", s.requireAuth(s.handleListBelongings))
 	mux.Handle("POST /api/belongings", s.requireAuth(s.handleCreateBelonging))

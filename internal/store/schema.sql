@@ -841,3 +841,26 @@ create table if not exists budget_targets (
     bucket  text primary key,
     percent numeric not null default 0
 );
+
+-- A birthday that has gone by is not overdue and it is not finished either; it
+-- is waiting on you to say you did something about it. Nothing on the contact
+-- itself can record that, because the answer is different every year, so the
+-- occurrence gets a row of its own.
+--
+-- `ref` is the entry's own URL, which is what already identifies the thing the
+-- date hangs off, and the date pins which occurrence. Both together with the
+-- kind, because a contact's birthday and their day count share a URL.
+create table if not exists calendar_marks (
+    id         bigserial primary key,
+    kind       text not null,
+    ref        text not null,
+    on_date    date not null,
+    created_by text not null default '',
+    created_at timestamptz not null default now(),
+    unique (kind, ref, on_date)
+);
+
+-- What you actually did about it, in your own words. The tick alone says the
+-- date was dealt with but not how, and a year later "udah telpon" is the part
+-- worth having.
+alter table calendar_marks add column if not exists note text not null default '';

@@ -760,7 +760,18 @@ export type PersonInput = {
   reach_every_days: number
 }
 
+/** One date already closed off, with whatever was written about it. */
+export type CalendarMark = {
+  kind: string
+  /** YYYY-MM-DD. */
+  on: string
+  note: string
+}
+
 export type CalendarEntry = {
+  /** Closed off by hand, with whatever was written about it at the time. */
+  done?: boolean
+  note?: string
   date: string
   kind: string
   label: string

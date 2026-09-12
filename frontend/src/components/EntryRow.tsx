@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import {
   Banknote,
   Cake,
+  Check,
   FileText,
   Globe,
   Home,
@@ -55,24 +56,54 @@ const KIND_TONE: Record<Kind, string> = {
 
 export const tone = (kind: string) => KIND_TONE[kind as Kind] ?? KIND_TONE.renewal
 
-export function EntryRow({ entry, onPick }: { entry: CalendarEntry; onPick?: () => void }) {
+/*
+Kinds that are dealt with rather than fixed.
+
+Everything else on this list clears itself: a renewal goes when its date moves,
+a to-do when it is ticked on its own page. A birthday has nothing to change —
+the day happens either way — so it stays until you say what you did about it.
+*/
+export const MARKABLE = new Set(['birthday', 'milestone'])
+
+export function EntryRow({
+  entry,
+  onPick,
+  onActions,
+}: {
+  entry: CalendarEntry
+  onPick?: () => void
+  /** Opens the box that closes this date off. Present on the home page, where
+   *  the list is worked through rather than read. */
+  onActions?: () => void
+}) {
   const { t } = useT()
   const Icon = KIND_ICON[entry.kind as Kind] ?? Globe
   const days = daysUntil(entry.date)
   const late = days !== null && days < 0
   const soon = days !== null && days >= 0 && days <= 14
+  /*
+  Whether the whole row is the button.
 
-  return (
-    <Link
-      to={entry.url}
-      onClick={onPick}
-      // The stripe repeats what the date column already says, but it says it
-      // down the left edge where a list is scanned rather than read.
-      className={cn(
-        'flex items-center gap-3 border-l-2 px-4 py-3 transition-colors hover:bg-accent',
-        late ? 'border-l-destructive' : soon ? 'border-l-warning' : 'border-l-transparent',
-      )}
-    >
+  On the home page this list is a list of jobs, so a row should do the job when
+  you tap it. For most kinds the job is to go and change something — a renewal
+  date, a document — and the link already goes there. For the ones that are
+  closed off by hand there is nowhere useful to go, so the row opens the box
+  that closes it instead, and the link to the record moves inside that box.
+
+  On the calendar no row does this: nothing is passed, and every row stays a
+  link, because the calendar is read rather than worked through.
+  */
+  const acts = Boolean(onActions) && MARKABLE.has(entry.kind)
+
+  // The stripe repeats what the date column already says, but it says it down
+  // the left edge where a list is scanned rather than read.
+  const shell = cn(
+    'flex w-full items-center gap-3 border-l-2 px-4 py-3 text-left transition-colors hover:bg-accent',
+    late ? 'border-l-destructive' : soon ? 'border-l-warning' : 'border-l-transparent',
+  )
+
+  const body = (
+    <>
       <span className={cn('grid size-6 shrink-0 place-items-center rounded', tone(entry.kind))}>
         <Icon className="size-3.5" />
       </span>
@@ -83,6 +114,15 @@ export function EntryRow({ entry, onPick }: { entry: CalendarEntry; onPick?: () 
         <div className="truncate text-xs text-muted-foreground">
           {entry.count ? t('cal.milestone', { n: formatCount(entry.count) }) : entry.detail}
         </div>
+        {/* What was done about it, a year later. A date closed off without a
+            word still reads as closed off, so the tick carries that on its
+            own and this line only appears when there is something to say. */}
+        {entry.done && (
+          <div className="mt-0.5 flex items-start gap-1.5 text-xs text-success">
+            <Check className="mt-0.5 size-3 shrink-0" />
+            <span className="truncate">{entry.note || t('cal.marked')}</span>
+          </div>
+        )}
       </div>
       {/* The icon already carries the kind and its colour; on a phone the badge
           only steals width from the name. */}
@@ -112,6 +152,16 @@ export function EntryRow({ entry, onPick }: { entry: CalendarEntry; onPick?: () 
           </div>
         )}
       </div>
+    </>
+  )
+
+  return acts ? (
+    <button type="button" onClick={onActions} className={shell}>
+      {body}
+    </button>
+  ) : (
+    <Link to={entry.url} onClick={onPick} className={shell}>
+      {body}
     </Link>
   )
 }

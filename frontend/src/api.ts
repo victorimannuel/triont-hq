@@ -21,6 +21,7 @@ import type {
   MoneyAccount,
   MoneyAccountInput,
   CalendarEntry,
+  CalendarMark,
   Document,
   DocumentInput,
   Hit,
@@ -310,6 +311,10 @@ export const api = {
   deletePerson: (id: number) => send<void>('DELETE', `/people/${id}`),
   touchPerson: (id: number) => send<void>('POST', `/people/${id}/touch`),
 
+  calendarMarks: (ref: string) =>
+    request<{ marks: CalendarMark[] }>(`/calendar/marks?ref=${encodeURIComponent(ref)}`),
+  markCalendarEntry: (kind: string, ref: string, date: string, done: boolean, note = '') =>
+    send<void>('POST', '/calendar/mark', { kind, ref, date, done, note }),
   calendar: (query: Record<string, string> = {}) => {
     const params = new URLSearchParams(
       Object.entries(query).filter(([, value]) => value !== ''),

@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 
 import { api } from '@/api'
 import { useT } from '@/i18n'
-import type { Client, Person, PersonInput } from '@/types'
+import type { CalendarMark, Client, Person, PersonInput } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -79,6 +79,7 @@ export default function PersonForm() {
   const [form, setForm] = useState<PersonInput>(blank)
   const [record, setRecord] = useState<Person | null>(null)
   const [clients, setClients] = useState<Client[]>([])
+  const [marks, setMarks] = useState<CalendarMark[]>([])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -88,6 +89,16 @@ export default function PersonForm() {
       .then((data) => setClients(data.clients))
       .catch(() => undefined)
   }, [])
+
+  // What was done about this person's dates. A page with no id is a new
+  // contact, which has no history yet.
+  useEffect(() => {
+    if (!id) return
+    api
+      .calendarMarks(`/people/${id}`)
+      .then((data) => setMarks(data.marks))
+      .catch(() => undefined)
+  }, [id])
 
   useEffect(() => {
     if (!id) return
@@ -237,6 +248,31 @@ export default function PersonForm() {
                   </Field>
                 )}
               </div>
+
+              {/* What you did on the dates that have already gone by. This is
+                  the page you open before the next one comes round, so it is
+                  where the note earns its keep. Nothing shows until something
+                  has been closed off. */}
+              {marks.length > 0 && (
+                <Field label={t('people.handled')} hint={t('people.handledHint')}>
+                  <div className="space-y-1.5">
+                    {marks.map((mark) => (
+                      <div
+                        key={`${mark.kind}-${mark.on}`}
+                        className="flex items-baseline gap-2 rounded-md border px-3 py-2 text-xs"
+                      >
+                        <span className="shrink-0 tabular-nums text-muted-foreground">
+                          {formatDate(mark.on)}
+                        </span>
+                        <span className="min-w-0 flex-1">{mark.note || t('cal.marked')}</span>
+                        <span className="shrink-0 text-muted-foreground">
+                          {t(`cal.kind.${mark.kind}`)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </Field>
+              )}
 
               {form.birthday && (
                 <Field label={t('people.milestones')} hint={t('people.milestonesHint')}>
