@@ -16,6 +16,8 @@ func taskKind(r *http.Request) (string, bool) {
 		return store.TaskTodo, true
 	case store.TaskBuy:
 		return store.TaskBuy, true
+	case store.TaskNote:
+		return store.TaskNote, true
 	}
 	return "", false
 }

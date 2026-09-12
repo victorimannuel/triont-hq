@@ -6,15 +6,20 @@ import (
 )
 
 /*
-A thing to do and a thing to buy are the same row with a different kind on it.
-Both get typed in one line, ticked with one tap, and cleared in a batch. What
-separates them is where you are standing when you read them, and that is a
-question for the pages rather than for the table.
+A thing to do, a thing to buy and a thing merely written down are the same row
+with a different kind on it. All three get typed, ticked with one tap, and
+cleared in a batch. What separates them is where you are standing when you read
+them, and that is a question for the pages rather than for the table.
+
+A note is the one you have not decided about yet: it is where a line goes when
+it is caught, before anyone has said whether it is a job, a purchase or
+nothing. That is why it holds more than one line where the other two do not.
 */
 
 const (
 	TaskTodo = "todo"
 	TaskBuy  = "buy"
+	TaskNote = "note"
 )
 
 type Task struct {
@@ -47,6 +52,31 @@ func scanTask(row interface{ Scan(...any) error }) (Task, error) {
 	err := row.Scan(&t.ID, &t.Kind, &t.Title, &t.DueOn, &t.DoneAt,
 		&t.CreatedBy, &t.UpdatedBy, &t.CreatedAt, &t.UpdatedAt)
 	return t, err
+}
+
+// OpenTasks counts what is still to do, by kind. The home page needs it
+// because a line typed into the capture box has no deadline, so nothing else
+// on that page would ever mention it again.
+func (s *Store) OpenTasks(ctx context.Context) (map[string]int, error) {
+	rows, err := s.pool.Query(ctx, `
+		select kind, count(*) from tasks
+		 where done_at is null and deleted_at is null
+		 group by kind`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := map[string]int{}
+	for rows.Next() {
+		var kind string
+		var n int
+		if err := rows.Scan(&kind, &n); err != nil {
+			return nil, err
+		}
+		out[kind] = n
+	}
+	return out, rows.Err()
 }
 
 // Tasks is one list, in the order it gets worked through: still to do first,

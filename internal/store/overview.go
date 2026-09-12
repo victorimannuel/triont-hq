@@ -22,6 +22,9 @@ type Overview struct {
 	// Today's habits, as a tally rather than a board: enough for the home page
 	// to say whether the evening's ticking has been done yet, and what is left.
 	HabitsToday
+	// Still open, by kind. A line captured on the home page carries no date,
+	// so without this it would leave no trace on the page it was typed into.
+	OpenTasks map[string]int `json:"open_tasks"`
 }
 
 // How far ahead each kind of deadline is worth worrying about. A domain can be
@@ -59,6 +62,9 @@ func (s *Store) Overview(ctx context.Context) (Overview, error) {
 		return o, err
 	}
 	if o.HabitsToday, err = s.HabitsToday(ctx, startOfDay(time.Now())); err != nil {
+		return o, err
+	}
+	if o.OpenTasks, err = s.OpenTasks(ctx); err != nil {
 		return o, err
 	}
 	return o, nil

@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { useConfirm } from '@/components/confirm'
 import { daysUntil, ErrorNote, formatDate, Loading, PageHeader } from '@/components/bits'
 
@@ -247,13 +248,29 @@ function AddRow({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Input
-        value={title}
-        onChange={(event) => setTitle(event.target.value)}
-        onKeyDown={(event) => event.key === 'Enter' && submit()}
-        placeholder={t(`tasks.${kind}.add`)}
-        className="min-w-40 flex-1"
-      />
+      {/* A scribble is the one kind worth more than a line, so it gets a
+          box that grows. Enter makes a new line there and ctrl-enter files
+          it; on the other two lists enter still files, as it always did. */}
+      {kind === 'note' ? (
+        <Textarea
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) submit()
+          }}
+          placeholder={t(`tasks.${kind}.add`)}
+          rows={3}
+          className="min-w-40 flex-1"
+        />
+      ) : (
+        <Input
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+          onKeyDown={(event) => event.key === 'Enter' && submit()}
+          placeholder={t(`tasks.${kind}.add`)}
+          className="min-w-40 flex-1"
+        />
+      )}
       {kind === 'todo' &&
         (dating ? (
           <Input
@@ -325,16 +342,30 @@ function TaskRow({
           if (!box.current?.contains(event.relatedTarget as Node)) save()
         }}
       >
-        <Input
-          value={title}
-          autoFocus
-          onChange={(event) => setTitle(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') save()
-            if (event.key === 'Escape') cancel()
-          }}
-          className="min-w-40 flex-1"
-        />
+        {task.kind === 'note' ? (
+          <Textarea
+            value={title}
+            autoFocus
+            onChange={(event) => setTitle(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) save()
+              if (event.key === 'Escape') cancel()
+            }}
+            rows={4}
+            className="min-w-40 flex-1"
+          />
+        ) : (
+          <Input
+            value={title}
+            autoFocus
+            onChange={(event) => setTitle(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') save()
+              if (event.key === 'Escape') cancel()
+            }}
+            className="min-w-40 flex-1"
+          />
+        )}
         {task.kind === 'todo' && (
           <Input
             type="date"
@@ -352,7 +383,13 @@ function TaskRow({
   }
 
   return (
-    <div className={cn('flex items-center gap-3 px-4 py-3', done && 'opacity-60')}>
+    <div
+      className={cn(
+        'flex gap-3 px-4 py-3',
+        task.kind === 'note' ? 'items-start' : 'items-center',
+        done && 'opacity-60',
+      )}
+    >
       <button
         type="button"
         onClick={onToggle}
@@ -371,7 +408,15 @@ function TaskRow({
         onClick={() => setEditing(true)}
         className="min-w-0 flex-1 text-left"
       >
-        <span className={cn('block truncate text-sm', done && 'line-through')}>{task.title}</span>
+        <span
+          className={cn(
+            'block text-sm',
+            task.kind === 'note' ? 'whitespace-pre-wrap break-words' : 'truncate',
+            done && 'line-through',
+          )}
+        >
+          {task.title}
+        </span>
       </button>
 
       {task.due_on && !done && (

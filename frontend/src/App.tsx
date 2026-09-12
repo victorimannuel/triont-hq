@@ -32,6 +32,7 @@ import {
   Monitor as MonitorIcon,
   Moon,
   Package,
+  PenLine,
   PiggyBank,
   Receipt,
   Server,
@@ -316,6 +317,7 @@ const NAV_GROUPS = [
     label: '',
     items: [
       { to: '/', key: 'home', icon: House, end: true },
+      { to: '/notes', key: 'notes', icon: PenLine, end: false },
       { to: '/todo', key: 'todo', icon: ListTodo, end: false },
       { to: '/habits', key: 'habits', icon: Repeat2, end: false },
       { to: '/journal', key: 'journal', icon: NotebookPen, end: false },
@@ -585,7 +587,8 @@ function Shell({
                 it is the one that takes the longer path. */}
             <Route path="/songs/:id" element={<SongSheet />} />
             <Route path="/songs/:id/edit" element={<SongForm />} />
-            <Route path="/todo" element={<Tasks key="todo" kind="todo" />} />
+            <Route path="/notes" element={<Tasks key="note" kind="note" />} />
+          <Route path="/todo" element={<Tasks key="todo" kind="todo" />} />
             <Route path="/shopping" element={<Tasks key="buy" kind="buy" />} />
             <Route path="/monitor" element={<Monitor />} />
             <Route path="/notices" element={<Notices />} />

@@ -143,7 +143,7 @@ export type SongInput = {
  *  it belongs to. A deadline is a to-do's only, and null until one is set. */
 export type Task = Audit & {
   id: number
-  kind: 'todo' | 'buy'
+  kind: 'todo' | 'buy' | 'note'
   title: string
   due_on: string | null
   /** When it was ticked. Null while it is still open. */
@@ -788,6 +788,8 @@ export type Overview = {
   habits_total: number
   /** The ones still open today, by name and in the board's order. */
   habits_left: string[]
+  /** How many are still open, keyed by task kind. */
+  open_tasks: Record<string, number>
   low_supplies: Supply[]
   trouble: Check[]
   stale_monitors: MonitorSource[]

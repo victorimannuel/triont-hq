@@ -1,39 +1,159 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { Repeat2 } from 'lucide-react'
+import { ListTodo, NotebookPen, PenLine, Repeat2, ShoppingBasket } from 'lucide-react'
+import { toast } from 'sonner'
 
 import { api } from '@/api'
 import { useT } from '@/i18n'
-import type { Overview as OverviewData } from '@/types'
+import type { CalendarEntry, Overview as OverviewData, TaskKind } from '@/types'
+import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { EntryRow } from '@/components/EntryRow'
 import { daysUntil, ErrorNote, Loading, PageHeader, Segmented, since } from '@/components/bits'
 import { useRemembered } from '@/lib/useRemembered'
+import { cn } from '@/lib/utils'
 
 // How far ahead the upcoming list looks. The server sends a month; this is
 // only which slice of it the page draws.
 const WINDOWS = ['7', '30'] as const
 const WINDOW_OPTIONS = WINDOWS.map((days) => ({ value: days, label: `${days}d` }))
 
+function todayKey() {
+  const now = new Date()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  return `${now.getFullYear()}-${month}-${String(now.getDate()).padStart(2, '0')}`
+}
+
+/*
+One line in, filed in one tap.
+
+The reason this exists is that everything else here costs four: open the menu,
+find the module, open its form, type, save. A thought does not survive that,
+and what it does instead is end up in the phone's notes app — which is the
+thing HQ is supposed to replace.
+
+So the box asks for nothing but the words. Where they go is chosen after they
+are typed, which is also when you actually know, and the destinations only
+appear once there is something to file.
+
+The default is the scribble list rather than the to-do list, because catching a
+thought and committing to doing something about it are two different decisions
+and the second one can wait. A line filed as a job you have not agreed to is
+how a to-do list stops being believed.
+*/
+function Capture({ onFiled }: { onFiled: () => void }) {
+  const { t } = useT()
+  const [line, setLine] = useState('')
+  const [busy, setBusy] = useState(false)
+  const typed = line.trim()
+
+  async function file(where: TaskKind | 'journal') {
+    if (!typed || busy) return
+    setBusy(true)
+    try {
+      if (where === 'journal') {
+        // The day holds one piece of text, so a captured line is appended to
+        // it rather than replacing what is already written there.
+        const on = todayKey()
+        const day = await api.journalDay(on)
+        await api.setJournalLine(on, day.line ? `${day.line}\n${typed}` : typed)
+      } else {
+        await api.createTask(where, { title: typed, due_on: '' })
+      }
+      setLine('')
+      toast.success(t(`home.filed.${where}`))
+      onFiled()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t('home.captureFailed'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const where: { key: TaskKind | 'journal'; icon: typeof ListTodo }[] = [
+    { key: 'note', icon: PenLine },
+    { key: 'todo', icon: ListTodo },
+    { key: 'buy', icon: ShoppingBasket },
+    { key: 'journal', icon: NotebookPen },
+  ]
+
+  return (
+    <form
+      className="mt-2 mb-3"
+      onSubmit={(event: FormEvent) => {
+        event.preventDefault()
+        void file('note')
+      }}
+    >
+      {/* Several lines, because a thought caught on the way past is rarely one.
+          Enter therefore makes a new line and ctrl-enter files it, which is the
+          opposite of the one-line boxes elsewhere and the right way round for a
+          box you are meant to think in. */}
+      <Textarea
+        value={line}
+        onChange={(event) => setLine(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) void file('note')
+        }}
+        placeholder={t('home.capture')}
+        disabled={busy}
+        rows={2}
+        aria-label={t('home.capture')}
+        className="resize-y"
+      />
+      {/* Hidden until there is something to file, so an empty home page stays
+          one quiet line rather than a row of buttons waiting to be understood. */}
+      <div className={cn('mt-2 flex flex-wrap gap-2', !typed && 'hidden')}>
+        {where.map((one) => (
+          <Button
+            key={one.key}
+            type="button"
+            variant={one.key === 'note' ? 'default' : 'outline'}
+            size="sm"
+            disabled={busy}
+            onClick={() => void file(one.key)}
+          >
+            <one.icon className="size-4" />
+            {t(`home.fileTo.${one.key}`)}
+          </Button>
+        ))}
+      </div>
+    </form>
+  )
+}
+
 /*
 Only what wants doing: what is broken, what is due, tonight's habits, what has
-run out. Every row here has a next step. The page used to carry record counts,
-the month's recurring money and recently touched projects as well — reference
-figures that change when something is edited, not things to check on, and each
-has a page of its own.
+run out. Every row here has a next step, starting with the box that puts one
+there. The page used to carry record counts, the month's recurring money and
+recently touched projects as well — reference figures that change when
+something is edited, not things to check on, and each has a page of its own.
 */
 export default function Overview() {
   const { t, tOpt } = useT()
   const [data, setData] = useState<OverviewData | null>(null)
   const [error, setError] = useState('')
   const [range, setRange] = useRemembered('hq.window', WINDOWS, '7')
+  // The row whose actions are open, or null. One sheet for the whole list
+  // rather than one per row.
+  const [acting, setActing] = useState<CalendarEntry | null>(null)
+  const [note, setNote] = useState('')
 
-  useEffect(() => {
+  const load = useCallback(() => {
     api
       .overview()
       .then(setData)
       .catch((err) => setError(err.message))
   }, [])
+
+  useEffect(load, [load])
 
   if (error) return <ErrorNote>{error}</ErrorNote>
   if (!data) return <Loading />
@@ -41,6 +161,36 @@ export default function Overview() {
   const low = data.low_supplies ?? []
   const trouble = data.trouble ?? []
   const quiet = data.stale_monitors ?? []
+  /*
+  Closing off a date, and saying what you did about it.
+
+  A bare tick would record that something happened and lose the one part worth
+  keeping. A menu of guessed-at actions is no better: what was actually done
+  about a birthday is a sentence, not one of three buttons. So the sheet asks,
+  and takes whatever is typed — including nothing, because a date dealt with
+  and not written up is still dealt with.
+
+  The note is filed against the occurrence rather than the person, so next
+  year's comes back on its own with nothing written on it yet.
+  */
+  async function act(entry: CalendarEntry, note: string) {
+    setActing(null)
+    setNote('')
+    try {
+      await api.markCalendarEntry(entry.kind, entry.url, entry.date, true, note.trim())
+      toast.success(t('cal.marked'))
+      load()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t('home.captureFailed'))
+    }
+  }
+
+  const counts = data.open_tasks ?? {}
+  const piles = ([
+    ['note', '/notes', 'home.openNote'],
+    ['todo', '/todo', 'home.openTodo'],
+    ['buy', '/shopping', 'home.openBuy'],
+  ] as const).filter(([kind]) => (counts[kind] ?? 0) > 0)
   const ahead = Number(range)
   const overdue = (data.upcoming ?? []).filter((e) => (daysUntil(e.date) ?? 0) < 0)
   const soon = (data.upcoming ?? []).filter((e) => {
@@ -51,6 +201,21 @@ export default function Overview() {
   return (
     <>
       <PageHeader title={t('home.title')} />
+
+      <Capture onFiled={load} />
+
+      {/* What capture has piled up. None of these lists carries a deadline, so
+          this line is the only thing on the page that would ever mention them
+          again. */}
+      {piles.length > 0 && (
+        <div className="mb-4 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+          {piles.map(([kind, to, key]) => (
+            <Link key={kind} to={to} className="hover:text-foreground hover:underline">
+              {t(key, { n: counts[kind] ?? 0 })}
+            </Link>
+          ))}
+        </div>
+      )}
 
       {/* One timeline: what is broken, then what today already owes, then what
           is coming. A monitor has no date, so it sits above the dated rows.
@@ -106,7 +271,14 @@ export default function Overview() {
             </Link>
           ))}
           {[...overdue, ...soon].map((entry) => (
-            <EntryRow key={`${entry.kind}-${entry.url}-${entry.date}`} entry={entry} />
+            <EntryRow
+              key={`${entry.kind}-${entry.url}-${entry.date}`}
+              entry={entry}
+              onActions={() => {
+                setNote('')
+                setActing(entry)
+              }}
+            />
           ))}
         </Card>
       )}
@@ -149,6 +321,59 @@ export default function Overview() {
           </span>
         </Link>
       )}
+
+      {/* Centred rather than a sheet up from the foot of the screen. The
+          calendar uses a sheet, but what it puts in one is a whole day's list,
+          which wants the width. This is a single line about a single row, and
+          a bar across the bottom of a desktop window for that reads as more
+          than it is. */}
+      <Dialog open={acting !== null} onOpenChange={(open) => !open && setActing(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogTitle className="lowercase">{t('cal.actions')}</DialogTitle>
+          <DialogDescription>
+            {acting?.label}
+            <span className="ml-2 text-muted-foreground">{acting?.detail}</span>
+          </DialogDescription>
+          {acting && (
+            <form
+              className="flex flex-col gap-3"
+              onSubmit={(event: FormEvent) => {
+                event.preventDefault()
+                void act(acting, note)
+              }}
+            >
+              <Textarea
+                value={note}
+                autoFocus
+                onChange={(event) => setNote(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+                    void act(acting, note)
+                  }
+                }}
+                placeholder={t('cal.actionPlaceholder')}
+                rows={3}
+                aria-label={t('cal.actions')}
+              />
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <Button type="submit">{t('cal.actionSave')}</Button>
+                {/* An empty note still closes the date off. Saying so out loud
+                    keeps the box from reading as something you have to fill. */}
+                <span className="text-xs text-muted-foreground">{t('cal.actionHint')}</span>
+                {/* The row used to be a link and is now a button, so the way to
+                    the record itself lives in here. */}
+                <Link
+                  to={acting.url}
+                  onClick={() => setActing(null)}
+                  className="ml-auto text-xs text-primary hover:underline"
+                >
+                  {t('cal.actionOpen')}
+                </Link>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* The shopping list is short and immediately actionable, so it sits on
           the page rather than behind a number you would have to click. */}
