@@ -745,6 +745,9 @@ const dict: Record<Lang, Record<string, string>> = {
       'vps, domain, sertifikat, atau apa pun yang jalan terus dan ada tanggal perpanjangannya.',
 
     'doc.title': 'dokumen',
+    'doc.viewGallery': 'galeri',
+    'doc.openRecord': 'buka dokumennya',
+    'doc.viewList': 'daftar',
     'doc.new': 'dokumen baru',
     'doc.edit': 'ubah dokumen',
     'doc.count': '{n} dokumen. nomornya terenkripsi.',
@@ -1590,6 +1593,9 @@ const dict: Record<Lang, Record<string, string>> = {
       'a vps, a domain, a certificate — anything that keeps running and has a renewal date.',
 
     'doc.title': 'documents',
+    'doc.viewGallery': 'gallery',
+    'doc.openRecord': 'open the record',
+    'doc.viewList': 'list',
     'doc.new': 'new document',
     'doc.edit': 'edit document',
     'doc.count': '{n} documents. the numbers are encrypted.',

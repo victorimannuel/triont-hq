@@ -130,6 +130,35 @@ func (s *Store) AttachmentCounts(ctx context.Context, entity string) (map[int64]
 	return out, rows.Err()
 }
 
+// AttachmentCovers is the first picture attached to each record of one kind,
+// which is what a gallery puts on the front of a card. One statement for the
+// whole page: a request per card would be a request per card.
+//
+// Only images. A PDF has a first page worth looking at too, but rendering one
+// is a different job and nothing here can do it yet.
+func (s *Store) AttachmentCovers(ctx context.Context, entity string) (map[int64]int64, error) {
+	rows, err := s.pool.Query(ctx, `
+		select distinct on (entity_id) entity_id, id
+		  from attachments
+		 where entity = $1 and deleted_at is null
+		   and mime_type like 'image/%'
+		 order by entity_id, position, created_at, id`, entity)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := map[int64]int64{}
+	for rows.Next() {
+		var entityID, id int64
+		if err := rows.Scan(&entityID, &id); err != nil {
+			return nil, err
+		}
+		out[entityID] = id
+	}
+	return out, rows.Err()
+}
+
 // StorageUsed is what the attachments add to every nightly dump. Worth being
 // able to see before it is worth worrying about.
 func (s *Store) StorageUsed(ctx context.Context) (int64, int, error) {

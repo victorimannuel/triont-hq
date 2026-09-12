@@ -11,7 +11,18 @@ import { api } from '@/api'
  * called conditionally, but it can be told not to ask.
  */
 export function useFileCounts(entity: string, enabled = true): Record<number, number> {
-  const [counts, setCounts] = useState<Record<number, number>>({})
+  return useFiles(entity, enabled).counts
+}
+
+/**
+ * The same request, when the covers are wanted too: the id of the first image
+ * attached to each record, which is what a gallery card is a picture of.
+ */
+export function useFiles(entity: string, enabled = true) {
+  const [state, setState] = useState<{
+    counts: Record<number, number>
+    covers: Record<number, number>
+  }>({ counts: {}, covers: {} })
 
   useEffect(() => {
     if (!enabled) return
@@ -20,9 +31,11 @@ export function useFileCounts(entity: string, enabled = true): Record<number, nu
       .attachmentCounts(entity)
       .then((data) => {
         if (!live) return
-        const next: Record<number, number> = {}
-        for (const [id, n] of Object.entries(data.counts)) next[Number(id)] = n
-        setCounts(next)
+        const counts: Record<number, number> = {}
+        for (const [id, n] of Object.entries(data.counts)) counts[Number(id)] = n
+        const covers: Record<number, number> = {}
+        for (const [id, n] of Object.entries(data.covers ?? {})) covers[Number(id)] = n
+        setState({ counts, covers })
       })
       .catch(() => undefined)
     return () => {
@@ -30,5 +43,5 @@ export function useFileCounts(entity: string, enabled = true): Record<number, nu
     }
   }, [entity, enabled])
 
-  return counts
+  return state
 }

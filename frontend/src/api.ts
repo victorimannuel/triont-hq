@@ -462,8 +462,12 @@ export const api = {
     send<Supply>('POST', `/supplies/${id}/adjust`, body),
   deleteSupply: (id: number) => send<void>('DELETE', `/supplies/${id}`),
 
+  /** Counts and cover images together: one call, because the page that wants
+   *  one always wants the other. */
   attachmentCounts: (entity: string) =>
-    request<{ counts: Record<string, number> }>(`/files/${entity}/counts`),
+    request<{ counts: Record<string, number>; covers: Record<string, number> }>(
+      `/files/${entity}/counts`,
+    ),
   attachments: (entity: string, id: number) =>
     request<{ attachments: Attachment[] }>(`/files/${entity}/${id}`),
   // Multipart, so this one bypasses the JSON helper above.

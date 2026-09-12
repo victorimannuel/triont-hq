@@ -53,7 +53,14 @@ func (s *Server) handleAttachmentCounts(w http.ResponseWriter, r *http.Request) 
 		s.oops(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"counts": counts})
+	// The covers ride along: every page that wants the counts is a list page,
+	// and a list page is one toggle away from being a gallery.
+	covers, err := s.store.AttachmentCovers(r.Context(), entity)
+	if err != nil {
+		s.oops(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"counts": counts, "covers": covers})
 }
 
 func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
