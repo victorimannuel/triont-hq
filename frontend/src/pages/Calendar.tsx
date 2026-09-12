@@ -116,6 +116,9 @@ export default function Calendar() {
 
   return (
     <>
+      {/* The subtitle names what is in here and how far it reaches. It used to
+          list every module the dates come from as well, which is a thing you
+          learn once and then read past every time. */}
       <PageHeader title={t('cal.title')} description={t('cal.subtitle')} action={toggle} />
 
       {entries.length === 0 && (

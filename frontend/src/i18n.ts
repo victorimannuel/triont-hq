@@ -816,8 +816,7 @@ const dict: Record<Lang, Record<string, string>> = {
       'satu buku alamat buat pic klien dan kenalan pribadi. yang nggak punya klien dihitung kenalan.',
 
     'cal.title': 'kalender',
-    'cal.subtitle':
-      'semua tenggat dari semua modul: to-do, perpanjangan domain, masa berlaku dokumen, servis, garansi, ulang tahun. sebulan ke belakang sampai setahun ke depan.',
+    'cal.subtitle': 'semua yang punya tanggal, sebulan ke belakang sampai setahun ke depan.',
     'cal.empty':
       'belum ada tanggal apa pun. isi tanggal perpanjangan di aset atau masa berlaku di dokumen, nanti muncul di sini.',
     'cal.kind.todo': 'to-do',
@@ -1641,8 +1640,7 @@ const dict: Record<Lang, Record<string, string>> = {
       'one address book for client contacts and people you know. no client means it is personal.',
 
     'cal.title': 'calendar',
-    'cal.subtitle':
-      'every deadline from every module: to-dos, domain renewals, document expiry, servicing, warranties, birthdays. a month back through a year ahead.',
+    'cal.subtitle': 'everything with a date on it, a month back through a year ahead.',
     'cal.empty':
       'nothing dated yet. put a renewal date on an asset or an expiry on a document and it shows up here.',
     'cal.kind.todo': 'to-do',
