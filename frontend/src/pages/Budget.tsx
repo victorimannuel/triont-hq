@@ -18,7 +18,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ErrorNote, formatMoney, Loading, PageHeader, Segmented } from '@/components/bits'
+import {
+  ErrorNote,
+  formatMoney,
+  GroupedInput,
+  Loading,
+  PageHeader,
+  Segmented,
+} from '@/components/bits'
 import { useConfirm } from '@/components/confirm'
 
 /*
@@ -439,6 +446,7 @@ export default function Budget() {
                 <RowForm
                   key={line.id}
                   month={month}
+                  income={data.income}
                   accounts={accounts}
                   buckets={meta.budget_buckets ?? []}
                   busy={busy}
@@ -496,6 +504,7 @@ export default function Budget() {
             )}
             <RowForm
               month={month}
+              income={data.income}
               accounts={accounts}
               buckets={meta.budget_buckets ?? []}
               busy={busy}
@@ -675,6 +684,7 @@ its own instead of being retyped every time.
 */
 function RowForm({
   month,
+  income,
   accounts,
   buckets,
   currencies,
@@ -688,6 +698,9 @@ function RowForm({
 }: {
   /** The month on screen, as YYYY-MM. Only the date box uses it. */
   month: string
+  /** What the month has to divide up. Only the allocation side passes it, and
+   *  only the share box uses it: an income is not a share of anything. */
+  income?: number
   accounts: MoneyAccount[]
   buckets?: { value: string; label: string }[]
   /** Offered on the income side only: what a source pays in varies, what a
@@ -714,6 +727,36 @@ function RowForm({
     initial?.percent != null ? String(initial.percent) : '',
   )
   const [dueOn, setDueOn] = useState(initial?.dueOn ?? '')
+  /*
+  Which of the two boxes is the answer, and which is only showing what that
+  answer comes to.
+
+  They are the same figure read two ways, so both stay typeable and the last
+  one touched wins. The difference is not cosmetic: a share is worked out
+  against income every time the month is opened, so it follows a raise on its
+  own, where a fixed amount stays where it was put. That is the choice this
+  records, and the greyed box is the one being derived.
+  */
+  const [basis, setBasis] = useState<'amount' | 'percent'>(
+    initial?.percent != null ? 'percent' : 'amount',
+  )
+
+  // Nothing can be worked out from a month with no income yet, so the other
+  // box stays empty rather than showing a nought.
+  const pool = income ?? 0
+  const shownAmount =
+    basis === 'amount'
+      ? amount
+      : percent !== '' && pool
+        ? String(Math.round((pool * Number(percent)) / 100))
+        : ''
+  const shownPercent =
+    basis === 'percent'
+      ? percent
+      : amount !== '' && pool
+        ? // Two decimals, and no trailing noughts to read past.
+          String(Number(((Number(amount) / pool) * 100).toFixed(2)))
+        : ''
 
   function submit(event: FormEvent) {
     event.preventDefault()
@@ -723,14 +766,17 @@ function RowForm({
       accountID: account ? Number(account) : null,
       bucket: buckets ? bucket : undefined,
       currency: currencies ? currency : undefined,
-      amount: Number(amount) || 0,
-      percent: percent ? Number(percent) : null,
+      // A share sends the share; the amount beside it is only what it comes
+      // to today, and the server works it out again on every read.
+      amount: Number(shownAmount) || 0,
+      percent: basis === 'percent' && percent !== '' ? Number(percent) : null,
       dueOn,
     })
     if (initial) return
     setName('')
     setAmount('')
     setPercent('')
+    setBasis('amount')
     setDueOn('')
   }
 
@@ -770,15 +816,14 @@ function RowForm({
           </SelectContent>
         </Select>
       )}
-      <Input
-        type="number"
-        inputMode="numeric"
-        min="0"
-        value={amount}
-        disabled={percent !== ''}
-        onChange={(event) => setAmount(event.target.value)}
+      <GroupedInput
+        value={shownAmount}
+        onValue={(next) => {
+          setBasis('amount')
+          setAmount(next)
+        }}
         placeholder={amountPlaceholder}
-        className="w-32 tabular-nums"
+        className={cn('w-32', basis === 'percent' && 'text-muted-foreground')}
       />
       {currencies && currencies.length > 0 && (
         <Select value={currency} onValueChange={setCurrency}>
@@ -801,11 +846,13 @@ function RowForm({
           min="0"
           max="100"
           step="any"
-          value={percent}
-          disabled={amount !== ''}
-          onChange={(event) => setPercent(event.target.value)}
+          value={shownPercent}
+          onChange={(event) => {
+            setBasis('percent')
+            setPercent(event.target.value)
+          }}
           placeholder="%"
-          className="w-20 tabular-nums"
+          className={cn('w-20 tabular-nums', basis === 'amount' && 'text-muted-foreground')}
         />
       )}
       {/* Last, and optional, because most rows have no particular day: the rent

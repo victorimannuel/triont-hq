@@ -482,6 +482,84 @@ export function MoneyInput({
   )
 }
 
+/** The thousands and decimal marks this locale writes numbers with. */
+function marks() {
+  const parts = new Intl.NumberFormat(currentLocale()).formatToParts(12345.6)
+  return {
+    group: parts.find((part) => part.type === 'group')?.value ?? ',',
+    decimal: parts.find((part) => part.type === 'decimal')?.value ?? '.',
+  }
+}
+
+// Digits alone, ignoring whatever punctuation is around them. Used to put the
+// caret back where it was after the separators have moved.
+const digitsBefore = (text: string, caret: number) =>
+  text.slice(0, caret).replace(/\D/g, '').length
+
+function caretAfter(text: string, digits: number) {
+  if (digits === 0) return 0
+  let seen = 0
+  for (let at = 0; at < text.length; at++) {
+    if (text[at] >= '0' && text[at] <= '9' && ++seen === digits) return at + 1
+  }
+  return text.length
+}
+
+/**
+ * A number field that groups thousands while it is being typed, so 300000
+ * reads as 300.000 and a missing or extra nought is visible instead of being
+ * counted. The value handed out stays plain digits with a dot for decimals —
+ * callers keep using `Number()` on it and never see the separators.
+ *
+ * Text rather than `type="number"`: that one refuses to render grouping, and a
+ * grouped string is not a valid number to it, so it would clear the box.
+ *
+ * Regrouping rewrites the whole string, which would otherwise throw the caret
+ * to the end on every keystroke. Counting digits rather than characters is
+ * what survives a separator appearing to the left of where you are typing.
+ */
+export function GroupedInput({
+  value,
+  onValue,
+  className,
+  ...rest
+}: Omit<ComponentProps<typeof Input>, 'value' | 'onChange' | 'type'> & {
+  /** Plain digits, optionally with a dot and decimals. Empty for an empty box. */
+  value: string
+  onValue: (value: string) => void
+}) {
+  const { group, decimal } = marks()
+
+  const shown = (() => {
+    if (value === '') return ''
+    const [whole, fraction] = value.split('.')
+    const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, group)
+    return fraction === undefined ? grouped : `${grouped}${decimal}${fraction}`
+  })()
+
+  return (
+    <Input
+      type="text"
+      inputMode="decimal"
+      className={cn('tabular-nums', className)}
+      value={shown}
+      onChange={(event) => {
+        const box = event.target
+        const wanted = digitsBefore(box.value, box.selectionStart ?? box.value.length)
+        // Everything that is not a digit goes, except one decimal mark.
+        const cleaned = box.value.replace(new RegExp(`[^0-9${decimal === '.' ? '.' : decimal}]`, 'g'), '')
+        const [whole, ...rest] = cleaned.split(decimal)
+        onValue(rest.length ? `${whole}.${rest.join('')}` : whole)
+        requestAnimationFrame(() => {
+          const at = caretAfter(box.value, wanted)
+          box.setSelectionRange(at, at)
+        })
+      }}
+      {...rest}
+    />
+  )
+}
+
 /**
  * How many, asked with the thumb. A bare number field means the keyboard for
  * an answer that is almost always one or two, so the buttons carry the common
