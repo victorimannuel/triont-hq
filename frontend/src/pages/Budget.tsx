@@ -123,15 +123,14 @@ export default function Budget() {
   // when nobody is editing them, which is what puts the figures back.
   const [targets, setTargets] = useState<Record<string, string> | null>(null)
   /*
-  Which list is on screen. Allocation opens first: income is three rows typed
-  once at the start of the month, and the allocations are what the rest of it
-  is spent adding to and ticking off.
+  Which list is on screen. Income opens first: it is where the month starts,
+  the few rows typed in once that all the allocations are then divided out of.
 
   Only the lists are behind this. Every figure the page is read for — income,
   allocated, left — sits above the strip and stays put, so switching tabs never
   hides the number the other tab is measured against.
   */
-  const [tab, setTab] = useState<'incomes' | 'lines'>('lines')
+  const [tab, setTab] = useState<'incomes' | 'lines'>('incomes')
 
   const load = useCallback(() => {
     api
