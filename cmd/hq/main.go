@@ -221,12 +221,36 @@ func setPassword(email, password string) error {
 	return err
 }
 
+// contentSecurityPolicy pins every resource to the app's own origin. The one
+// inline script the page carries is the theme bootstrap in frontend/index.html,
+// which must run before first paint; it is allowed by the hash below rather than
+// by 'unsafe-inline', so an injected <script> is still refused. Edit that script
+// and this hash has to move with it — a browser prints the hash it expected to
+// the console when it blocks one, so recovering the new value is a page reload
+// away. Styles keep 'unsafe-inline' on purpose: the boot splash is an inline
+// <style> and every React style attribute is inline too, and a stylesheet cannot
+// exfiltrate the way a script can. Nothing here loads from a third party, so no
+// host has to be named.
+const contentSecurityPolicy = "default-src 'self'; " +
+	"base-uri 'self'; " +
+	"object-src 'none'; " +
+	"frame-ancestors 'none'; " +
+	"form-action 'self'; " +
+	"img-src 'self' data: blob:; " +
+	"font-src 'self' data:; " +
+	"style-src 'self' 'unsafe-inline'; " +
+	"script-src 'self' 'sha256-ZCA+r9PQM9yNkumdDV5xh0UBtvGVQc94UTefMJXwP5k='; " +
+	"connect-src 'self'; " +
+	"worker-src 'self'; " +
+	"manifest-src 'self'"
+
 func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Referrer-Policy", "no-referrer")
 		h.Set("X-Frame-Options", "DENY")
+		h.Set("Content-Security-Policy", contentSecurityPolicy)
 		next.ServeHTTP(w, r)
 	})
 }
