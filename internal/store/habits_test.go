@@ -63,3 +63,29 @@ func TestStreakIgnoresTheClock(t *testing.T) {
 		t.Errorf("got %d, want 2", got)
 	}
 }
+
+// The day turns at three in the morning, so the small hours count for the day
+// that just ended and everything else counts for the day it plainly is.
+func TestHabitDayTurnsAtThree(t *testing.T) {
+	wib := time.FixedZone("WIB", 7*3600)
+	cases := []struct {
+		name string
+		at   time.Time
+		want string
+	}{
+		{"just after midnight", time.Date(2026, 9, 16, 0, 30, 0, 0, wib), "2026-09-15"},
+		{"one thirty am", time.Date(2026, 9, 16, 1, 30, 0, 0, wib), "2026-09-15"},
+		{"last minute before three", time.Date(2026, 9, 16, 2, 59, 0, 0, wib), "2026-09-15"},
+		{"three sharp", time.Date(2026, 9, 16, 3, 0, 0, 0, wib), "2026-09-16"},
+		{"midday", time.Date(2026, 9, 16, 12, 0, 0, 0, wib), "2026-09-16"},
+		{"late evening", time.Date(2026, 9, 16, 23, 30, 0, 0, wib), "2026-09-16"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := habitDayOf(c.at).Format("2006-01-02")
+			if got != c.want {
+				t.Fatalf("habitDayOf(%s) = %s, want %s", c.at.Format("15:04"), got, c.want)
+			}
+		})
+	}
+}

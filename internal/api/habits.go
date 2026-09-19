@@ -29,6 +29,11 @@ func (s *Server) readHabit(r *http.Request) (store.HabitInput, string) {
 	}
 	in.Notes = trim(in.Notes)
 	in.Unit = trim(in.Unit)
+	// One done-day is worth at least one. A zero here is an unset field, not a
+	// habit that consumes nothing, so it falls back to the column default.
+	if in.PerDay <= 0 {
+		in.PerDay = 1
+	}
 	return in, ""
 }
 
@@ -65,6 +70,21 @@ func (s *Server) handleUpdateHabit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, habit)
+}
+
+func (s *Server) handleReorderHabits(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		IDs []int64 `json:"ids"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		fail(w, http.StatusBadRequest, "urutannya nggak kebaca")
+		return
+	}
+	if err := s.store.ReorderHabits(r.Context(), in.IDs); err != nil {
+		s.oops(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (s *Server) handleDeleteHabit(w http.ResponseWriter, r *http.Request) {

@@ -2,7 +2,10 @@ package store
 
 import (
 	"context"
+	"errors"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 /*
@@ -24,6 +27,16 @@ type Habit struct {
 	Name   string `json:"name"`
 	Notes  string `json:"notes"`
 	Active bool   `json:"active"`
+	// Hidden from the board while the page is covered for showing someone else:
+	// a private habit drops out entirely rather than being bulleted like the
+	// rest. Off unless it is said to be on.
+	Private bool `json:"private"`
+	// The supply this habit draws down as it is done, if any. Null when the
+	// habit is nothing to do with stock, which is most of them.
+	SupplyID *int64 `json:"supply_id"`
+	// What one done-day is worth: one D3, two fish oil. It is the default the
+	// tick records and, for a linked habit, the amount taken off the shelf.
+	PerDay float64 `json:"per_day"`
 	// The days inside the window the page asked for, as YYYY-MM-DD, so a cell
 	// can be drawn without any date arithmetic in the browser.
 	Days []string `json:"days"`
@@ -62,13 +75,16 @@ type Habit struct {
 }
 
 type HabitInput struct {
-	Name   string `json:"name"`
-	Notes  string `json:"notes"`
-	Unit   string `json:"unit"`
-	Active bool   `json:"active"`
+	Name     string  `json:"name"`
+	Notes    string  `json:"notes"`
+	Unit     string  `json:"unit"`
+	Active   bool    `json:"active"`
+	Private  bool    `json:"private"`
+	SupplyID *int64  `json:"supply_id"`
+	PerDay   float64 `json:"per_day"`
 }
 
-const habitCols = `id, name, notes, unit, active,
+const habitCols = `id, name, notes, unit, active, private, supply_id, per_day,
 	created_by, updated_by, created_at, updated_at,
 	-- The oldest image attached to this habit. A subquery rather than a join,
 	-- because a join would multiply the row by every file on it.
@@ -82,7 +98,8 @@ const habitCols = `id, name, notes, unit, active,
 
 func scanHabit(row interface{ Scan(...any) error }) (Habit, error) {
 	var h Habit
-	err := row.Scan(&h.ID, &h.Name, &h.Notes, &h.Unit, &h.Active,
+	err := row.Scan(&h.ID, &h.Name, &h.Notes, &h.Unit, &h.Active, &h.Private,
+		&h.SupplyID, &h.PerDay,
 		&h.CreatedBy, &h.UpdatedBy, &h.CreatedAt, &h.UpdatedAt, &h.ImageID)
 	return h, err
 }
@@ -97,7 +114,7 @@ func (s *Store) Habits(ctx context.Context, days int) ([]Habit, error) {
 
 	rows, err := s.pool.Query(ctx, `select `+habitCols+`
 		  from habits where deleted_at is null
-		 order by active desc, created_at, id`)
+		 order by position, created_at, id`)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +169,7 @@ func (s *Store) Habits(ctx context.Context, days int) ([]Habit, error) {
 		return nil, err
 	}
 
-	today := startOfDay(time.Now())
+	today := habitToday()
 	for id, done := range history {
 		at, ok := index[id]
 		if !ok {
@@ -197,6 +214,23 @@ func startOfDay(t time.Time) time.Time {
 	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 }
 
+// A day begins at three in the morning, not at midnight: a habit ticked at half
+// past one is answering for the day that just ended, not for the one that is
+// three hours old. The clock is wound back that far before the date is read
+// off it — the same rule the browser keeps — so the run the page shows and the
+// run the server counts never disagree about which day it is.
+const dayStartHour = 3
+
+func habitToday() time.Time {
+	return habitDayOf(time.Now())
+}
+
+// habitDayOf is the rule on its own, taking the moment rather than reading the
+// clock, so it can be checked at three in the morning without waiting for it.
+func habitDayOf(now time.Time) time.Time {
+	return startOfDay(now.Add(-dayStartHour * time.Hour))
+}
+
 /*
 streak counts back from now. done must be newest first.
 
@@ -231,6 +265,25 @@ func streak(done []time.Time, today time.Time) int {
 	return count
 }
 
+// ReorderHabits writes each id's position from where it sits in the list, so
+// the board keeps the order it was arranged into. Ids left out are untouched.
+func (s *Store) ReorderHabits(ctx context.Context, ids []int64) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	for position, id := range ids {
+		if _, err := tx.Exec(ctx, `
+			update habits set position = $2
+			 where id = $1 and deleted_at is null`, id, position); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
+}
+
 // HabitsUndone names the active habits with nothing recorded for that day, in
 // the order the check-in will ask about them. This is what the evening
 // notification counts, and an empty result is what makes it stay quiet.
@@ -241,7 +294,7 @@ func (s *Store) HabitsUndone(ctx context.Context, day time.Time) ([]string, erro
 		 where h.deleted_at is null and h.active
 		   and not exists (select 1 from habit_days d
 		                    where d.habit_id = h.id and d.on_date = $1)
-		 order by h.created_at, h.id`, day)
+		 order by h.position, h.created_at, h.id`, day)
 	if err != nil {
 		return nil, err
 	}
@@ -284,7 +337,7 @@ func (s *Store) HabitsToday(ctx context.Context, day time.Time) (HabitsToday, er
 		  from habits h
 		  left join habit_days d on d.habit_id = h.id and d.on_date = $1
 		 where h.deleted_at is null and h.active
-		 order by h.created_at, h.id`, day)
+		 order by h.position, h.created_at, h.id`, day)
 	if err != nil {
 		return out, err
 	}
@@ -321,10 +374,11 @@ func (s *Store) CreateHabit(ctx context.Context, in HabitInput, actor string) (H
 
 func (s *Store) UpdateHabit(ctx context.Context, id int64, in HabitInput, actor string) (Habit, error) {
 	habit, err := scanHabit(s.pool.QueryRow(ctx, `
-		update habits set name = $1, notes = $2, unit = $3, active = $4,
-		       updated_by = $5, updated_at = now()
-		 where id = $6 and deleted_at is null
-		returning `+habitCols, in.Name, in.Notes, in.Unit, in.Active, actor, id))
+		update habits set name = $1, notes = $2, unit = $3, active = $4, private = $5,
+		       supply_id = $6, per_day = $7, updated_by = $8, updated_at = now()
+		 where id = $9 and deleted_at is null
+		returning `+habitCols,
+		in.Name, in.Notes, in.Unit, in.Active, in.Private, in.SupplyID, in.PerDay, actor, id))
 	if err != nil {
 		return habit, norm(err)
 	}
@@ -351,19 +405,73 @@ minutes. A plain tick sends 1, which is what the column defaults to, so a habit
 with no unit behaves exactly as it did before there were amounts. Ticking a day
 that already has an amount overwrites it rather than adding, because the tap
 means "this is what today was", not "one more".
+
+A habit linked to a supply moves the stock in the same transaction: the shelf
+goes down by however much more got consumed than the day already had on it, so
+re-ticking the same day with a bigger number takes only the difference and
+unticking puts the whole amount back. The tick and the stock never end up
+disagreeing because they are written together or not at all.
 */
 func (s *Store) SetHabitDay(ctx context.Context, habitID int64, day time.Time, done bool, amount float64) error {
-	if !done {
-		_, err := s.pool.Exec(ctx,
-			`delete from habit_days where habit_id = $1 and on_date = $2`, habitID, day)
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
 		return err
 	}
-	if amount <= 0 {
-		amount = 1
+	defer tx.Rollback(ctx)
+
+	// The supply to draw down, and what this day already recorded — both read
+	// before the change so the shelf can move by the difference rather than
+	// blindly. A missing day row is nought, not an error.
+	var supplyID *int64
+	if err := tx.QueryRow(ctx,
+		`select supply_id from habits where id = $1 and deleted_at is null`,
+		habitID).Scan(&supplyID); err != nil {
+		return norm(err)
 	}
-	_, err := s.pool.Exec(ctx, `
-		insert into habit_days (habit_id, on_date, amount) values ($1, $2, $3)
-		on conflict (habit_id, on_date) do update set amount = excluded.amount`,
-		habitID, day, amount)
-	return norm(err)
+	var prev float64
+	if err := tx.QueryRow(ctx,
+		`select amount from habit_days where habit_id = $1 and on_date = $2`,
+		habitID, day).Scan(&prev); err != nil {
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		prev = 0
+	}
+
+	var now float64
+	if done {
+		if amount <= 0 {
+			amount = 1
+		}
+		if _, err := tx.Exec(ctx, `
+			insert into habit_days (habit_id, on_date, amount) values ($1, $2, $3)
+			on conflict (habit_id, on_date) do update set amount = excluded.amount`,
+			habitID, day, amount); err != nil {
+			return norm(err)
+		}
+		now = amount
+	} else {
+		if _, err := tx.Exec(ctx,
+			`delete from habit_days where habit_id = $1 and on_date = $2`,
+			habitID, day); err != nil {
+			return err
+		}
+		now = 0
+	}
+
+	// Consumption changed by (now - prev); take that off the shelf. A negative
+	// difference — unticking, or correcting to a smaller count — puts stock
+	// back. Clamped at zero the same way a manual adjust is.
+	if supplyID != nil {
+		if delta := now - prev; delta != 0 {
+			if _, err := tx.Exec(ctx, `
+				update supplies set quantity = greatest(0, quantity - $2), updated_at = now()
+				 where id = $1 and deleted_at is null`,
+				*supplyID, delta); err != nil {
+				return err
+			}
+		}
+	}
+
+	return tx.Commit(ctx)
 }

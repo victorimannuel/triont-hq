@@ -1,12 +1,22 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type PointerEvent,
+} from 'react'
 import { Link } from 'react-router-dom'
-import { Check, Flame, ListChecks, Plus, Repeat2, Trash2 } from 'lucide-react'
+import { Check, Eye, EyeOff, Flame, GripVertical, ListChecks, Plus, Repeat2, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { api } from '@/api'
 import { currentLocale, useT } from '@/i18n'
 import type { Habit } from '@/types'
 import { cn } from '@/lib/utils'
+import { hqDay, keyOf } from '@/lib/day'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -36,22 +46,19 @@ type Span = (typeof WINDOWS)[number]['value']
 
 type Day = { key: string; label: string; today: boolean }
 
-// The local date, not an ISO timestamp: a tick belongs to the day the person
-// standing there thinks it is.
-function dayKey(day: Date) {
-  return `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
-}
-
-// Oldest first, today last. Noon rather than midnight so a daylight-saving
-// shift cannot roll a date backwards while stepping through them.
+// Oldest first, today last. The run starts from the day it is now by the
+// three-o'clock rule, so the last cell is the same day the check-in ticks and
+// the small hours after midnight sit on the day that just ended. Noon rather
+// than midnight so a daylight-saving shift cannot roll a date backwards while
+// stepping through them.
 function recentDays(span: number): Day[] {
   const short = new Intl.DateTimeFormat(currentLocale(), { weekday: 'narrow' })
   const out: Day[] = []
   for (let back = span - 1; back >= 0; back--) {
-    const day = new Date()
+    const day = hqDay()
     day.setHours(12, 0, 0, 0)
     day.setDate(day.getDate() - back)
-    out.push({ key: dayKey(day), label: short.format(day), today: back === 0 })
+    out.push({ key: keyOf(day), label: short.format(day), today: back === 0 })
   }
   return out
 }
@@ -93,11 +100,60 @@ function Strip({ habit, days }: { habit: Habit; days: Day[] }) {
 export default function Habits() {
   const { t } = useT()
   const ask = useConfirm()
+  // Hidden habits drop off the board the moment they are hidden; this reveals
+  // them again so they can be unhidden or managed.
+  const [showHidden, setShowHidden] = useState(false)
   const [habits, setHabits] = useState<Habit[] | null>(null)
   const [error, setError] = useState('')
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
   const [span, setSpan] = useState<Span>('7')
+  // Which row is being dragged, for the grip reorder below. dragRef mirrors it
+  // for the pointer handlers to read without a stale closure; rowRefs and
+  // habitsRef give them the live row positions and order.
+  const [dragId, setDragId] = useState<number | null>(null)
+  const dragRef = useRef<number | null>(null)
+  const rowRefs = useRef(new Map<number, HTMLElement>())
+  const habitsRef = useRef<Habit[]>([])
+  habitsRef.current = habits ?? []
+  // The list itself, so the drag reads positions relative to it, and the last
+  // top of every row, so a reorder can be played as a slide rather than a jump.
+  const listRef = useRef<HTMLDivElement>(null)
+  const prevTops = useRef(new Map<number, number>())
+  // Where inside the held row the finger took hold, and where it is now, so the
+  // row can be kept pinned under it as the list reshuffles beneath.
+  const grabOffset = useRef(0)
+  const pointerY = useRef(0)
+
+  /*
+  FLIP: after the order changes, each row that moved is slid from where it was
+  to where it landed, so a reorder reads as motion instead of a teleport.
+
+  Positions come off offsetTop, not getBoundingClientRect, on purpose: offsetTop
+  is the layout position and ignores the transform this animation rides on, so
+  the drag's own hit-testing below stays honest even while rows are mid-slide.
+  The Web Animations API plays the slide without leaving any inline style behind.
+  The held row is left out of this — it does not slide between slots, it follows
+  the finger, which placeDragged handles once the shuffle has re-rendered it.
+  */
+  useLayoutEffect(() => {
+    const rows = rowRefs.current
+    const next = new Map<number, number>()
+    for (const [id, el] of rows) next.set(id, el.offsetTop)
+    for (const [id, el] of rows) {
+      const was = prevTops.current.get(id)
+      const now = next.get(id)!
+      if (was !== undefined && was !== now && id !== dragRef.current) {
+        el.animate(
+          [{ transform: `translateY(${was - now}px)` }, { transform: 'translateY(0)' }],
+          { duration: 200, easing: 'cubic-bezier(0.2, 0, 0, 1)' },
+        )
+      }
+    }
+    prevTops.current = next
+    // The shuffle just moved the held row's slot; pin it back to the finger.
+    placeDragged()
+  })
   const days = useMemo(() => recentDays(Number(span)), [span])
   const wide = span !== '7'
 
@@ -123,7 +179,15 @@ export default function Habits() {
     }
     setBusy(true)
     try {
-      await api.createHabit({ name: trimmed, notes: '', unit: '', active: true })
+      await api.createHabit({
+        name: trimmed,
+        notes: '',
+        unit: '',
+        active: true,
+        private: false,
+        supply_id: null,
+        per_day: 1,
+      })
       setName('')
       load()
     } catch (err) {
@@ -148,7 +212,11 @@ export default function Habits() {
     // tick is already implied by there being a number. Unticking asks nothing
     // extra, and a habit without a unit is worth one as it always was.
     const counted = done && habit.unit !== ''
-    let typed = String(habit.amounts[day] ?? 1)
+    // One done-day defaults to the habit's per-day figure — two fish oil, one of
+    // most things — so a linked habit takes the right amount off the shelf even
+    // when it has no unit to be asked about.
+    const step = habit.per_day || 1
+    let typed = String(habit.amounts[day] ?? step)
     const ok = await ask({
       title: t(done ? 'habit.confirmTick' : 'habit.confirmUntick', {
         name: habit.name,
@@ -168,9 +236,9 @@ export default function Habits() {
     })
     if (!ok) return
 
-    // An emptied box means the same as leaving it alone: once, which is what
-    // the tick would have meant anyway.
-    const amount = counted ? Number(typed) || 1 : 1
+    // An emptied box means the same as leaving it alone: the per-day figure,
+    // which is what the tick would have meant anyway.
+    const amount = counted ? Number(typed) || step : done ? step : 1
 
     setHabits((list) =>
       (list ?? []).map((row) =>
@@ -212,6 +280,134 @@ export default function Habits() {
     setHabits((list) => (list ?? []).filter((row) => row.id !== habit.id))
     try {
       await api.deleteHabit(habit.id)
+    } catch {
+      toast.error(t('habit.failed'))
+      load()
+    }
+  }
+
+  // Mark a habit private, or unmark it. A private one drops off the board while
+  // the eye by the heading has the page covered, so it can be shown to someone
+  // without them seeing it.
+  async function togglePrivate(habit: Habit) {
+    const next = !habit.private
+    setHabits((list) =>
+      (list ?? []).map((row) => (row.id === habit.id ? { ...row, private: next } : row)),
+    )
+    try {
+      await api.updateHabit(habit.id, {
+        name: habit.name,
+        notes: habit.notes,
+        unit: habit.unit,
+        active: habit.active,
+        private: next,
+        supply_id: habit.supply_id,
+        per_day: habit.per_day,
+      })
+    } catch {
+      toast.error(t('habit.failed'))
+      load()
+    }
+  }
+
+  /*
+  Drag a row by its grip to reorder.
+
+  Pointer events rather than the native HTML5 drag, because that one never fires
+  under a thumb; touch-none on the handle stops the page scrolling while a row is
+  moving. The held row follows the finger; the rest slide out of its way and the
+  order is saved once it lifts.
+  */
+
+  // Pin the held row to the finger. Its slot in the layout may be anywhere as
+  // the list reshuffles under it, so it is translated from that slot to where
+  // the finger holds it. offsetTop is the untransformed slot, so this reads
+  // right even though the row already wears a transform.
+  function placeDragged() {
+    const id = dragRef.current
+    if (id === null) return
+    const el = rowRefs.current.get(id)
+    const list = listRef.current
+    if (!el || !list) return
+    const slotTop = list.getBoundingClientRect().top + el.offsetTop
+    const y = pointerY.current - grabOffset.current - slotTop
+    el.style.transform = `translateY(${y}px) scale(1.03)`
+  }
+
+  function startDrag(event: PointerEvent<HTMLButtonElement>, id: number) {
+    event.preventDefault()
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId)
+    } catch {
+      // A synthetic pointer has nothing to capture; harmless.
+    }
+    const row = rowRefs.current.get(id)
+    // How far down the row the finger landed, held constant so the row does not
+    // jump under it on the first move.
+    grabOffset.current = event.clientY - (row?.getBoundingClientRect().top ?? event.clientY)
+    pointerY.current = event.clientY
+    dragRef.current = id
+    setDragId(id)
+  }
+
+  function onDrag(event: PointerEvent<HTMLButtonElement>) {
+    if (dragRef.current === null) return
+    pointerY.current = event.clientY
+    const list = listRef.current
+    if (!list) return
+    const order = habitsRef.current
+    // The pointer in the list's own coordinates, tested against each row's
+    // offsetTop. offsetTop rather than a live rect on purpose: a row sliding
+    // mid-animation must not move the target out from under the finger.
+    const y = event.clientY - list.getBoundingClientRect().top
+    // The first row whose middle the pointer has passed is where the dragged
+    // row belongs; past the last middle, it belongs at the end.
+    let target = order.length - 1
+    for (let i = 0; i < order.length; i++) {
+      const el = rowRefs.current.get(order[i].id)
+      if (!el) continue
+      if (y < el.offsetTop + el.offsetHeight / 2) {
+        target = i
+        break
+      }
+    }
+    const from = order.findIndex((h) => h.id === dragRef.current)
+    if (from !== -1 && from !== target) {
+      const next = [...order]
+      const [moved] = next.splice(from, 1)
+      next.splice(target, 0, moved)
+      setHabits(next)
+    }
+    // Follow the finger now; if the line above reshuffled, the layout effect
+    // re-pins it from its new slot so it never lurches.
+    placeDragged()
+  }
+
+  async function endDrag(event: PointerEvent<HTMLButtonElement>) {
+    if (dragRef.current === null) return
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    } catch {
+      // Capture may already be gone; nothing to release.
+    }
+    const id = dragRef.current
+    const el = rowRefs.current.get(id)
+    // Let go: settle from where the finger left it down into its slot rather
+    // than blinking there.
+    if (el) {
+      const from = el.style.transform
+      el.style.transform = ''
+      if (from) {
+        el.animate(
+          [{ transform: from }, { transform: 'none' }],
+          { duration: 180, easing: 'cubic-bezier(0.2, 0, 0, 1)' },
+        )
+      }
+    }
+    dragRef.current = null
+    setDragId(null)
+    try {
+      await api.reorderHabits(habitsRef.current.map((row) => row.id))
     } catch {
       toast.error(t('habit.failed'))
       load()
@@ -294,18 +490,52 @@ export default function Habits() {
             {/* Seven cells and a name do not both fit a phone, so below sm the
                 cells wrap to a line of their own rather than squeezing the
                 name down to nothing. */}
-            <div className="divide-y">
-              {habits.map((habit) => (
+            {/* relative so a row's offsetTop is measured against this list, which
+                is what the drag's hit-testing reads. */}
+            <div ref={listRef} className="relative divide-y">
+              {/* Hidden habits are off the board unless "show hidden" is on. */}
+              {(showHidden ? habits : habits.filter((row) => !row.private)).map((habit) => (
                 <div
                   key={habit.id}
-                  className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3"
+                  ref={(el) => {
+                    if (el) rowRefs.current.set(habit.id, el)
+                    else rowRefs.current.delete(habit.id)
+                  }}
+                  className={cn(
+                    // Only the shadow eases; the transform is driven every frame
+                    // to follow the finger, so a transition on it would lag.
+                    'flex flex-wrap items-center gap-x-3 gap-y-2 bg-card px-4 py-3 transition-shadow duration-150',
+                    // Only visible while revealed, and dimmed so it reads as one
+                    // of the hidden ones.
+                    habit.private && 'opacity-60',
+                    // Picked up: lifted with a shadow and pinned to the finger.
+                    // The scale rides on the same inline transform the follow
+                    // sets, so it is not applied here.
+                    dragId === habit.id && 'relative z-20 rounded-lg shadow-lg',
+                  )}
                 >
-                  {/* The basis is what does the wrapping. Left to flex-1 the
-                      name would rather shrink to nothing than push the cells
-                      onto a second line, which is exactly what it did. The
-                      3rem it gives back is the bin button, so that comes up
-                      beside the name instead of taking a third line. */}
-                  <div className="order-1 min-w-0 grow basis-[calc(100%-3rem)] sm:basis-0">
+                  {/* Drag by the grip to reorder — on the left, where a handle
+                      is looked for. Pointer events, not native HTML5 drag, so it
+                      works under a thumb; touch-none stops the page scrolling
+                      while a row is moving. */}
+                  <button
+                    type="button"
+                    aria-label={t('habit.drag')}
+                    title={t('habit.drag')}
+                    onPointerDown={(event) => startDrag(event, habit.id)}
+                    onPointerMove={onDrag}
+                    onPointerUp={endDrag}
+                    onPointerCancel={endDrag}
+                    className="order-0 -ml-1 grid size-8 shrink-0 cursor-grab touch-none place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent active:cursor-grabbing"
+                  >
+                    <GripVertical className="size-4" />
+                  </button>
+                  {/* The name grows to fill the row, which pushes the hide and
+                      delete buttons hard to the right rather than leaving them
+                      stranded on a line of their own. The cells take a full
+                      basis on a phone so they drop below instead of squeezing
+                      the name; a wide screen puts them back inline. */}
+                  <div className="order-1 min-w-0 flex-1">
                     {/* The name is the way in to renaming, pausing and the
                         picture. A row this dense has no room for a pencil. */}
                     <Link
@@ -319,7 +549,11 @@ export default function Habits() {
                         </span>
                       )}
                     </Link>
-                    <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                    {/* Wraps rather than running under the buttons: a counted
+                        habit's total makes this line long, and the name column
+                        is only as wide as the row minus the grip and the two
+                        buttons. */}
+                    <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
                       {habit.streak > 0 && (
                         <span className="flex items-center gap-1 whitespace-nowrap text-warning">
                           <Flame className="size-3" />
@@ -339,7 +573,7 @@ export default function Habits() {
                     </p>
                   </div>
 
-                  <span className="order-3 shrink-0 sm:order-2">
+                  <span className="order-3 basis-full shrink-0 sm:order-2 sm:basis-auto">
                     {wide ? (
                       <Strip habit={habit} days={days} />
                     ) : (
@@ -383,7 +617,20 @@ export default function Habits() {
                     )}
                   </span>
 
-                  <div className="order-2 w-9 shrink-0 sm:order-3">
+                  <div className="order-2 flex shrink-0 items-center sm:order-3">
+                    {/* Hide this one: it drops off the board at once, so a habit
+                        not meant for a passing audience is gone with a tap. The
+                        eye-off marks it while "show hidden" has it revealed. */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => togglePrivate(habit)}
+                      aria-label={habit.private ? t('habit.unhide') : t('habit.hide')}
+                      title={habit.private ? t('habit.unhide') : t('habit.hide')}
+                      className={cn(habit.private ? 'text-primary' : 'text-muted-foreground')}
+                    >
+                      {habit.private ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"
@@ -399,6 +646,19 @@ export default function Habits() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* The way back to anything hidden — only shown when there is something to
+          reveal, so it is invisible until the feature is used. */}
+      {habits && habits.some((row) => row.private) && (
+        <div className="mt-3 flex justify-center">
+          <Button variant="ghost" size="sm" onClick={() => setShowHidden((v) => !v)}>
+            {showHidden ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            {showHidden
+              ? t('habit.hideHidden')
+              : t('habit.showHidden', { n: habits.filter((row) => row.private).length })}
+          </Button>
+        </div>
       )}
     </div>
   )

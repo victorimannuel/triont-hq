@@ -4,10 +4,17 @@ import { Trash2 } from 'lucide-react'
 
 import { api } from '@/api'
 import { useT } from '@/i18n'
-import type { Habit, HabitInput } from '@/types'
+import type { Habit, HabitInput, Supply } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useConfirm } from '@/components/confirm'
 import { Files } from '@/components/Files'
 import {
@@ -43,6 +50,7 @@ export default function HabitForm() {
 
   const [form, setForm] = useState<HabitInput | null>(null)
   const [record, setRecord] = useState<Habit | null>(null)
+  const [supplies, setSupplies] = useState<Supply[]>([])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -62,10 +70,24 @@ export default function HabitForm() {
           notes: found.notes,
           unit: found.unit,
           active: found.active,
+          // Carried through untouched: the board's eye toggles this, and a save
+          // here must not quietly switch a hidden habit back on.
+          private: found.private,
+          supply_id: found.supply_id,
+          per_day: found.per_day,
         })
       })
       .catch((err) => setError(err instanceof Error ? err.message : t('habit.failed')))
   }, [id, t])
+
+  // The supplies this habit could draw down, for the picker below. Fetched
+  // once; an empty shelf just leaves the picker with only "not linked".
+  useEffect(() => {
+    api
+      .supplies({})
+      .then((data) => setSupplies(data.supplies))
+      .catch(() => setSupplies([]))
+  }, [])
 
   function set<K extends keyof HabitInput>(key: K, value: HabitInput[K]) {
     setForm((prev) => (prev ? { ...prev, [key]: value } : prev))
@@ -110,6 +132,10 @@ export default function HabitForm() {
   if (error && !form) return <ErrorNote>{error}</ErrorNote>
   if (!form) return <Loading />
 
+  // The supply the habit is linked to right now, for the "per day" field to
+  // show its unit beside the number.
+  const linked = supplies.find((item) => item.id === form.supply_id)
+
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader back="/habits" title={form.name || t('habit.edit')} />
@@ -149,6 +175,50 @@ export default function HabitForm() {
                 placeholder={t('habit.unitPlaceholder')}
               />
             </Field>
+
+            {/* Draw a supply down as this gets done. Radix Select has no empty
+                value, so "not linked" carries a sentinel that maps back to null. */}
+            <Field label={t('habit.supply')} hint={t('habit.supplyHint')}>
+              <Select
+                value={form.supply_id === null ? 'none' : String(form.supply_id)}
+                onValueChange={(value) =>
+                  set('supply_id', value === 'none' ? null : Number(value))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{t('habit.supplyNone')}</SelectItem>
+                  {supplies.map((item) => (
+                    <SelectItem key={item.id} value={String(item.id)}>
+                      {item.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+
+            {/* How much one tick takes off the shelf — two for fish oil, one for
+                most things. Only worth asking once a supply is actually linked. */}
+            {form.supply_id !== null && (
+              <Field label={t('habit.perDay')} htmlFor="perDay" hint={t('habit.perDayHint')}>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="perDay"
+                    type="number"
+                    min="1"
+                    step="1"
+                    className="w-28"
+                    value={String(form.per_day)}
+                    onChange={(event) => set('per_day', Number(event.target.value) || 1)}
+                  />
+                  {linked?.unit && (
+                    <span className="text-sm text-muted-foreground">{linked.unit}</span>
+                  )}
+                </div>
+              </Field>
+            )}
 
             {/* Paused rather than deleted. Giving one up is exactly when the
                 record of having kept it becomes worth having. */}
