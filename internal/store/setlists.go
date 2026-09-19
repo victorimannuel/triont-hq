@@ -96,6 +96,7 @@ func (s *Store) SetlistSongs(ctx context.Context, id int64) ([]SetlistSong, erro
 	rows, err := s.pool.Query(ctx, `
 		select x.id, x.steps,
 		       g.id, g.title, g.artist, g.song_key, g.tempo, g.part, g.body, g.notes,
+		       g.reference_url,
 		       g.created_by, g.updated_by, g.created_at, g.updated_at
 		  from setlist_songs x
 		  join songs g on g.id = x.song_id and g.deleted_at is null
@@ -112,6 +113,7 @@ func (s *Store) SetlistSongs(ctx context.Context, id int64) ([]SetlistSong, erro
 		var g Song
 		if err := rows.Scan(&item.ID, &item.Steps,
 			&g.ID, &g.Title, &g.Artist, &g.Key, &g.Tempo, &g.Part, &g.Body, &g.Notes,
+			&g.ReferenceURL,
 			&g.CreatedBy, &g.UpdatedBy, &g.CreatedAt, &g.UpdatedAt); err != nil {
 			return nil, err
 		}

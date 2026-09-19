@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/victorimannuel/triont-hq/internal/store"
 )
@@ -51,6 +52,14 @@ func (s *Server) readSong(r *http.Request) (store.SongInput, string) {
 	in.Part = valid(songParts, in.Part, "")
 	if in.Tempo < 0 || in.Tempo > 400 {
 		return in, "tempo di luar akal"
+	}
+	// Anything that is not plainly an outward link is refused rather than
+	// stored and turned into an anchor later.
+	in.ReferenceURL = trim(in.ReferenceURL)
+	if in.ReferenceURL != "" &&
+		!strings.HasPrefix(in.ReferenceURL, "https://") &&
+		!strings.HasPrefix(in.ReferenceURL, "http://") {
+		return in, "link referensi harus diawali http:// atau https://"
 	}
 	return in, ""
 }

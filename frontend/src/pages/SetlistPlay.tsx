@@ -1,6 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ChevronDown, ChevronUp, ListPlus, Music, Pencil, Plus, Trash2, X } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Check,
+  ChevronUp,
+  GripVertical,
+  ListPlus,
+  Music,
+  Pencil,
+  Plus,
+  Settings2,
+  Trash2,
+  Type,
+  X,
+} from 'lucide-react'
 import { toast } from 'sonner'
 
 import { api } from '@/api'
@@ -10,10 +25,12 @@ import { cn } from '@/lib/utils'
 import { transposeKey } from '@/lib/chords'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Textarea } from '@/components/ui/textarea'
+import { BarEditor, parseChart, writeChart } from '@/components/BarEditor'
 import { Input } from '@/components/ui/input'
 import { useConfirm } from '@/components/confirm'
 import { ChordChart } from '@/components/ChordChart'
-import { ErrorNote, Loading, PageHeader } from '@/components/bits'
+import { ErrorNote, Loading, PageHeader, Spinner } from '@/components/bits'
 
 /**
  * An evening, played through. The rail is the point: on stage the next song
@@ -23,6 +40,22 @@ import { ErrorNote, Loading, PageHeader } from '@/components/bits'
  * A key changed here is remembered against this evening rather than against
  * the song, so "tonight in Bb" survives without rewriting what the song is.
  */
+/*
+The characters a chord chart is written with.
+
+A bar line with a space either side, because `|1 4|5` is unreadable and nobody
+types the spaces by hand twice. The rest are what gets used inside a bar: a
+repeat, a beat divider, and a held chord.
+*/
+const BARS = [
+  { label: '|', insert: ' | ' },
+  { label: '||', insert: ' || ' },
+  { label: '%', insert: '%' },
+  { label: '/', insert: '/' },
+  { label: '-', insert: '-' },
+] as const
+
+
 export default function SetlistPlay() {
   const { id } = useParams()
   const { t } = useT()
@@ -33,7 +66,26 @@ export default function SetlistPlay() {
   const [songs, setSongs] = useState<SetlistSong[] | null>(null)
   const [at, setAt] = useState(0)
   const [editing, setEditing] = useState(false)
+  // Which row is being dragged, while it is being dragged.
+  const [dragging, setDragging] = useState<number | null>(null)
+  /*
+  The chart being typed, or null when one is not.
+
+  It holds the song it belongs to, not just the text. The rail can change what
+  is on screen while this is open, and a draft that only knew its own text
+  would be saved against whatever happened to be showing.
+  */
+  const [draft, setDraft] = useState<{ songID: number; body: string } | null>(null)
+  const chart = draft?.body ?? null
+  const [saving, setSaving] = useState(false)
+  // The grid is how a chart is written; the raw text is the way out for
+  // anything it has no box for.
+  const [raw, setRaw] = useState(false)
+  const box = useRef<HTMLTextAreaElement>(null)
   const [error, setError] = useState('')
+  // The sideways rail on a phone, and the row that is open in it.
+  const rail = useRef<HTMLDivElement>(null)
+  const here = useRef<HTMLDivElement>(null)
 
   const load = useCallback(() => {
     if (!id) return
@@ -74,6 +126,134 @@ export default function SetlistPlay() {
     pending.current[row.id] = setTimeout(() => {
       api.setSetlistSteps(row.id, steps).catch(() => toast.error(t('setlist.failed')))
     }, 600)
+  }
+
+  /*
+  Dropping one song where another is, on a screen that has a pointer.
+
+  The arrows stay: a phone has no drag worth the name, and two taps beats a
+  long press and a wobble even where it does. Saved the same way either way —
+  the list moves on screen first, the server is told after.
+  */
+  async function drop(to: number) {
+    const from = dragging
+    setDragging(null)
+    if (from === null || from === to) return
+    const list = [...(songs ?? [])]
+    const [moved] = list.splice(from, 1)
+    list.splice(to, 0, moved)
+    setSongs(list)
+    // Follow the song that was being looked at, wherever it ended up.
+    const current = songs?.[at]
+    if (current) setAt(list.findIndex((x) => x.id === current.id))
+    try {
+      await api.reorderSetlist(Number(id), list.map((x) => x.id))
+    } catch {
+      toast.error(t('setlist.failed'))
+      load()
+    }
+  }
+
+  /*
+  Slide the open song to the left edge of the rail.
+
+  The rail scrolls sideways on a phone, and tapping the second song leaves it
+  where it was — halfway along, with the third still off the screen, so every
+  song after it costs a tap and a swipe. Putting the open one at the left puts
+  the next one in reach, which is the only move anybody makes here.
+
+  Sideways only: on a wide screen the rail is a column, and a column does not
+  need help.
+  */
+  useEffect(() => {
+    const box = rail.current
+    const row = here.current
+    if (!box || !row || box.scrollWidth <= box.clientWidth) return
+    box.scrollTo({ left: row.offsetLeft - box.offsetLeft, behavior: 'smooth' })
+  }, [at, songs])
+
+  /*
+  Save the chart and go back to reading it.
+
+  The song is sent whole because that is what the endpoint takes, so the copy
+  held here is spread into the update — anything edited on the song's own page
+  in the meantime would be a stale field otherwise, and this page reloads after
+  saving for the same reason.
+  */
+  /*
+  Put a character in at the caret and leave the caret after it.
+
+  Setting the value through React alone would send the caret to the end of the
+  text, which on the third bar of a line is worse than not having the button.
+  So the selection is read before and written back after the box has been
+  re-rendered with the new value.
+  */
+  function insert(text: string) {
+    const el = box.current
+    if (!el || !draft) return
+    const from = el.selectionStart
+    const to = el.selectionEnd
+    setDraft({ ...draft, body: draft.body.slice(0, from) + text + draft.body.slice(to) })
+    requestAnimationFrame(() => {
+      el.focus()
+      el.setSelectionRange(from + text.length, from + text.length)
+    })
+  }
+
+  async function saveChart() {
+    if (!draft) return
+    // The song the draft was typed for, found by id rather than by what is on
+    // screen — those are the same thing right up until they are not.
+    const song = (songs ?? []).find((row) => row.song.id === draft.songID)?.song
+    if (!song) {
+      setDraft(null)
+      return
+    }
+    setSaving(true)
+    try {
+      await api.updateSong(song.id, {
+        title: song.title,
+        artist: song.artist,
+        key: song.key,
+        tempo: song.tempo,
+        part: song.part,
+        body: draft.body,
+        notes: song.notes,
+        reference_url: song.reference_url ?? '',
+      })
+      setDraft(null)
+      load()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t('song.failed'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  /*
+  Open another song, checking first that nothing is being thrown away.
+
+  Untouched drafts close without a word — opening the editor and changing your
+  mind is not a decision worth interrupting. Anything actually typed gets asked
+  about, because the alternative is losing it to a mis-tap on a phone.
+  */
+  async function pick(index: number) {
+    const song = songs?.[index]
+    if (draft && song && song.song.id !== draft.songID) {
+      const original =
+        (songs ?? []).find((row) => row.song.id === draft.songID)?.song.body ?? ''
+      if (draft.body !== original) {
+        const ok = await ask({
+          title: t('setlist.dropChart'),
+          body: t('setlist.dropChartBody'),
+          confirmLabel: t('setlist.dropChartYes'),
+          danger: true,
+        })
+        if (!ok) return
+      }
+      setDraft(null)
+    }
+    setAt(index)
   }
 
   async function move(index: number, by: number) {
@@ -118,6 +298,7 @@ export default function SetlistPlay() {
         part: '',
         body: '',
         notes: '',
+        reference_url: '',
       })
       await api.addSetlistSong(Number(id), song.id)
       const data = await api.setlist(Number(id))
@@ -190,6 +371,7 @@ export default function SetlistPlay() {
         <aside className="lg:w-60 lg:shrink-0">
           <Card className="overflow-hidden py-0">
             <CardContent
+              ref={rail}
               className={cn(
                 'flex gap-1 overflow-x-auto p-2',
                 'lg:flex-col lg:gap-0 lg:divide-y lg:overflow-visible lg:p-0',
@@ -201,14 +383,43 @@ export default function SetlistPlay() {
               {songs.map((row, index) => (
                 <div
                   key={row.id}
+                  ref={index === at ? here : undefined}
+                  // Capped on a phone, where the rail scrolls sideways. Without
+                  // a ceiling each item grows to whatever its title is, so one
+                  // long song name pushes the rest of the set off the screen
+                  // and the truncate below never gets a width to bite on.
+                  draggable={editing}
+                  onDragStart={() => setDragging(index)}
+                  onDragEnd={() => setDragging(null)}
+                  onDragOver={(event) => editing && event.preventDefault()}
+                  onDrop={() => void drop(index)}
                   className={cn(
-                    'flex shrink-0 items-center gap-1 lg:shrink',
+                    'flex max-w-36 shrink-0 items-center gap-1 lg:max-w-none lg:shrink',
                     index === at && 'bg-accent',
+                    editing && 'cursor-grab active:cursor-grabbing',
+                    dragging === index && 'opacity-40',
                   )}
                 >
+                  {/* The thing you actually drag.
+
+                      A `draggable` row does nothing when the pointer goes down
+                      on a button inside it: the button takes the press and the
+                      drag never starts. So the handle is a plain span, and it
+                      only exists while the order is being changed. */}
+                  {editing && (
+                    <span
+                      draggable
+                      onDragStart={() => setDragging(index)}
+                      onDragEnd={() => setDragging(null)}
+                      aria-hidden
+                      className="grid shrink-0 cursor-grab place-items-center pl-1 text-muted-foreground active:cursor-grabbing"
+                    >
+                      <GripVertical className="size-4" />
+                    </span>
+                  )}
                   <button
                     type="button"
-                    onClick={() => setAt(index)}
+                    onClick={() => void pick(index)}
                     className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-accent"
                   >
                     <span className="w-4 shrink-0 text-right font-mono text-xs text-muted-foreground">
@@ -234,6 +445,10 @@ export default function SetlistPlay() {
 
                   {editing && (
                     <span className="flex shrink-0 items-center pr-1">
+                      {/* The rail runs sideways on a phone and downwards on a
+                          wide screen, so an up arrow means "earlier" in one
+                          layout and nothing at all in the other. Same button,
+                          the arrow that matches what you are looking at. */}
                       <Button
                         variant="ghost"
                         size="icon"
@@ -241,7 +456,8 @@ export default function SetlistPlay() {
                         onClick={() => move(index, -1)}
                         aria-label={t('setlist.moveUp')}
                       >
-                        <ChevronUp className="size-4" />
+                        <ChevronLeft className="size-4 lg:hidden" />
+                        <ChevronUp className="hidden size-4 lg:block" />
                       </Button>
                       <Button
                         variant="ghost"
@@ -250,7 +466,8 @@ export default function SetlistPlay() {
                         onClick={() => move(index, 1)}
                         aria-label={t('setlist.moveDown')}
                       >
-                        <ChevronDown className="size-4" />
+                        <ChevronRight className="size-4 lg:hidden" />
+                        <ChevronDown className="hidden size-4 lg:block" />
                       </Button>
                       <Button
                         variant="ghost"
@@ -281,19 +498,99 @@ export default function SetlistPlay() {
                     <p className="text-sm text-muted-foreground">{current.song.artist}</p>
                   )}
                 </div>
-                <Button asChild variant="ghost" size="sm" className="shrink-0">
-                  <Link to={`/songs/${current.song.id}/edit`}>
-                    <Pencil className="size-4" />
-                    {t('setlist.editChart')}
-                  </Link>
-                </Button>
+                {/* The chart is typed here; everything else about the song
+                    — its title, its key, the recording — is on its own page,
+                    and that link says where to come back to. */}
+                {chart === null ? (
+                  <span className="flex shrink-0 items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setDraft({ songID: current.song.id, body: current.song.body })}
+                    >
+                      <Pencil className="size-4" />
+                      {t('setlist.editChart')}
+                    </Button>
+                    <Button asChild variant="ghost" size="icon" className="size-8">
+                      <Link
+                        to={`/songs/${current.song.id}/edit?from=/setlists/${id}`}
+                        aria-label={t('song.edit')}
+                        title={t('song.edit')}
+                      >
+                        <Settings2 className="size-4" />
+                      </Link>
+                    </Button>
+                  </span>
+                ) : (
+                  <span className="flex shrink-0 items-center gap-1">
+                    <Button size="sm" disabled={saving} onClick={() => void saveChart()}>
+                      {saving ? <Spinner /> : <Check className="size-4" />}
+                      {t('common.save')}
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setDraft(null)}>
+                      {t('common.cancel')}
+                    </Button>
+                  </span>
+                )}
               </div>
+              {chart !== null ? (
+                <>
+                  {/* The boxes are the editor. The text underneath is still
+                      what gets stored, and this is the way to it when a chart
+                      wants something the grid has no box for. */}
+                  <div className="mb-2 flex flex-wrap items-center gap-1">
+                    <Button
+                      type="button"
+                      variant={raw ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setRaw(!raw)}
+                      aria-pressed={raw}
+                    >
+                      <Type className="size-4" />
+                      {t('song.asText')}
+                    </Button>
+                    {raw &&
+                      BARS.map((one) => (
+                        <Button
+                          key={one.label}
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="min-w-10 font-mono"
+                          onClick={() => insert(one.insert)}
+                        >
+                          {one.label}
+                        </Button>
+                      ))}
+                  </div>
+
+                  {raw ? (
+                    /* Monospace, and nothing reformats it: the column a chord
+                       sits in is what says which syllable it lands on. */
+                    <Textarea
+                      ref={box}
+                      value={chart ?? ''}
+                      autoFocus
+                      onChange={(event) => setDraft({ ...draft!, body: event.target.value })}
+                      placeholder={t('song.chartHint')}
+                      spellCheck={false}
+                      className="min-h-[60vh] font-mono text-sm"
+                    />
+                  ) : (
+                    <BarEditor
+                      rows={parseChart(chart ?? '')}
+                      onRows={(rows) => setDraft({ ...draft!, body: writeChart(rows) })}
+                    />
+                  )}
+                </>
+              ) : (
               <ChordChart
                 key={current.id}
                 song={current.song}
                 steps={current.steps}
                 onSteps={(steps) => setSteps(current, steps)}
               />
+              )}
             </>
           ) : (
             <Card>

@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Trash2 } from 'lucide-react'
 
 import { api } from '@/api'
@@ -28,6 +28,7 @@ const blank: SongInput = {
   part: '',
   body: '',
   notes: '',
+  reference_url: '',
 }
 
 /**
@@ -37,6 +38,18 @@ const blank: SongInput = {
  */
 export default function SongForm() {
   const { id } = useParams()
+  const [params] = useSearchParams()
+  /*
+  Where the arrow goes, and where saving lands.
+
+  This form is opened from the song list and from a setlist, and by default it
+  returns to the song. A caller that wants otherwise says so in `from`, and
+  only a path inside HQ is accepted — a full URL there would turn the back
+  arrow into somebody else's link.
+  */
+  const fromParam = params.get('from')
+  const back =
+    fromParam && fromParam.startsWith('/') && !fromParam.startsWith('//') ? fromParam : null
   const meta = useMeta()
   const navigate = useNavigate()
   const { t, tOpt } = useT()
@@ -46,6 +59,35 @@ export default function SongForm() {
   const [record, setRecord] = useState<Song | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [looking, setLooking] = useState(false)
+
+  /*
+  Pasting a link fills the song in.
+
+  Only what is still blank, though. A video is called whatever somebody
+  uploaded it as — "Amazing Grace (Live) [HD] 4K" — so this is a starting point
+  and never a correction, and a title already typed wins.
+
+  A failure says nothing. Nobody pasted the link in order to look a title up;
+  they pasted it so the recording would be there, and that part worked.
+  */
+  async function lookUp(url: string) {
+    const link = url.trim()
+    if (!link || form.title.trim()) return
+    setLooking(true)
+    try {
+      const got = await api.videoTitle(link)
+      setForm((current) => ({
+        ...current,
+        title: current.title.trim() || got.title,
+        artist: current.artist.trim() || got.artist,
+      }))
+    } catch {
+      // Private, deleted, mistyped, or not YouTube at all.
+    } finally {
+      setLooking(false)
+    }
+  }
 
   useEffect(() => {
     if (!id) return
@@ -60,6 +102,7 @@ export default function SongForm() {
           tempo: song.tempo,
           part: song.part,
           body: song.body,
+          reference_url: song.reference_url ?? '',
           notes: song.notes,
         })
       })
@@ -76,7 +119,7 @@ export default function SongForm() {
     setError('')
     try {
       const saved = id ? await api.updateSong(Number(id), form) : await api.createSong(form)
-      navigate(`/songs/${saved.id}`)
+      navigate(back ?? `/songs/${saved.id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : t('common.saveFailed'))
     } finally {
@@ -108,7 +151,7 @@ export default function SongForm() {
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader
-        back={id ? `/songs/${id}` : '/songs'}
+        back={back ?? (id ? `/songs/${id}` : '/songs')}
         title={id ? form.title || t('song.edit') : t('song.new')}
       />
 
@@ -188,6 +231,26 @@ export default function SongForm() {
                 className="font-mono whitespace-pre"
                 placeholder={'Intro   | C | G | Am | F |\n\nVerse\nC          G\nlirik di sini'}
               />
+            </Field>
+
+            {/* A recording to play it against. The chart says which chords;
+                it cannot say the feel, the tempo anyone actually takes it at,
+                or which of four arrangements this one is. */}
+            <Field label={t('song.reference')} htmlFor="reference" hint={t('song.referenceHint')}>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="reference"
+                  type="url"
+                  inputMode="url"
+                  value={form.reference_url}
+                  onChange={(e) => set('reference_url', e.target.value)}
+                  // On leaving the box rather than on every keystroke: a link
+                  // is pasted whole, and half of one is not worth asking about.
+                  onBlur={(e) => void lookUp(e.target.value)}
+                  placeholder="https://youtube.com/watch?v=..."
+                />
+                {looking && <Spinner />}
+              </div>
             </Field>
 
             <Field label={t('song.notes')} htmlFor="notes">

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { AArrowDown, AArrowUp, Minus, Plus, RotateCcw } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { AArrowDown, AArrowUp, AudioLines, Minus, Play, Plus, RotateCcw } from 'lucide-react'
 
 import { useT } from '@/i18n'
 import type { Song } from '@/types'
@@ -78,13 +79,16 @@ export function ChordChart({
           >
             <Minus className="size-4" />
           </Button>
-          {/* The key it is in now, and how far that is from the page. Both,
-              because either one alone leaves you counting. */}
+          {/* The key it is in now, how far that is from the page, and what
+              the page itself says. All three, because the first alone leaves
+              you counting and the first two leave you wondering what you are
+              counting from — and on a setlist the transpose is saved, so the
+              chart can be sitting in a key nobody remembers choosing. */}
           <span className="min-w-24 px-2 text-center font-mono text-sm">
             {key || t('song.noKey')}
             {steps !== 0 && (
               <span className="ml-1 text-xs text-muted-foreground">
-                {steps > 0 ? `+${steps}` : steps}
+                {steps > 0 ? `+${steps}` : steps} · {song.key || t('song.noKey')}
               </span>
             )}
           </span>
@@ -113,6 +117,35 @@ export function ChordChart({
           <Button variant="ghost" size="sm" onClick={() => onSteps(0)}>
             <RotateCcw className="size-4" />
             {t('song.reset', { key: song.key || '—' })}
+          </Button>
+        )}
+
+        {/* Tuning happens with the chart already open, so the way to it is
+            here rather than three taps away in a menu. */}
+        <Button variant="ghost" size="sm" asChild>
+          <Link to="/tuner">
+            <AudioLines className="size-4" />
+            {t('tuner.title')}
+          </Link>
+        </Button>
+
+        {/* The recording, when there is one. Its own tab: a chart is read while
+            the song plays, and navigating away from it mid-verse is the
+            opposite of what this is for. */}
+        {song.reference_url && (
+          <Button
+            variant="ghost"
+            size="sm"
+            asChild
+            // Tinted, because it is the one control here that does not change
+            // what is on the page — everything else transposes, respells or
+            // resizes the chart, and this one leaves for a recording.
+            className="bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
+          >
+            <a href={song.reference_url} target="_blank" rel="noreferrer">
+              <Play className="size-4 fill-current" />
+              {t('song.listen')}
+            </a>
           </Button>
         )}
 
