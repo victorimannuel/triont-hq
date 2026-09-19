@@ -61,8 +61,17 @@ self.addEventListener('push', (event) => {
       badge: data.badge ?? '/badge-96.png',
       // Same tag replaces rather than stacks, so a resend does not leave two.
       tag: data.tag ?? 'hq',
+      // ...but replacing is silent by default, which is the wrong half of the
+      // bargain: the shopping list goes out three times a day and a deadline
+      // every morning of the week before it, and each of those is meant to be
+      // noticed, not quietly swapped into a tray nobody is looking at.
+      //
+      // The cast is because renotify belongs to the service worker's own
+      // notification options and lib.dom does not carry it. Dropping it would
+      // be dropping the alert.
+      renotify: true,
       data: { url: data.url ?? '/' },
-    }),
+    } as NotificationOptions & { renotify: boolean }),
   )
 })
 

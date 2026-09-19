@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+#
+# hq-task — drop a task into the HQ tracker (prod) from this device.
+#
+# Other Claude sessions on this machine call this to add a task without any
+# public write endpoint: it inserts straight into the prod database over ssh,
+# so no token is ever exposed to the internet. Runs only from here, where the
+# server keys already live.
+#
+#   hq-task "Fix costing rollup" --owner kevin --priority high --area Costing
+#
+# Only the task text is required. Defaults: priority=normal, owner=unassigned,
+# status=todo, environment/area/next/comment empty, by=victor@triont.id.
+# --dry prints the SQL instead of running it.
+set -euo pipefail
+
+SSH_HOST="imeco-prod"
+DB="hq-db"
+
+task=""
+priority="normal"
+owner="unassigned"
+status="todo"
+area=""
+environment=""
+next=""
+comment=""
+by="victor@triont.id"
+dry=0
+
+usage() {
+  cat >&2 <<'USAGE'
+usage: hq-task "task text" [flags]
+  --priority urgent|high|normal|low        (default normal)
+  --owner    kevin|victor|jaffy|unassigned (default unassigned)
+  --status   todo|in_progress|needs_check|done|blocked|on_hold (default todo)
+  --area     TEXT
+  --env      local|dev|staging|production
+  --next     TEXT     (next step)
+  --comment  TEXT
+  --by       TEXT     (created_by, default victor@triont.id)
+  --dry               (print the SQL, do not run it)
+USAGE
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --priority) priority="$2"; shift 2 ;;
+    --owner)    owner="$2"; shift 2 ;;
+    --status)   status="$2"; shift 2 ;;
+    --area)     area="$2"; shift 2 ;;
+    --env)      environment="$2"; shift 2 ;;
+    --next)     next="$2"; shift 2 ;;
+    --comment)  comment="$2"; shift 2 ;;
+    --by)       by="$2"; shift 2 ;;
+    --dry)      dry=1; shift ;;
+    -h|--help)  usage; exit 0 ;;
+    -*)         echo "hq-task: unknown flag: $1" >&2; usage; exit 2 ;;
+    *)          if [ -z "$task" ]; then task="$1"; else echo "hq-task: unexpected arg: $1" >&2; exit 2; fi; shift ;;
+  esac
+done
+
+[ -n "$task" ] || { echo "hq-task: task text is required" >&2; usage; exit 2; }
+
+# Validate the fixed lists the same way the API's valid() does: an unknown value
+# falls back to the safe default rather than being stored.
+case "$priority" in urgent|high|normal|low) ;; *) priority="normal" ;; esac
+case "$owner" in kevin|victor|jaffy|unassigned) ;; *) owner="unassigned" ;; esac
+case "$status" in todo|in_progress|needs_check|done|blocked|on_hold) ;; *) status="todo" ;; esac
+case "$environment" in ""|local|dev|staging|production) ;; *) environment="" ;; esac
+
+# Double every single quote so apostrophes and injection attempts stay data.
+q() { printf "%s" "$1" | sed "s/'/''/g"; }
+
+sql="insert into tracker_tasks
+  (task, priority, area, owner, status, environment, next_step, comment, created_by, updated_by)
+values
+  ('$(q "$task")', '$priority', '$(q "$area")', '$owner', '$status', '$(q "$environment")', '$(q "$next")', '$(q "$comment")', '$(q "$by")', '$(q "$by")')
+returning id, task, priority, owner, status;"
+
+if [ "$dry" -eq 1 ]; then
+  printf '%s\n' "$sql"
+  exit 0
+fi
+
+printf '%s' "$sql" | ssh "$SSH_HOST" "sudo docker exec -i $DB psql -U hq -d hq -v ON_ERROR_STOP=1"

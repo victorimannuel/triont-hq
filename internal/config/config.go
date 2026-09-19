@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 )
 
 // Config is read once at boot. Anything missing that the app cannot safely
@@ -33,12 +34,23 @@ type Config struct {
 	// The evening check-in has its own hour. At seven in the morning nothing
 	// has been ticked yet, so asking then would only ever list everything.
 	HabitHour int
+	// Hours the shopping list goes out, local time. It is the one roundup you
+	// act on away from a screen, and a reminder at seven has been forgotten
+	// by the time you pass a shop — so it is asked again in the afternoon and
+	// again at night, when there is still a chance to write it down.
+	SupplyHours []int
 	// Bearer token external monitors use to report in. The only door into
 	// HQ that a session cookie does not open.
 	MonitorToken string
 	// Bearer token an MCP client carries. Another door a session cookie does
 	// not open, but everything behind this one is read-only.
 	MCPToken string
+	// Key for reading a plate off a photograph. Empty switches the guess off
+	// and says so; nothing else about the food log depends on it, so the
+	// module works by hand either way — and with no key set, no photograph
+	// ever leaves the server.
+	VisionKey   string
+	VisionModel string
 }
 
 func Load() (Config, error) {
@@ -60,12 +72,15 @@ func Load() (Config, error) {
 		VAPIDSubject: env("HQ_VAPID_SUBJECT", "mailto:admin@localhost"),
 		ReminderHour: envInt("HQ_REMINDER_HOUR", 7),
 		HabitHour:    envInt("HQ_HABIT_HOUR", 20),
+		SupplyHours:  envHours("HQ_SUPPLY_HOURS", []int{7, 15, 21}),
 		// Empty disables the monitor ingest endpoint outright rather than
 		// leaving it open with a guessable secret.
 		MonitorToken: os.Getenv("HQ_MONITOR_TOKEN"),
 		// Same bargain: empty leaves the endpoint closed rather than open
 		// with a token somebody could guess.
-		MCPToken: os.Getenv("HQ_MCP_TOKEN"),
+		MCPToken:    os.Getenv("HQ_MCP_TOKEN"),
+		VisionKey:   os.Getenv("HQ_VISION_KEY"),
+		VisionModel: env("HQ_VISION_MODEL", "claude-sonnet-5"),
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -111,4 +126,30 @@ func envInt(name string, fallback int) int {
 		}
 	}
 	return fallback
+}
+
+/*
+envHours reads a comma-separated list of hours, as in "7,15,21".
+
+A list that is wrong anywhere falls back whole rather than in part: half a
+schedule is harder to notice than none of it, because the notifications that
+do arrive make it look like it worked.
+*/
+func envHours(name string, fallback []int) []int {
+	raw := os.Getenv(name)
+	if raw == "" {
+		return fallback
+	}
+	out := []int{}
+	for _, part := range strings.Split(raw, ",") {
+		n, err := strconv.Atoi(strings.TrimSpace(part))
+		if err != nil || n < 0 || n > 23 {
+			return fallback
+		}
+		out = append(out, n)
+	}
+	if len(out) == 0 {
+		return fallback
+	}
+	return out
 }

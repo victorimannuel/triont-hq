@@ -37,12 +37,35 @@ export default defineConfig({
         display: 'standalone',
         // No orientation lock: this is installed on a laptop as often as a
         // phone, and locking it to portrait is a mobile-only assumption.
-        // Both the page's own warm off-white rather than the accent. A
-        // coloured title bar over a quiet page reads as a browser that has
-        // wandered in; matching it makes the installed app look like one
-        // surface from the top of the screen down.
+        // The page's own warm off-white, so the launch screen hands over to
+        // the app without a seam.
         background_color: '#fcfaf7',
-        theme_color: '#fcfaf7',
+        /*
+        One setting doing two jobs, which is why this took three tries.
+
+        Android paints the installed app's status bar with it, and the white
+        notification icons sit on that bar — the meta tags in index.html only
+        reach the bar in a browser tab, not in an installed app, so the two
+        cannot be chosen separately.
+
+        Off-white was the old value: a white mark on a near-white bar is a mark
+        nobody can see. The accent brown showed the mark and put a loud band
+        across the top. The page's own #110f0c showed the mark and vanished
+        into the header, which read as no bar at all.
+
+        A mid-dark brown. The app's own theme is dark, so its notification
+        icon is white — which vanishes on a light bar and is why off-white
+        failed. It reads on anything dark; the harder part is the header right
+        below it is #110f0c, so too-dark a bar merges into one black block
+        ("gelap bgt"). This sits far enough above the header to keep an edge
+        and far enough below the accent to stay a surface rather than a
+        stripe. Darker browns lost the edge; lighter ones started competing
+        with the app's own accent.
+
+        Android caches this inside the installed app, so a change here reaches
+        a phone when Chrome next rebuilds it rather than on the next deploy.
+        */
+        theme_color: '#634632',
         icons: [
           // Exact sizes rather than two big ones: Windows picks from this list
           // to build the shortcut icon, and picking beats downscaling.
