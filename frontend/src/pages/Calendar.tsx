@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarDays, ChevronLeft, ChevronRight, Globe, List } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, Globe, List, Plus } from 'lucide-react'
 
 import { api } from '@/api'
 import { useT } from '@/i18n'
@@ -119,7 +119,21 @@ export default function Calendar() {
       {/* The subtitle names what is in here and how far it reaches. It used to
           list every module the dates come from as well, which is a thing you
           learn once and then read past every time. */}
-      <PageHeader title={t('cal.title')} description={t('cal.subtitle')} action={toggle} />
+      <PageHeader
+        title={t('cal.title')}
+        description={t('cal.subtitle')}
+        action={
+          <div className="flex items-center gap-2">
+            <Button asChild size="sm">
+              <Link to="/calendar/new">
+                <Plus className="size-4" />
+                {t('cal.add')}
+              </Link>
+            </Button>
+            {toggle}
+          </div>
+        }
+      />
 
       {entries.length === 0 && (
         <Card className="py-10 text-center text-muted-foreground">{t('cal.empty')}</Card>

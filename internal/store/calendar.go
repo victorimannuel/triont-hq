@@ -110,6 +110,15 @@ func (s *Store) Calendar(ctx context.Context, from, to time.Time) ([]CalendarEnt
 		 where c.deleted_at is null and c.birthday is not null
 		   and (c.birthday + m.n)::date between $1 and $2
 
+		union all
+		-- Events typed straight onto the calendar. Link back to the event itself,
+		-- which is the one calendar row you open to edit rather than to fix
+		-- something elsewhere.
+		select on_date, 'event', title, coalesce(nullif(notes, ''), 'acara'),
+		       '/calendar/' || id, 0
+		  from calendar_events
+		 where deleted_at is null and on_date between $1 and $2
+
 		order by 1, 3`, from, to)
 	if err != nil {
 		return nil, err
