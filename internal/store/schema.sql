@@ -5,6 +5,11 @@ create table if not exists users (
     created_at    timestamptz not null default now()
 );
 
+-- Starred nav destinations, per account, as a JSON array of nav keys in the
+-- order they were pinned. On the account rather than the device so the same
+-- favourites follow you from the desktop to the phone.
+alter table users add column if not exists nav_favorites text not null default '';
+
 create table if not exists projects (
     id            bigserial primary key,
     slug          text not null unique,
@@ -658,6 +663,15 @@ create table if not exists habits (
 
 create index if not exists habits_live_idx on habits (deleted_at);
 
+-- Manual order for the board. Default 0 so existing rows keep their created_at
+-- order until they are moved; a reorder writes an explicit position to each.
+alter table habits add column if not exists position integer not null default 0;
+create index if not exists habits_order_idx on habits (position, created_at, id);
+
+-- A habit marked private drops off the board while the page is covered for
+-- showing to someone, rather than being bulleted like the rest of the row.
+alter table habits add column if not exists private boolean not null default false;
+
 -- One day it got done. The row existing is the fact, so there is no boolean
 -- to disagree with it and unticking is a delete.
 create table if not exists habit_days (
@@ -676,6 +690,14 @@ alter table habits add column if not exists unit text not null default '';
 -- How much got done that day. Defaulting to 1 is what keeps every row written
 -- before this column existed meaning exactly what it meant then: done once.
 alter table habit_days add column if not exists amount numeric not null default 1;
+
+-- A habit can draw down a supply as it gets done: ticking "minum vitamin D3"
+-- takes one D3 off the shelf, fish oil takes two. The link is optional; per_day
+-- is what one done-day is worth, so ticking the day and moving the stock are the
+-- one action. on delete set null so throwing away a supply only unlinks it.
+alter table habits add column if not exists supply_id bigint references supplies (id) on delete set null;
+alter table habits add column if not exists per_day numeric not null default 1;
+create index if not exists habits_supply_idx on habits (supply_id);
 
 -- One line a day. Keyed by the date rather than an id: the point of it is that
 -- there is exactly one per day, and an empty line is no row at all rather than
@@ -869,3 +891,314 @@ create table if not exists calendar_marks (
 -- date was dealt with but not how, and a year later "udah telpon" is the part
 -- worth having.
 alter table calendar_marks add column if not exists note text not null default '';
+
+-- Events typed straight onto the calendar, rather than derived from another
+-- record. Everything else the calendar shows is a date read off something that
+-- lives elsewhere; this is the one kind you add here and nowhere else.
+create table if not exists calendar_events (
+    id         bigserial primary key,
+    title      text not null,
+    on_date    date not null,
+    notes      text not null default '',
+    created_by text not null default '',
+    updated_by text not null default '',
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    deleted_at timestamptz,
+    deleted_by text not null default ''
+);
+
+create index if not exists calendar_events_live_idx on calendar_events (deleted_at);
+create index if not exists calendar_events_date_idx on calendar_events (on_date);
+
+-- A recording to play it against. A chart says which chords; it cannot say the
+-- feel, the tempo anyone actually takes it at, or which of four arrangements
+-- this one is, and a link costs nothing to keep beside it.
+alter table songs add column if not exists reference_url text not null default '';
+
+-- What food is made of, per household unit.
+--
+-- The whole model hangs off `grams`: a photo can say "nasi, dua centong" but
+-- nothing can say what a centong weighs, because it is a spoon in a particular
+-- kitchen. Set it once and every meal after that is arithmetic rather than a
+-- guess. The macros are per 100 g, which is how every published food table
+-- gives them, so a number copied off TKPI goes in without conversion.
+create table if not exists foods (
+    id         bigserial primary key,
+    name       text not null,
+    -- As it is said at the table: centong, butir, potong, gelas.
+    unit       text not null default 'porsi',
+    grams      numeric(10, 2) not null default 100,
+    kcal       numeric(10, 2) not null default 0,
+    protein_g  numeric(10, 2) not null default 0,
+    carbs_g    numeric(10, 2) not null default 0,
+    fat_g      numeric(10, 2) not null default 0,
+    notes      text not null default '',
+    created_by text not null default '',
+    updated_by text not null default '',
+    deleted_at timestamptz,
+    deleted_by text not null default '',
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+);
+
+create index if not exists foods_live_idx on foods (deleted_at);
+-- One row per food, so a name cannot end up with two sets of numbers and the
+-- log quietly disagree with itself depending on which was picked.
+create unique index if not exists foods_name_idx on foods (lower(name)) where deleted_at is null;
+
+-- One sitting. The photo hangs off this as an ordinary attachment, so it is
+-- encrypted and backed up like every other file in HQ.
+create table if not exists meals (
+    id         bigserial primary key,
+    eaten_at   timestamptz not null default now(),
+    kind       text not null default 'other',
+    notes      text not null default '',
+    created_by text not null default '',
+    updated_by text not null default '',
+    deleted_at timestamptz,
+    deleted_by text not null default '',
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+);
+
+create index if not exists meals_live_idx on meals (deleted_at, eaten_at desc);
+
+-- What was on the plate, counted in the food's own units.
+--
+-- The numbers are copied from the food rather than joined to it. A log is a
+-- record of what was true then: correcting the calories of rice today must not
+-- silently rewrite what last month's lunch came to. The food id is kept for
+-- the name and for editing, and may go null without taking the row with it.
+create table if not exists meal_items (
+    id        bigserial primary key,
+    meal_id   bigint not null references meals (id) on delete cascade,
+    food_id   bigint references foods (id) on delete set null,
+    name      text not null default '',
+    unit      text not null default '',
+    count     numeric(10, 2) not null default 1,
+    grams     numeric(10, 2) not null default 100,
+    kcal      numeric(10, 2) not null default 0,
+    protein_g numeric(10, 2) not null default 0,
+    carbs_g   numeric(10, 2) not null default 0,
+    fat_g     numeric(10, 2) not null default 0,
+    -- Whether a person put this number here or a photo did. Worth keeping:
+    -- a week of totals reads differently when half of it was never checked.
+    guessed   boolean not null default false,
+    position  int not null default 0
+);
+
+create index if not exists meal_items_owner_idx on meal_items (meal_id, position);
+
+-- A starting food table, so the first meal can be logged without typing forty
+-- rows first.
+--
+-- The numbers are per 100 g and they are approximate: published tables
+-- disagree with each other, a warung's portion is not a recipe's, and frying
+-- adds whatever oil it adds. They are close enough to make a weekly total
+-- mean something, and every one of them is editable — correcting a food is
+-- the thing that makes this table yours rather than mine.
+--
+-- Inserted only into an empty table. Deleting a food soft-deletes it, so the
+-- row stays and this never resurrects what was thrown away.
+insert into foods (name, unit, grams, kcal, protein_g, carbs_g, fat_g)
+select * from (values
+    ('nasi putih',          'centong',      100.0, 130.0,  2.7,  28.0,  0.3),
+    ('nasi merah',          'centong',      100.0, 110.0,  2.6,  23.0,  0.9),
+    ('nasi goreng',         'piring',       250.0, 165.0,  5.0,  22.0,  6.0),
+    ('bubur ayam',          'mangkok',      250.0,  90.0,  3.5,  13.0,  2.5),
+    ('mie instan',          'bungkus',       80.0, 450.0,  9.0,  60.0, 19.0),
+    ('mie goreng',          'piring',       200.0, 170.0,  5.0,  22.0,  7.0),
+    ('roti tawar',          'lembar',        25.0, 265.0,  9.0,  49.0,  3.2),
+    ('kentang rebus',       'buah',         120.0,  87.0,  2.0,  20.0,  0.1),
+
+    ('telur rebus',         'butir',         55.0, 155.0, 13.0,   1.1, 11.0),
+    ('telur ceplok',        'butir',         60.0, 196.0, 14.0,   0.8, 15.0),
+    ('dada ayam',           'potong',       100.0, 165.0, 31.0,   0.0,  3.6),
+    ('ayam goreng',         'potong',        90.0, 260.0, 26.0,   8.0, 14.0),
+    ('sate ayam',           'tusuk',         25.0, 190.0, 20.0,   6.0,  9.0),
+    ('daging sapi',         'potong',        60.0, 250.0, 26.0,   0.0, 15.0),
+    ('rendang',             'potong',        80.0, 195.0, 15.0,   5.0, 13.0),
+    ('ikan lele goreng',    'ekor',         100.0, 240.0, 22.0,   3.0, 15.0),
+    ('ikan kembung goreng', 'ekor',          90.0, 220.0, 22.0,   0.0, 14.0),
+    ('udang',               'ekor',          15.0,  99.0, 24.0,   0.2,  0.3),
+    ('bakso',               'butir',         20.0, 200.0, 12.0,  12.0, 11.0),
+    ('sosis',               'batang',        40.0, 300.0, 12.0,   5.0, 26.0),
+    ('nugget ayam',         'potong',        20.0, 290.0, 15.0,  17.0, 18.0),
+
+    ('tempe goreng',        'potong',        30.0, 225.0, 18.0,  12.0, 12.0),
+    ('tempe kukus',         'potong',        30.0, 190.0, 19.0,   9.0, 11.0),
+    ('tahu goreng',         'potong',        35.0, 175.0, 15.0,   6.0, 11.0),
+    ('tahu putih',          'potong',        35.0,  76.0,  8.0,   1.9,  4.8),
+    ('kacang tanah',        'sendok makan',  15.0, 567.0, 26.0,  16.0, 49.0),
+
+    ('tumis kangkung',      'mangkok',      100.0,  60.0,  3.0,   5.0,  3.5),
+    ('sayur bayam',         'mangkok',      100.0,  23.0,  2.9,   3.6,  0.4),
+    ('sop sayur',           'mangkok',      200.0,  40.0,  1.5,   5.0,  1.5),
+    ('capcay',              'mangkok',      200.0,  70.0,  3.0,   7.0,  3.5),
+    ('gado-gado',           'porsi',        250.0, 140.0,  6.0,  12.0,  8.0),
+    ('soto ayam',           'mangkok',      300.0,  60.0,  5.0,   4.0,  3.0),
+
+    ('pisang',              'buah',         100.0,  89.0,  1.1,  23.0,  0.3),
+    ('apel',                'buah',         150.0,  52.0,  0.3,  14.0,  0.2),
+    ('jeruk',               'buah',         130.0,  47.0,  0.9,  12.0,  0.1),
+    ('pepaya',              'potong',       150.0,  43.0,  0.5,  11.0,  0.3),
+    ('semangka',            'potong',       150.0,  30.0,  0.6,   8.0,  0.2),
+    ('alpukat',             'buah',         150.0, 160.0,  2.0,   9.0, 15.0),
+
+    ('kerupuk',             'biji',           5.0, 470.0,  5.0,  60.0, 23.0),
+    ('bakwan',              'biji',          50.0, 280.0,  4.0,  30.0, 16.0),
+    ('pisang goreng',       'biji',          60.0, 240.0,  2.0,  35.0, 10.0),
+    ('martabak manis',      'potong',        80.0, 350.0,  7.0,  45.0, 16.0),
+
+    ('susu full cream',     'gelas',        200.0,  61.0,  3.2,   4.8,  3.3),
+    ('susu low fat',        'gelas',        200.0,  42.0,  3.4,   5.0,  1.0),
+    ('kopi hitam',          'gelas',        200.0,   1.0,  0.1,   0.0,  0.0),
+    ('teh manis',           'gelas',        200.0,  30.0,  0.0,   8.0,  0.0),
+    ('gula pasir',          'sendok makan',  12.0, 387.0,  0.0, 100.0,  0.0),
+    ('minyak goreng',       'sendok makan',  13.0, 884.0,  0.0,   0.0,100.0)
+) as seed (name, unit, grams, kcal, protein_g, carbs_g, fat_g)
+where not exists (select 1 from foods);
+
+-- Hours at work, as they actually went.
+--
+-- A clock you have to remember to start is a clock that lies, so the log is
+-- built to be corrected after the fact rather than kept perfectly: an entry is
+-- two moments and a note, and nothing stops you typing both moments in later.
+-- The running clock is the same row with no end on it yet.
+create table if not exists time_entries (
+    id         bigserial primary key,
+    -- Null is allowed and means work that belonged to no project. Losing the
+    -- project must not lose the hours, hence set null rather than cascade.
+    project_id bigint references projects (id) on delete set null,
+    note       text not null default '',
+    started_at timestamptz not null,
+    -- Null while it is still running.
+    ended_at   timestamptz,
+    created_by text not null default '',
+    updated_by text not null default '',
+    deleted_by text not null default '',
+    deleted_at timestamptz,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+);
+
+-- Every read is a window of days, newest first.
+create index if not exists time_entries_started_idx
+    on time_entries (started_at desc) where deleted_at is null;
+
+-- The clocks that are still going, which is the one query every page load
+-- makes and the only one that has to be quick regardless of how long the log
+-- gets.
+create index if not exists time_entries_running_idx
+    on time_entries (started_at desc) where ended_at is null and deleted_at is null;
+
+-- Which part of the project. A day job is not one thing: at MHK there is AFS,
+-- NPD, RR and whatever comes next, and "8 hours on MHK" answers nothing that
+-- needs answering.
+--
+-- Free text rather than a table of its own. The only thing there is to know
+-- about a part is its name, and the list is open-ended — a new one starts
+-- existing the moment it gets typed, and the picker offers back whatever has
+-- been used on that project before.
+alter table time_entries add column if not exists part text not null default '';
+
+-- Two clocks at once used to be impossible, on the reasoning that one hour
+-- cannot be spent twice. But it can be worked twice: sitting in an RR call
+-- while an NPD build runs is two projects and one hour, and the log has to be
+-- able to say so. The day's total is a sum of what was worked, not of how long
+-- the chair was warm.
+drop index if exists time_entries_one_running_idx;
+
+-- A personal task tracker, the same shape as the shared NPD spreadsheet so what
+-- used to live in Excel lives here instead. Free text where the sheet had free
+-- text (area); a fixed list where it had a dropdown (priority, project, owner,
+-- status, company), validated in the API rather than the column.
+create table if not exists tracker_tasks (
+    id          bigserial primary key,
+    priority    text not null default 'normal',
+    project     text not null default 'general',
+    area        text not null default '',
+    task        text not null,
+    owner       text not null default 'unassigned',
+    status      text not null default 'todo',
+    company     text not null default '',
+    next_step   text not null default '',
+    comment     text not null default '',
+    created_by  text not null default '',
+    updated_by  text not null default '',
+    created_at  timestamptz not null default now(),
+    updated_at  timestamptz not null default now(),
+    deleted_at  timestamptz,
+    deleted_by  text not null default ''
+);
+
+create index if not exists tracker_tasks_live_idx   on tracker_tasks (deleted_at);
+create index if not exists tracker_tasks_status_idx on tracker_tasks (status);
+
+-- The tracker gained a project dimension, and its old "environment" column
+-- (deploy-state) was repurposed into "company". Both run on every boot: the
+-- rename fires once on an existing database, the add-columns cover a fresh one.
+alter table tracker_tasks add column if not exists project text not null default 'general';
+do $$ begin
+  if exists (select 1 from information_schema.columns
+              where table_name = 'tracker_tasks' and column_name = 'environment')
+     and not exists (select 1 from information_schema.columns
+              where table_name = 'tracker_tasks' and column_name = 'company') then
+    alter table tracker_tasks rename column environment to company;
+  end if;
+end $$;
+alter table tracker_tasks add column if not exists company text not null default '';
+create index if not exists tracker_tasks_project_idx on tracker_tasks (project);
+
+-- Companies for the tracker, editable from the app rather than hardcoded, so a
+-- new one can be added without a deploy. A task points at a company by its slug,
+-- which stays put when the display name is edited.
+create table if not exists tracker_companies (
+    id         bigserial primary key,
+    slug       text not null,
+    name       text not null,
+    created_by text not null default '',
+    updated_by text not null default '',
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    deleted_at timestamptz,
+    deleted_by text not null default ''
+);
+
+create index if not exists tracker_companies_live_idx on tracker_companies (deleted_at);
+
+-- The slug is unique only among live companies, so deleting one frees its name to
+-- be added again. It first shipped as a plain UNIQUE that also covered
+-- soft-deleted rows, which made re-adding a deleted name fail; swap that for a
+-- partial index. Both run on every boot: the drop clears the old constraint on an
+-- existing database, the create covers a fresh one.
+alter table tracker_companies drop constraint if exists tracker_companies_slug_key;
+create unique index if not exists tracker_companies_slug_live
+    on tracker_companies (slug) where deleted_at is null;
+
+-- Seed the one company that used to be hardcoded, so tasks already tagged 'mhk'
+-- keep their label. Only into an empty table, so a later delete is not undone.
+insert into tracker_companies (slug, name)
+select 'mhk', 'MHK'
+where not exists (select 1 from tracker_companies);
+
+-- A running list of things to get for a future partner: presents, pieces for a
+-- first home, whatever comes to mind now and would be forgotten later. It is a
+-- shopping list read on no particular schedule, so nothing here has a deadline.
+-- The one date it keeps is the day a thing was actually bought, which is also
+-- the whole of "done" on this list — null there is simply not yet.
+create table if not exists partner_items (
+    id         bigserial primary key,
+    item       text not null,
+    bought_on  date,
+    created_by text not null default '',
+    updated_by text not null default '',
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    deleted_at timestamptz,
+    deleted_by text not null default ''
+);
+
+create index if not exists partner_items_live_idx   on partner_items (deleted_at);
+create index if not exists partner_items_bought_idx on partner_items (bought_on, created_at);

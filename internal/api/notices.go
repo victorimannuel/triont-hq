@@ -25,6 +25,10 @@ type noticeLogEntry struct {
 	URL    string `json:"url"`
 	DueOn  string `json:"due_on"`
 	Read   bool   `json:"read"`
+	// Sent by the test button rather than by the morning. The row is kept
+	// because a test you cannot see the trace of proves half of what it
+	// should, and marked because it is not news.
+	Test bool `json:"test"`
 }
 
 func (s *Server) noticeLog(ctx context.Context, days int) ([]noticeLogEntry, error) {
@@ -42,13 +46,27 @@ func (s *Server) noticeLog(ctx context.Context, days int) ([]noticeLogEntry, err
 			Label:  row.Label,
 			Read:   row.ReadAt != nil,
 		}
-		// "kind|url|date", the shape noticeKey and roundupKey both build.
-		if parts := strings.Split(row.Key, "|"); len(parts) == 3 {
-			entry.Kind, entry.URL, entry.DueOn = parts[0], parts[1], parts[2]
-		}
+		entry.Kind, entry.URL, entry.DueOn, entry.Test = unpackNoticeKey(row.Key)
 		out = append(out, entry)
 	}
 	return out, nil
+}
+
+/*
+unpackNoticeKey reads a key back into the three things a row needs to draw
+itself, plus whether it was a drill.
+
+"kind|url|date" is the shape noticeKey and roundupKey both build. What comes
+after it is either the hour a roundup went out — two sends of the same list on
+one day are two rows, not two meanings — or the mark a test leaves, which is
+the one part of the tail worth reading.
+*/
+func unpackNoticeKey(key string) (kind, url, dueOn string, test bool) {
+	parts := strings.Split(key, "|")
+	if len(parts) < 3 {
+		return "", "", "", false
+	}
+	return parts[0], parts[1], parts[2], len(parts) > 3 && strings.HasPrefix(parts[3], "test")
 }
 
 func (s *Server) handleNotices(w http.ResponseWriter, r *http.Request) {

@@ -6,6 +6,7 @@ import { api } from '@/api'
 import { ALL, useList } from '@/lib/useList'
 import { useFileCounts } from '@/lib/useFileCounts'
 import { useT } from '@/i18n'
+import { FEATURES } from '@/lib/features'
 import type { Person } from '@/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -98,8 +99,12 @@ export default function People() {
                   <TableHead>{t('common.name')}</TableHead>
                   <TableHead>{t('project.client')}</TableHead>
                   <TableHead>{t('people.contact')}</TableHead>
-                  <TableHead>{t('people.lastTalked')}</TableHead>
-                  <TableHead className="w-10" />
+                  {FEATURES.peopleLastTalked && (
+                    <>
+                      <TableHead>{t('people.lastTalked')}</TableHead>
+                      <TableHead className="w-10" />
+                    </>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -176,25 +181,31 @@ export default function People() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {person.last_contacted_on
-                        ? formatDate(person.last_contacted_on)
-                        : t('people.never')}
-                      {person.reach_every_days > 0 && (
-                        <div>{t('people.everyDays', { n: person.reach_every_days })}</div>
-                      )}
-                    </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => touch(person)}
-                        aria-label={t('people.touch')}
-                        title={t('people.touch')}
-                      >
-                        <Check className="size-4" />
-                      </Button>
-                    </TableCell>
+                    {FEATURES.peopleLastTalked && (
+                      <TableCell className="text-xs text-muted-foreground">
+                        {person.last_contacted_on
+                          ? formatDate(person.last_contacted_on)
+                          : t('people.never')}
+                        {person.reach_every_days > 0 && (
+                          <div>{t('people.everyDays', { n: person.reach_every_days })}</div>
+                        )}
+                      </TableCell>
+                    )}
+                    {/* Marks today as the day you last spoke. Nothing to press
+                        while the date it writes is not on screen. */}
+                    {FEATURES.peopleLastTalked && (
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => touch(person)}
+                          aria-label={t('people.touch')}
+                          title={t('people.touch')}
+                        >
+                          <Check className="size-4" />
+                        </Button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
                 {!loading && people.length === 0 && (

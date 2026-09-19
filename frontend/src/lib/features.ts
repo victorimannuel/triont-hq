@@ -24,4 +24,13 @@ export const FEATURES = {
    * asked a question the address book did not need to answer.
    */
   peopleReachEvery: false,
+
+  /**
+   * When you last spoke to someone: the date on their page, the column in the
+   * list and the button that sets it to today. Off for the same reason as the
+   * one above — keeping it honest means updating it after every conversation,
+   * and an address book nobody updates is worse than one that never asked.
+   * The dates already recorded are still in the database.
+   */
+  peopleLastTalked: false,
 } as const

@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useConfirm } from '@/components/confirm'
+import { SecretField } from '@/components/SecretField'
 import {
   AuditInfo,
   ErrorNote,
@@ -56,6 +57,12 @@ export default function CredentialForm() {
   const [projects, setProjects] = useState<Project[]>([])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+
+  // Memoised: the reveal timer restarts whenever this identity changes.
+  const fetchSecret = useCallback(
+    async (which: number) => (await api.reveal(which)).secret,
+    [],
+  )
 
   useEffect(() => {
     api
@@ -195,17 +202,16 @@ export default function CredentialForm() {
               </Field>
             </div>
 
-            <Field
-              label={t('credential.secret')}
-              htmlFor="secret"
-              hint={hasSecret ? t('credential.secretKept') : undefined}
-            >
-              <Input
-                id="secret"
-                type="password"
-                autoComplete="new-password"
+            <Field label={t('credential.secret')} htmlFor="secret">
+              <SecretField
+                id={Number(id) || 0}
+                has={hasSecret}
                 value={form.secret}
-                onChange={(e) => set('secret', e.target.value)}
+                onValue={(v) => set('secret', v)}
+                fetcher={fetchSecret}
+                failMessage={t('credential.revealFailed')}
+                inputID="secret"
+                autoComplete="new-password"
               />
             </Field>
 

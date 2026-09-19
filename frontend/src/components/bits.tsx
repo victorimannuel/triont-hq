@@ -1,6 +1,9 @@
 import { useEffect, useState, type ComponentProps, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { ArrowLeft, ChevronRight, Eye, EyeOff, Loader2, Minus, Plus } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Eye, EyeOff, Loader2, Minus, Plus, Star } from 'lucide-react'
+
+import { NAV } from '@/nav'
+import { toggleFav, useFavs } from '@/lib/favnav'
 
 import {
   disguisedAll,
@@ -78,10 +81,48 @@ export function PageHeader({
           <h1 className="text-2xl font-semibold lowercase tracking-tight">{title}</h1>
           {description && <p className="text-sm text-muted-foreground">{description}</p>}
         </div>
+        <PageFavToggle />
         <CoverToggle />
       </div>
       {action}
     </div>
+  )
+}
+
+/*
+Star the page you are on, next to the eye because it is the same kind of thing:
+a per-page switch reached for while looking at the page it acts on. What it stars
+appears in the Favourites list — the sidebar on a desktop, the top of the "more"
+sheet on a phone. Only on a real destination: a detail or a form is not somewhere
+you pin.
+*/
+function PageFavToggle() {
+  const { t } = useT()
+  const { pathname } = useLocation()
+  const favs = useFavs()
+
+  // The destination this path belongs to; the longest match wins, so
+  // /waktu/bulan stars "waktu" rather than nothing. Undefined on a page that is
+  // not itself a nav destination, and then there is nothing to pin.
+  const current = NAV.filter((item) =>
+    item.end ? pathname === item.to : pathname === item.to || pathname.startsWith(`${item.to}/`),
+  ).sort((a, b) => b.to.length - a.to.length)[0]
+  if (!current) return null
+
+  const isFav = favs.includes(current.key)
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      // Faint until it is doing something, exactly like the eye beside it.
+      className={cn('mt-0.5 shrink-0', !isFav && 'text-muted-foreground/40')}
+      aria-label={isFav ? t('nav.unfavorite') : t('nav.favorite')}
+      title={isFav ? t('nav.unfavorite') : t('nav.favorite')}
+      onClick={() => toggleFav(current.key)}
+    >
+      <Star className={cn('size-4', isFav && 'fill-current text-primary')} />
+    </Button>
   )
 }
 
@@ -204,6 +245,8 @@ export function ErrorNote({ children }: { children: ReactNode }) {
 // picks a different bucket rather than rebuilding the old one.
 const stamps = new Map<string, Intl.DateTimeFormat>()
 const days = new Map<string, Intl.DateTimeFormat>()
+const clocks = new Map<string, Intl.DateTimeFormat>()
+const weekdays = new Map<string, Intl.DateTimeFormat>()
 
 function formatter(cache: Map<string, Intl.DateTimeFormat>, options: Intl.DateTimeFormatOptions) {
   const locale = currentLocale()
@@ -227,6 +270,27 @@ export function formatDate(value?: string | null) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
   return formatter(days, { dateStyle: 'medium' }).format(date)
+}
+
+// Weekday and date, spelled out, for a screen that has to say plainly which day
+// it is filing under. The check-in wants this because the day a tick lands on
+// is not always the day the clock reads — the small hours belong to the day
+// that just ended.
+export function formatDay(value?: string | null) {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return formatter(weekdays, { weekday: 'long', day: 'numeric', month: 'long' }).format(date)
+}
+
+// The clock on its own, for a row that already says which day it was. Used
+// where the same thing is said more than once a day and the date alone cannot
+// tell two of them apart.
+export function formatTime(value?: string | null) {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return formatter(clocks, { timeStyle: 'short' }).format(date)
 }
 
 // An amount that carries decimals shows them, whatever the currency; a round

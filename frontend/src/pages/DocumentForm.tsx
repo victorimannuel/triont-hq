@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useConfirm } from '@/components/confirm'
+import { SecretField } from '@/components/SecretField'
 import {
   AuditInfo,
   ErrorNote,
@@ -55,6 +56,12 @@ export default function DocumentForm() {
   const [record, setRecord] = useState<Document | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+
+  // Memoised: the reveal timer restarts whenever this identity changes.
+  const fetchNumber = useCallback(
+    async (which: number) => (await api.revealDocument(which)).number,
+    [],
+  )
 
   useEffect(() => {
     if (!id) return
@@ -115,13 +122,7 @@ export default function DocumentForm() {
   }
 
   // What sits in the folded half, so hiding it never hides that it is filled.
-  const extras = [
-    form.holder,
-    form.issuer,
-    form.number,
-    form.location,
-    form.notes,
-  ].filter(Boolean).length
+  const extras = [form.holder, form.issuer, form.location, form.notes].filter(Boolean).length
 
   return (
     <div className={cn('mx-auto', id ? 'max-w-2xl lg:max-w-5xl' : 'max-w-2xl')}>
@@ -162,6 +163,20 @@ export default function DocumentForm() {
                 </Field>
               </div>
 
+              {/* The number is the document, so it sits with the name rather
+                  than behind a fold with the shelf it lives on. */}
+              <Field label={t('doc.number')} htmlFor="number">
+                <SecretField
+                  id={record?.id ?? 0}
+                  has={record?.has_number ?? false}
+                  value={form.number}
+                  onValue={(v) => set('number', v)}
+                  fetcher={fetchNumber}
+                  failMessage={t('doc.revealFailed')}
+                  inputID="number"
+                />
+              </Field>
+
               <div className="grid gap-5 sm:grid-cols-2">
                 <Field label={t('doc.issued')} htmlFor="issued">
                   <Input
@@ -201,21 +216,6 @@ export default function DocumentForm() {
                     />
                   </Field>
                 </div>
-
-                <Field
-                  label={t('doc.number')}
-                  htmlFor="number"
-                  hint={record?.has_number ? t('doc.numberKept') : undefined}
-                >
-                  <Input
-                    id="number"
-                    type="password"
-                    autoComplete="off"
-                    className="font-mono text-xs"
-                    value={form.number}
-                    onChange={(e) => set('number', e.target.value)}
-                  />
-                </Field>
 
                 <Field label={t('doc.location')} htmlFor="location" hint={t('doc.locationHint')}>
                   <NameInput

@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import {
   Banknote,
   Cake,
+  CalendarClock,
   Check,
   FileText,
   Globe,
@@ -36,6 +37,7 @@ export const KIND_ICON = {
   rent: Home,
   income: Banknote,
   expense: Receipt,
+  event: CalendarClock,
 } as const
 
 export type Kind = keyof typeof KIND_ICON
@@ -52,6 +54,7 @@ const KIND_TONE: Record<Kind, string> = {
   rent: 'bg-rose-500/15 text-rose-700 dark:text-rose-300',
   income: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
   expense: 'bg-red-500/15 text-red-700 dark:text-red-300',
+  event: 'bg-sky-500/15 text-sky-700 dark:text-sky-300',
 }
 
 export const tone = (kind: string) => KIND_TONE[kind as Kind] ?? KIND_TONE.renewal

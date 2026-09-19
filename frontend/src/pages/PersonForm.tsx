@@ -223,14 +223,16 @@ export default function PersonForm() {
                     onChange={(e) => set('birthday', e.target.value)}
                   />
                 </Field>
-                <Field label={t('people.lastTalked')} htmlFor="last">
-                  <Input
-                    id="last"
-                    type="date"
-                    value={form.last_contacted_on}
-                    onChange={(e) => set('last_contacted_on', e.target.value)}
-                  />
-                </Field>
+                {FEATURES.peopleLastTalked && (
+                  <Field label={t('people.lastTalked')} htmlFor="last">
+                    <Input
+                      id="last"
+                      type="date"
+                      value={form.last_contacted_on}
+                      onChange={(e) => set('last_contacted_on', e.target.value)}
+                    />
+                  </Field>
+                )}
                 {FEATURES.peopleReachEvery && (
                   <Field
                     label={t('people.reachEvery')}

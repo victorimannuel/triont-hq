@@ -23,6 +23,7 @@ export type SentNotice = {
   label: string
   url: string
   due_on: string
+  test: boolean
 }
 
 export type Passkey = {
@@ -64,6 +65,8 @@ export type Habit = Audit & {
   name: string
   notes: string
   active: boolean
+  /** Hidden from the board while the page is covered for showing someone. */
+  private: boolean
   /** The days inside the asked-for window that were done, as YYYY-MM-DD. */
   days: string[]
   /** Consecutive days up to now. Today not being ticked yet does not break it. */
@@ -81,6 +84,12 @@ export type Habit = Audit & {
   amounts: Record<string, number>
   /** The first image attached, for the check-in to show. Null when there is none. */
   image_id: number | null
+  /** The supply this habit draws down as it is done, or null when it is nothing
+   *  to do with stock. */
+  supply_id: number | null
+  /** What one done-day is worth: the default amount a tick records and, for a
+   *  linked habit, how much comes off the shelf. */
+  per_day: number
 }
 
 export type HabitInput = {
@@ -88,6 +97,9 @@ export type HabitInput = {
   notes: string
   unit: string
   active: boolean
+  private: boolean
+  supply_id: number | null
+  per_day: number
 }
 
 /** An evening's worth of songs, in the order they get played. */
@@ -127,6 +139,8 @@ export type Song = Audit & {
   part: string
   body: string
   notes: string
+  /** A recording to play it against. Empty when there is not one. */
+  reference_url: string
 }
 
 export type SongInput = {
@@ -137,6 +151,7 @@ export type SongInput = {
   part: string
   body: string
   notes: string
+  reference_url: string
 }
 
 /** A line on one of the two lists. Same row either way; `kind` says which page
@@ -171,6 +186,13 @@ export type Supply = Audit & {
   last_restocked_on: string | null
 }
 
+/** A tracker company, editable from its own page. Tasks reference it by slug. */
+export type TrackerCompany = Audit & {
+  id: number
+  slug: string
+  name: string
+}
+
 export type SupplyPurchase = {
   id: number
   supply_id: number
@@ -193,6 +215,163 @@ export type PurchaseInput = {
   currency: string
   vendor: string
   notes: string
+}
+
+/**
+ * A food, described per household unit rather than per gram.
+ *
+ * Nobody knows what they ate in grams, but everyone knows they had two
+ * centong of rice. `grams` is what one of those weighs, and it is the number
+ * the whole model hangs off; the macros are per 100 g, as published tables
+ * give them.
+ */
+export type Food = Audit & {
+  id: number
+  name: string
+  unit: string
+  grams: number
+  kcal: number
+  protein_g: number
+  carbs_g: number
+  fat_g: number
+  notes: string
+}
+
+export type FoodInput = {
+  name: string
+  unit: string
+  grams: number
+  kcal: number
+  protein_g: number
+  carbs_g: number
+  fat_g: number
+  notes: string
+}
+
+/** A total, in what a person reads rather than per 100 g. */
+export type Nutrition = {
+  kcal: number
+  protein_g: number
+  carbs_g: number
+  fat_g: number
+  grams: number
+}
+
+export type MealItem = {
+  id: number
+  meal_id: number
+  food_id: number | null
+  name: string
+  unit: string
+  count: number
+  /** Per unit, frozen when it was eaten. */
+  grams: number
+  /** Per 100 g, frozen the same way. */
+  kcal: number
+  protein_g: number
+  carbs_g: number
+  fat_g: number
+  /** Still what a photo guessed, not what a person confirmed. */
+  guessed: boolean
+  position: number
+  totals: Nutrition
+}
+
+export type MealItemInput = {
+  food_id: number | null
+  name: string
+  count: number
+  guessed: boolean
+  /** Only for a row with no food behind it; otherwise the food is the source. */
+  unit?: string
+  grams?: number
+  kcal?: number
+  protein_g?: number
+  carbs_g?: number
+  fat_g?: number
+}
+
+export type Meal = Audit & {
+  id: number
+  eaten_at: string
+  kind: string
+  notes: string
+  items: MealItem[]
+  image_id: number | null
+  totals: Nutrition
+}
+
+export type MealInput = {
+  eaten_at: string
+  kind: string
+  notes: string
+  items: MealItemInput[]
+}
+
+/** One day on the strip behind today. Days with nothing logged come as zeroes. */
+export type DayTotal = {
+  on: string
+  totals: Nutrition
+  meals: number
+}
+
+/** One stretch of work. `ended_at` null means the clock is still running, and
+ *  `seconds` counts up to now while it is. */
+export type TimeEntry = {
+  id: number
+  project_id: number | null
+  project: string
+  /** Which part of the project — AFS, NPD, RR. Free text; empty is fine. */
+  part: string
+  note: string
+  started_at: string
+  ended_at: string | null
+  seconds: number
+  created_by: string
+  updated_by: string
+  created_at: string
+  updated_at: string
+}
+
+export type TimeEntryInput = {
+  project_id: number | null
+  part: string
+  note: string
+  started_at: string
+  /** Empty means still running. */
+  ended_at: string
+}
+
+export type DayWork = {
+  on: string
+  seconds: number
+  entries: number
+}
+
+export type ProjectWork = {
+  project_id: number | null
+  project: string
+  part: string
+  seconds: number
+  entries: number
+}
+
+/** One name the part picker offers under one project, learned from what has
+ *  already been logged against it. */
+export type ProjectPart = {
+  project_id: number | null
+  name: string
+}
+
+/** One line a photo proposed. Nothing here is saved until it has been looked at. */
+export type GuessedItem = {
+  food_id: number | null
+  name: string
+  unit: string
+  count: number
+  guessed: boolean
+  /** Nothing in the food table matched, so its numbers are not known yet. */
+  unknown: boolean
 }
 
 export type SupplyInput = {
@@ -281,6 +460,43 @@ export type IncomeInput = {
   ended_on: string
   next_due_on: string
   notes: string
+}
+
+export type TrackerTask = Audit & {
+  id: number
+  priority: string
+  project: string
+  area: string
+  task: string
+  owner: string
+  status: string
+  company: string
+  next_step: string
+  comment: string
+}
+
+export type TrackerInput = {
+  priority: string
+  project: string
+  area: string
+  task: string
+  owner: string
+  status: string
+  company: string
+  next_step: string
+  comment: string
+}
+
+export type PartnerItem = Audit & {
+  id: number
+  item: string
+  /** The day it was bought, or null while it is still to get. */
+  bought_on: string | null
+}
+
+export type PartnerInput = {
+  item: string
+  bought_on: string
 }
 
 export type ExpenseStream = Audit & {
@@ -456,6 +672,9 @@ export type TrashEntity =
   | 'file'
   | 'task'
   | 'journal'
+  | 'company'
+  | 'trackertask'
+  | 'partner'
 
 export type TrashItem = {
   entity: TrashEntity
@@ -489,6 +708,12 @@ export type Meta = {
   supply_units: Option[]
   song_parts: Option[]
   budget_buckets: Option[]
+  meal_kinds: Option[]
+  tracker_priorities: Option[]
+  tracker_projects: Option[]
+  tracker_owners: Option[]
+  tracker_statuses: Option[]
+  tracker_companies: Option[]
 }
 
 export type Contact = Audit & {
@@ -779,6 +1004,20 @@ export type CalendarEntry = {
   url: string
   // Days lived, for a milestone. Zero for every other kind.
   count: number
+}
+
+/** An event typed straight onto the calendar, editable on its own page. */
+export type CalendarEvent = Audit & {
+  id: number
+  title: string
+  on_date: string
+  notes: string
+}
+
+export type CalendarEventInput = {
+  title: string
+  on_date: string
+  notes: string
 }
 
 export type Overview = {

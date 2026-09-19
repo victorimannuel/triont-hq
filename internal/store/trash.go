@@ -26,6 +26,8 @@ var softTables = map[string]bool{
 	"belongings": true, "contacts": true, "supplies": true,
 	"income_streams": true, "expense_streams": true,
 	"songs": true, "setlists": true, "habits": true,
+	"foods": true, "meals": true,
+	"tracker_tasks": true, "tracker_companies": true, "partner_items": true,
 	// The rows that hang off one of the above, plus the two lists. Their
 	// parent going in the bin already hid them; this is for deleting one on
 	// its own, which used to be final.
@@ -33,6 +35,7 @@ var softTables = map[string]bool{
 	"setlist_songs": true, "attachments": true, "tasks": true,
 	"journal_days":   true,
 	"money_accounts": true, "budget_lines": true, "budget_incomes": true,
+	"time_entries": true, "calendar_events": true,
 }
 
 func (s *Store) softDelete(ctx context.Context, table, column, value, actor string) error {
@@ -150,6 +153,13 @@ func (s *Store) ListTrash(ctx context.Context) ([]TrashItem, error) {
 		union all
 		select 'habit', id, name, coalesce(notes, ''), deleted_by, deleted_at
 		  from habits where deleted_at is not null
+		union all
+		select 'food', id, name, unit, deleted_by, deleted_at
+		  from foods where deleted_at is not null
+		union all
+		-- A meal has no name, so what identifies it is when it was eaten.
+		select 'meal', id, to_char(eaten_at, 'DD Mon YYYY HH24:MI'), kind, deleted_by, deleted_at
+		  from meals where deleted_at is not null
 
 		-- The rows that hang off something else. Their label says what they
 		-- were and their detail says what they hung off, because "buku.png"
@@ -197,11 +207,34 @@ func (s *Store) ListTrash(ctx context.Context) ([]TrashItem, error) {
 		select 'budgetincome', id, name, to_char(on_month, 'YYYY-MM'), deleted_by, deleted_at
 		  from budget_incomes where deleted_at is not null
 		union all
+		-- An hour of work has no name either. What it was on and when it
+		-- started is what tells two of them apart.
+		select 'work', e.id,
+		       coalesce(nullif(e.note, ''), nullif(p.name, ''), ''),
+		       to_char(e.started_at, 'DD Mon YYYY HH24:MI'),
+		       e.deleted_by, e.deleted_at
+		  from time_entries e
+		  left join projects p on p.id = e.project_id
+		 where e.deleted_at is not null
+		union all
 		-- A journal day is keyed by its date, and the bin can only carry an
 		-- id. YYYYMMDD as a number is reversible, which is the whole ask.
 		select 'journal', to_char(on_date, 'YYYYMMDD')::bigint, line,
 		       on_date::text, deleted_by, deleted_at
 		  from journal_days where deleted_at is not null
+		union all
+		select 'company', id, name, slug, deleted_by, deleted_at
+		  from tracker_companies where deleted_at is not null
+		union all
+		select 'trackertask', id, task, coalesce(nullif(area, ''), project),
+		       deleted_by, deleted_at
+		  from tracker_tasks where deleted_at is not null
+		union all
+		select 'partner', id, item, coalesce(bought_on::text, ''), deleted_by, deleted_at
+		  from partner_items where deleted_at is not null
+		union all
+		select 'event', id, title, on_date::text, deleted_by, deleted_at
+		  from calendar_events where deleted_at is not null
 		order by 6 desc`)
 	if err != nil {
 		return nil, err
@@ -238,11 +271,14 @@ func (s *Store) PurgeTrash(ctx context.Context, entity string, id int64) error {
 		"supply": "supplies",
 		"income": "income_streams", "expense": "expense_streams",
 		"song": "songs", "setlist": "setlists", "habit": "habits",
+		"food": "foods", "meal": "meals",
 		"link": "project_links", "maintenance": "maintenance_logs",
 		"purchase": "supply_purchases", "setlistsong": "setlist_songs",
 		"file": "attachments", "task": "tasks",
 		"account": "money_accounts", "budgetline": "budget_lines",
-		"budgetincome": "budget_incomes",
+		"budgetincome": "budget_incomes", "work": "time_entries",
+		"company": "tracker_companies", "trackertask": "tracker_tasks",
+		"partner": "partner_items", "event": "calendar_events",
 	}[entity]
 
 	if entity == "journal" {

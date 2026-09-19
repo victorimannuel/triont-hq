@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   BellOff,
+  BellRing,
   Check,
   CheckCheck,
   Globe,
@@ -19,7 +20,7 @@ import { setUnread } from '@/lib/notices'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { ErrorNote, formatDate, Loading, PageHeader } from '@/components/bits'
+import { ErrorNote, formatDate, formatTime, Loading, PageHeader } from '@/components/bits'
 import { KIND_ICON, tone, type Kind } from '@/components/EntryRow'
 
 /**
@@ -40,12 +41,16 @@ const ROUNDUP_ICON: Record<string, LucideIcon> = {
   habit: Repeat2,
   supply: ShoppingCart,
   trouble: TriangleAlert,
+  // What the test button sends on a day with nothing due. It has no calendar
+  // kind because there is nothing to have a kind about.
+  test: BellRing,
 }
 
 const ROUNDUP_TONE: Record<string, string> = {
   habit: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300',
   supply: 'bg-sky-500/15 text-sky-700 dark:text-sky-300',
   trouble: 'bg-red-500/15 text-red-700 dark:text-red-300',
+  test: 'bg-muted text-muted-foreground',
 }
 
 export default function Notices() {
@@ -161,11 +166,25 @@ function NoticeRow({ notice, onRead }: { notice: SentNotice; onRead: () => void 
         <p className={cn('truncate text-sm', !notice.read && 'font-medium')}>
           {notice.label || t('notices.unnamed')}
         </p>
-        <p className="truncate text-xs text-muted-foreground">
-          {roundup ? t(`notices.kind.${notice.kind}`) : t(`cal.kind.${notice.kind}`)}
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          {/* So a drill is never mistaken for the real thing having happened. */}
+          {notice.test && (
+            <span className="shrink-0 rounded border px-1 py-px text-[10px] leading-none uppercase">
+              {t('notices.test')}
+            </span>
+          )}
+          <span className="truncate">
+            {roundup ? t(`notices.kind.${notice.kind}`) : t(`cal.kind.${notice.kind}`)}
+          </span>
         </p>
       </div>
-      <p className="shrink-0 text-xs text-muted-foreground">{formatDate(notice.sent_on)}</p>
+      {/* The clock sits under the date because the shopping list now goes out
+          three times a day: without it, three rows saying the same thing on
+          the same date look like one row repeated. */}
+      <div className="shrink-0 text-right text-xs leading-tight text-muted-foreground">
+        <p>{formatDate(notice.sent_on)}</p>
+        <p>{formatTime(notice.sent_at)}</p>
+      </div>
     </>
   )
 

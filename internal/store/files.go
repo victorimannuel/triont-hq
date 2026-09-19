@@ -36,6 +36,7 @@ var fileEntities = map[string]string{
 	"person":    "contacts",
 	"asset":     "assets",
 	"habit":     "habits",
+	"meal":      "meals",
 }
 
 func FileEntityOK(entity string) bool {

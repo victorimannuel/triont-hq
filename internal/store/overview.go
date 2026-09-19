@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"time"
 )
 
 // Overview is what the home page shows, gathered in one place so the handler
@@ -61,7 +60,7 @@ func (s *Store) Overview(ctx context.Context) (Overview, error) {
 	if o.StaleMonitors, err = s.StaleMonitors(ctx); err != nil {
 		return o, err
 	}
-	if o.HabitsToday, err = s.HabitsToday(ctx, startOfDay(time.Now())); err != nil {
+	if o.HabitsToday, err = s.HabitsToday(ctx, habitToday()); err != nil {
 		return o, err
 	}
 	if o.OpenTasks, err = s.OpenTasks(ctx); err != nil {

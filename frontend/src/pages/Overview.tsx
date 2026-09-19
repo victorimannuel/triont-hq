@@ -19,17 +19,12 @@ import { EntryRow } from '@/components/EntryRow'
 import { daysUntil, ErrorNote, Loading, PageHeader, Segmented, since } from '@/components/bits'
 import { useRemembered } from '@/lib/useRemembered'
 import { cn } from '@/lib/utils'
+import { todayKey } from '@/lib/day'
 
 // How far ahead the upcoming list looks. The server sends a month; this is
 // only which slice of it the page draws.
 const WINDOWS = ['7', '30'] as const
 const WINDOW_OPTIONS = WINDOWS.map((days) => ({ value: days, label: `${days}d` }))
-
-function todayKey() {
-  const now = new Date()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  return `${now.getFullYear()}-${month}-${String(now.getDate()).padStart(2, '0')}`
-}
 
 /*
 One line in, filed in one tap.
@@ -86,7 +81,7 @@ function Capture({ onFiled }: { onFiled: () => void }) {
 
   return (
     <form
-      className="mt-2 mb-3"
+      className="mt-6 mb-3"
       onSubmit={(event: FormEvent) => {
         event.preventDefault()
         void file('note')
@@ -202,19 +197,43 @@ export default function Overview() {
     <>
       <PageHeader title={t('home.title')} />
 
-      <Capture onFiled={load} />
-
-      {/* What capture has piled up. None of these lists carries a deadline, so
-          this line is the only thing on the page that would ever mention them
-          again. */}
-      {piles.length > 0 && (
-        <div className="mb-4 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-          {piles.map(([kind, to, key]) => (
-            <Link key={kind} to={to} className="hover:text-foreground hover:underline">
-              {t(key, { n: counts[kind] ?? 0 })}
-            </Link>
-          ))}
-        </div>
+      {/* Habits lead the page. The reason to open the home page in the evening
+          is that tonight's ticking has not been done yet, so it comes first,
+          straight to the check-in rather than to the board — the board is for
+          looking back. Hidden entirely when there are no habits, so the page
+          does not advertise an empty feature. */}
+      {data.habits_total > 0 && (
+        <Link
+          to="/habits/checkin"
+          className="card-surface mt-2 mb-3 flex items-center gap-3 rounded-xl border px-4 py-3 transition-colors hover:bg-accent"
+        >
+          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary/15 text-primary">
+            <Repeat2 className="size-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="font-medium">{t('home.habits')}</div>
+            <div className="text-xs text-muted-foreground">
+              {data.habits_done >= data.habits_total
+                ? t('home.habitsAllDone')
+                : t('home.habitsLeft', { n: data.habits_total - data.habits_done })}
+            </div>
+            {/* Which ones, not only how many: a glance says what can be done
+                now. Read here, ticked on the check-in — the whole card is the
+                link there, so these are labels and nothing more. */}
+            {data.habits_left.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {data.habits_left.map((name, at) => (
+                  <span key={`${at}-${name}`} className="rounded-full bg-muted px-2 py-0.5 text-xs">
+                    {name}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+          <span className="shrink-0 tabular-nums text-lg font-semibold tracking-tight">
+            {data.habits_done}/{data.habits_total}
+          </span>
+        </Link>
       )}
 
       {/* One timeline: what is broken, then what today already owes, then what
@@ -283,43 +302,22 @@ export default function Overview() {
         </Card>
       )}
 
-      {/* Straight to the check-in rather than to the board. The board is for
-          looking back; the reason to open this from the home page is that
-          tonight's ticking has not been done yet, and the tally says so
-          without having to go and count. Hidden entirely when there are no
-          habits, so the page does not advertise an empty feature. */}
-      {data.habits_total > 0 && (
-        <Link
-          to="/habits/checkin"
-          className="card-surface mt-3 flex items-center gap-3 rounded-xl border px-4 py-3 transition-colors hover:bg-accent"
-        >
-          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary/15 text-primary">
-            <Repeat2 className="size-4" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="font-medium">{t('home.habits')}</div>
-            <div className="text-xs text-muted-foreground">
-              {data.habits_done >= data.habits_total
-                ? t('home.habitsAllDone')
-                : t('home.habitsLeft', { n: data.habits_total - data.habits_done })}
-            </div>
-            {/* Which ones, not only how many: a glance says what can be done
-                now. Read here, ticked on the check-in — the whole card is the
-                link there, so these are labels and nothing more. */}
-            {data.habits_left.length > 0 && (
-              <div className="mt-1.5 flex flex-wrap gap-1">
-                {data.habits_left.map((name, at) => (
-                  <span key={`${at}-${name}`} className="rounded-full bg-muted px-2 py-0.5 text-xs">
-                    {name}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-          <span className="shrink-0 tabular-nums text-lg font-semibold tracking-tight">
-            {data.habits_done}/{data.habits_total}
-          </span>
-        </Link>
+      {/* Capture, and what it has piled up: notes, todos and things to buy. It
+          sits below what wants doing rather than at the top — a thought can
+          wait for a box a few sections down, where the evening's habits and
+          what is due cannot. */}
+      <Capture onFiled={load} />
+
+      {/* None of these lists carries a deadline, so this line is the only thing
+          on the page that would ever mention them again. */}
+      {piles.length > 0 && (
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+          {piles.map(([kind, to, key]) => (
+            <Link key={kind} to={to} className="hover:text-foreground hover:underline">
+              {t(key, { n: counts[kind] ?? 0 })}
+            </Link>
+          ))}
+        </div>
       )}
 
       {/* Centred rather than a sheet up from the foot of the screen. The

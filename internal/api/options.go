@@ -109,6 +109,33 @@ var (
 		{"needs", "Kebutuhan"}, {"wants", "Keinginan"},
 		{"savings", "Tabungan"}, {"debt", "Utang"},
 	}
+	// Which sitting a meal was. Not the time it happened — that is on the
+	// record already — but which of the day's meals it counts as, because
+	// "sarapan at eleven" is still a person's breakfast.
+	mealKinds = []option{
+		{"breakfast", "Sarapan"}, {"lunch", "Makan siang"},
+		{"dinner", "Makan malam"}, {"snack", "Cemilan"},
+		{"drink", "Minum"}, {"other", "Lainnya"},
+	}
+	// The personal task tracker, kept in step with the shared NPD spreadsheet
+	// so a row means the same thing in both. Labels stay in English here
+	// because that is what the spreadsheet uses.
+	trackerPriorities = []option{
+		{"urgent", "Urgent"}, {"high", "High"}, {"normal", "Normal"}, {"low", "Low"},
+	}
+	trackerProjects = []option{
+		{"npd", "NPD"}, {"afs", "AFS"}, {"sc", "SC"}, {"general", "General"},
+	}
+	trackerOwners = []option{
+		{"kevin", "Kevin"}, {"victor", "Victor"}, {"jaffy", "Jaffy"},
+		{"unassigned", "Unassigned"},
+	}
+	trackerStatuses = []option{
+		{"todo", "To Do"}, {"in_progress", "In Progress"}, {"needs_check", "Needs Check"},
+		{"done", "Done"}, {"blocked", "Blocked"}, {"on_hold", "On Hold"},
+	}
+	// Companies are not here: they live in the tracker_companies table so they can
+	// be added from the app. handleMeta reads them from there.
 )
 
 // valid returns value when the list allows it and fallback otherwise, so a

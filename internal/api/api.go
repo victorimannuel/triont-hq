@@ -53,6 +53,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/auth/login", s.handleLogin)
 	mux.HandleFunc("POST /api/auth/logout", s.handleLogout)
 	mux.Handle("GET /api/auth/me", s.requireAuth(s.handleMe))
+	mux.Handle("GET /api/favorites", s.requireAuth(s.handleGetFavorites))
+	mux.Handle("PUT /api/favorites", s.requireAuth(s.handleSetFavorites))
 	mux.HandleFunc("GET /api/meta", s.handleMeta)
 	mux.HandleFunc("GET /api/health", s.handleHealth)
 
@@ -114,12 +116,37 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("DELETE /api/purchases/{id}", s.requireAuth(s.handleDeletePurchase))
 	mux.Handle("DELETE /api/supplies/{id}", s.requireAuth(s.handleDeleteSupply))
 
+	// Eating. The food table is the reference; the meals are the log that
+	// reads from it, and the guess is the camera shortcut into that log.
+	mux.Handle("GET /api/foods", s.requireAuth(s.handleListFoods))
+	mux.Handle("POST /api/foods", s.requireAuth(s.handleCreateFood))
+	mux.Handle("PUT /api/foods/{id}", s.requireAuth(s.handleUpdateFood))
+	mux.Handle("DELETE /api/foods/{id}", s.requireAuth(s.handleDeleteFood))
+
+	mux.Handle("GET /api/meals", s.requireAuth(s.handleListMeals))
+	mux.Handle("POST /api/meals", s.requireAuth(s.handleCreateMeal))
+	mux.Handle("GET /api/meals/{id}", s.requireAuth(s.handleGetMeal))
+	mux.Handle("PUT /api/meals/{id}", s.requireAuth(s.handleUpdateMeal))
+	mux.Handle("POST /api/meals/{id}/guess", s.requireAuth(s.handleGuessMeal))
+	mux.Handle("DELETE /api/meals/{id}", s.requireAuth(s.handleDeleteMeal))
+
+	// Working. One clock, and the log it writes into.
+	mux.Handle("GET /api/time", s.requireAuth(s.handleListTime))
+	mux.Handle("GET /api/time/running", s.requireAuth(s.handleRunningTime))
+	mux.Handle("GET /api/time/summary", s.requireAuth(s.handleTimeSummary))
+	mux.Handle("POST /api/time", s.requireAuth(s.handleCreateTime))
+	mux.Handle("POST /api/time/start", s.requireAuth(s.handleStartTime))
+	mux.Handle("POST /api/time/{id}/stop", s.requireAuth(s.handleStopTime))
+	mux.Handle("PUT /api/time/{id}", s.requireAuth(s.handleUpdateTime))
+	mux.Handle("DELETE /api/time/{id}", s.requireAuth(s.handleDeleteTime))
+
 	mux.Handle("GET /api/journal", s.requireAuth(s.handleJournal))
 	mux.Handle("GET /api/journal/{on}", s.requireAuth(s.handleJournalDay))
 	mux.Handle("PUT /api/journal/{on}", s.requireAuth(s.handleSetJournalLine))
 
 	mux.Handle("GET /api/habits", s.requireAuth(s.handleListHabits))
 	mux.Handle("POST /api/habits", s.requireAuth(s.handleCreateHabit))
+	mux.Handle("POST /api/habits/order", s.requireAuth(s.handleReorderHabits))
 	mux.Handle("PUT /api/habits/{id}", s.requireAuth(s.handleUpdateHabit))
 	mux.Handle("POST /api/habits/{id}/day", s.requireAuth(s.handleSetHabitDay))
 	mux.Handle("DELETE /api/habits/{id}", s.requireAuth(s.handleDeleteHabit))
@@ -197,6 +224,24 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("PUT /api/expenses/{id}", s.requireAuth(s.handleUpdateExpense))
 	mux.Handle("DELETE /api/expenses/{id}", s.requireAuth(s.handleDeleteExpense))
 
+	mux.Handle("GET /api/tracker", s.requireAuth(s.handleListTracker))
+	mux.Handle("POST /api/tracker", s.requireAuth(s.handleCreateTracker))
+	mux.Handle("GET /api/tracker/{id}", s.requireAuth(s.handleGetTracker))
+	mux.Handle("PUT /api/tracker/{id}", s.requireAuth(s.handleUpdateTracker))
+	mux.Handle("DELETE /api/tracker/{id}", s.requireAuth(s.handleDeleteTracker))
+
+	// Companies are a small editable list of their own, kept off the /tracker/{id}
+	// path so a task id can never be read as the word "companies".
+	mux.Handle("GET /api/tracker-companies", s.requireAuth(s.handleListTrackerCompanies))
+	mux.Handle("POST /api/tracker-companies", s.requireAuth(s.handleCreateTrackerCompany))
+	mux.Handle("PUT /api/tracker-companies/{id}", s.requireAuth(s.handleUpdateTrackerCompany))
+	mux.Handle("DELETE /api/tracker-companies/{id}", s.requireAuth(s.handleDeleteTrackerCompany))
+
+	mux.Handle("GET /api/partner-items", s.requireAuth(s.handleListPartner))
+	mux.Handle("POST /api/partner-items", s.requireAuth(s.handleCreatePartner))
+	mux.Handle("PUT /api/partner-items/{id}", s.requireAuth(s.handleUpdatePartner))
+	mux.Handle("DELETE /api/partner-items/{id}", s.requireAuth(s.handleDeletePartner))
+
 	mux.Handle("GET /api/income", s.requireAuth(s.handleListIncome))
 	mux.Handle("POST /api/income", s.requireAuth(s.handleCreateIncome))
 	mux.Handle("GET /api/income/{id}", s.requireAuth(s.handleGetIncome))
@@ -204,8 +249,16 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("DELETE /api/income/{id}", s.requireAuth(s.handleDeleteIncome))
 
 	mux.Handle("GET /api/calendar", s.requireAuth(s.handleCalendar))
+	mux.Handle("GET /api/video-title", s.requireAuth(s.handleVideoTitle))
 	mux.Handle("GET /api/calendar/marks", s.requireAuth(s.handleCalendarMarks))
 	mux.Handle("POST /api/calendar/mark", s.requireAuth(s.handleMarkCalendarEntry))
+
+	// Events typed onto the calendar. A hyphen, not /calendar/{id}, so an event
+	// id never gets read as one of the calendar's own sub-paths.
+	mux.Handle("POST /api/calendar-events", s.requireAuth(s.handleCreateCalendarEvent))
+	mux.Handle("GET /api/calendar-events/{id}", s.requireAuth(s.handleGetCalendarEvent))
+	mux.Handle("PUT /api/calendar-events/{id}", s.requireAuth(s.handleUpdateCalendarEvent))
+	mux.Handle("DELETE /api/calendar-events/{id}", s.requireAuth(s.handleDeleteCalendarEvent))
 
 	mux.Handle("GET /api/belongings", s.requireAuth(s.handleListBelongings))
 	mux.Handle("POST /api/belongings", s.requireAuth(s.handleCreateBelonging))
@@ -303,30 +356,45 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 
 // handleMeta feeds the front-end its dropdowns so the allowed values live in
 // exactly one place.
-func (s *Server) handleMeta(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
+	// Companies come from the table rather than a hardcoded list, so a new one
+	// added from the app shows up in every dropdown without a deploy. A read
+	// error just yields an empty list rather than failing the whole meta call.
+	companies := []option{}
+	if list, err := s.store.ListTrackerCompanies(r.Context()); err == nil {
+		for _, c := range list {
+			companies = append(companies, option{Value: c.Slug, Label: c.Name})
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"statuses":           statuses,
-		"kinds":              kinds,
-		"link_categories":    linkCategories,
-		"credential_kinds":   credentialKinds,
-		"asset_kinds":        assetKinds,
-		"asset_statuses":     assetStatuses,
-		"billing_cycles":     billingCycles,
-		"currencies":         currencies,
-		"client_statuses":    clientStatuses,
-		"client_kinds":       clientKinds,
-		"ownerships":         ownerships,
-		"conditions":         conditions,
-		"income_statuses":    incomeStatuses,
-		"expense_categories": expenseCategories,
-		"document_kinds":     documentKinds,
-		"belonging_kinds":    belongingKinds,
-		"belonging_statuses": belongingStatuses,
-		"maintenance_kinds":  maintenanceKinds,
-		"supply_categories":  supplyCategories,
-		"supply_units":       supplyUnits,
-		"song_parts":         songParts,
-		"budget_buckets":     budgetBuckets,
+		"statuses":             statuses,
+		"kinds":                kinds,
+		"link_categories":      linkCategories,
+		"credential_kinds":     credentialKinds,
+		"asset_kinds":          assetKinds,
+		"asset_statuses":       assetStatuses,
+		"billing_cycles":       billingCycles,
+		"currencies":           currencies,
+		"client_statuses":      clientStatuses,
+		"client_kinds":         clientKinds,
+		"ownerships":           ownerships,
+		"conditions":           conditions,
+		"income_statuses":      incomeStatuses,
+		"expense_categories":   expenseCategories,
+		"document_kinds":       documentKinds,
+		"belonging_kinds":      belongingKinds,
+		"belonging_statuses":   belongingStatuses,
+		"maintenance_kinds":    maintenanceKinds,
+		"supply_categories":    supplyCategories,
+		"supply_units":         supplyUnits,
+		"song_parts":           songParts,
+		"budget_buckets":       budgetBuckets,
+		"meal_kinds":           mealKinds,
+		"tracker_priorities": trackerPriorities,
+		"tracker_projects":   trackerProjects,
+		"tracker_owners":     trackerOwners,
+		"tracker_statuses":   trackerStatuses,
+		"tracker_companies":  companies,
 	})
 }
 

@@ -99,6 +99,7 @@ var eventKinds = map[string][2]string{
 	"rent":        {"sewa", "rent"},
 	"income":      {"pemasukan", "income"},
 	"expense":     {"pengeluaran", "expense"},
+	"event":       {"acara", "event"},
 }
 
 // textEventKind names the sort of thing a deadline is. A milestone is the one

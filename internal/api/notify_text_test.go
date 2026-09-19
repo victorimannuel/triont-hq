@@ -62,16 +62,78 @@ func TestRoundupsSplitAndRankThemselves(t *testing.T) {
 	}
 }
 
-// The inbox splits a key on "|" into kind, link and date. A roundup has to
-// arrive in that shape or it lands in the list unnamed and with nowhere to go.
+// The inbox splits a key on "|" and reads kind, link and date off the front. A
+// roundup has to arrive in that shape or it lands in the list unnamed and with
+// nowhere to go. The hour comes after, and is what lets the same list go out
+// again later the same day.
 func TestRoundupKeyMatchesWhatTheInboxUnpacks(t *testing.T) {
-	day := time.Date(2026, 9, 5, 0, 0, 0, 0, time.UTC)
-	key := roundupKey(roundups(supplies(1), nil)[0], day)
-	if want := "supply|/supplies|2026-09-05"; key != want {
+	at := time.Date(2026, 9, 5, 15, 40, 0, 0, time.UTC)
+	key := roundupKey(roundups(supplies(1), nil)[0], at)
+	if want := "supply|/supplies|2026-09-05|15"; key != want {
 		t.Fatalf("got %q, want %q", key, want)
 	}
-	if parts := strings.Split(key, "|"); len(parts) != 3 {
-		t.Errorf("the inbox would not unpack %q", key)
+	parts := strings.Split(key, "|")
+	if len(parts) < 3 {
+		t.Fatalf("the inbox would not unpack %q", key)
+	}
+	if parts[0] != "supply" || parts[1] != "/supplies" || parts[2] != "2026-09-05" {
+		t.Errorf("the inbox would read %q wrongly", key)
+	}
+}
+
+// Three sends in a day have to be three different claims, or the afternoon and
+// the night are silently swallowed by the morning's row.
+func TestRoundupKeyDiffersPerHour(t *testing.T) {
+	group := roundups(supplies(1), nil)[0]
+	day := time.Date(2026, 9, 5, 0, 0, 0, 0, time.UTC)
+	seen := map[string]bool{}
+	for _, hour := range []int{7, 15, 21} {
+		seen[roundupKey(group, day.Add(time.Duration(hour)*time.Hour))] = true
+	}
+	if len(seen) != 3 {
+		t.Fatalf("got %d distinct keys, want 3: %v", len(seen), seen)
+	}
+}
+
+/*
+The test button must not be able to spend the morning's claim, or pressing it
+at six would make seven o'clock go quiet — which is the whole reason the test
+used to leave no trace at all.
+
+It must also still land in the inbox readably: right kind, right link, marked
+as the drill it was.
+*/
+func TestTestKeyIsItsOwnClaimAndReadsAsATest(t *testing.T) {
+	at := time.Date(2026, 9, 5, 15, 40, 0, 0, time.UTC)
+	group := roundups(supplies(1), nil)[0]
+
+	real := roundupKey(group, at)
+	drill := testKey(group.baseKey(at), at)
+	if real == drill {
+		t.Fatalf("a test would claim the real slot: %q", drill)
+	}
+
+	kind, url, dueOn, test := unpackNoticeKey(drill)
+	if kind != "supply" || url != "/supplies" || dueOn != "2026-09-05" {
+		t.Errorf("the inbox would read %q as %q %q %q", drill, kind, url, dueOn)
+	}
+	if !test {
+		t.Errorf("%q did not read as a test", drill)
+	}
+
+	// The hour that follows a real roundup is a number, and must never be
+	// mistaken for the marker.
+	if _, _, _, test := unpackNoticeKey(real); test {
+		t.Errorf("%q read as a test", real)
+	}
+}
+
+// Pressing test twice is two presses, and the second one has to show up.
+func TestTestKeyDiffersPerMinute(t *testing.T) {
+	at := time.Date(2026, 9, 5, 15, 40, 0, 0, time.UTC)
+	base := roundups(supplies(1), nil)[0].baseKey(at)
+	if testKey(base, at) == testKey(base, at.Add(time.Minute)) {
+		t.Fatal("a minute later claimed the same row")
 	}
 }
 

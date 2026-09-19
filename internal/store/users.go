@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 )
 
@@ -26,6 +27,42 @@ func (s *Store) CountUsers(ctx context.Context) (int, error) {
 	var n int
 	err := s.pool.QueryRow(ctx, `select count(*) from users`).Scan(&n)
 	return n, err
+}
+
+// NavFavorites is the account's starred nav destinations, an ordered list of nav
+// keys. Kept as JSON in a text column: a short list read and written whole, where
+// a table of its own would be more machinery than it earns.
+func (s *Store) NavFavorites(ctx context.Context, userID int64) ([]string, error) {
+	var raw string
+	if err := s.pool.QueryRow(ctx,
+		`select nav_favorites from users where id = $1`, userID).Scan(&raw); err != nil {
+		return nil, norm(err)
+	}
+	if strings.TrimSpace(raw) == "" {
+		return []string{}, nil
+	}
+	var keys []string
+	if err := json.Unmarshal([]byte(raw), &keys); err != nil {
+		// A value that will not parse is treated as none, not an error: this is a
+		// convenience, not a record worth failing a page load over.
+		return []string{}, nil
+	}
+	return keys, nil
+}
+
+// SetNavFavorites replaces the whole list, since that is how it is toggled: the
+// client sends the list it wants after each star.
+func (s *Store) SetNavFavorites(ctx context.Context, userID int64, keys []string) error {
+	if keys == nil {
+		keys = []string{}
+	}
+	raw, err := json.Marshal(keys)
+	if err != nil {
+		return err
+	}
+	_, err = s.pool.Exec(ctx,
+		`update users set nav_favorites = $1 where id = $2`, string(raw), userID)
+	return err
 }
 
 // UpsertUser creates the account or resets its password. Used by the boot-time

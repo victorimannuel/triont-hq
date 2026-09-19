@@ -10,40 +10,18 @@ import {
 } from 'react-router-dom'
 import {
   Bell,
-  Calendar as CalendarIcon,
   Eye,
   EyeOff,
-  FileText,
-  FolderGit2,
-  House,
-  KeyRound,
   Languages,
-  Activity,
   Loader2,
   LogOut,
-  ListTodo,
   Menu,
   Search,
-  ShoppingCart,
-  ListMusic,
-  NotebookPen,
-  Repeat2,
-  Music,
   Monitor as MonitorIcon,
   Moon,
-  Package,
-  PenLine,
-  PiggyBank,
-  Receipt,
-  Server,
   Sun,
   ShieldCheck,
-  ShoppingBasket,
-  Timer as TimerIcon,
   Trash2,
-  UserRound,
-  Users,
-  Wallet,
 } from 'lucide-react'
 
 import { api } from '@/api'
@@ -81,8 +59,12 @@ import {
 import { ConfirmProvider } from '@/components/confirm'
 import { Logo } from '@/components/Logo'
 import { TimerPill } from '@/components/TimerPill'
+import { WorkPill } from '@/components/WorkPill'
 import { notifyAlarm, playAlarm } from '@/lib/alarm'
 import { refreshUnread, useUnread } from '@/lib/notices'
+import { refreshRunning } from '@/lib/running'
+import { syncFavs, useFavs } from '@/lib/favnav'
+import { NAV, NAV_GROUPS, PRIMARY, TABS, type NavItem } from '@/nav'
 import { clock, setRingHandler, useTimerAlarm } from '@/lib/timer'
 import { Toaster } from '@/components/ui/sonner'
 import { cn } from '@/lib/utils'
@@ -109,16 +91,22 @@ const BelongingForm = lazy(() => import('@/pages/BelongingForm'))
 const People = lazy(() => import('@/pages/People'))
 const PersonForm = lazy(() => import('@/pages/PersonForm'))
 const Calendar = lazy(() => import('@/pages/Calendar'))
+const CalendarEventForm = lazy(() => import('@/pages/CalendarEventForm'))
 const Income = lazy(() => import('@/pages/Income'))
 const IncomeForm = lazy(() => import('@/pages/IncomeForm'))
 const Expenses = lazy(() => import('@/pages/Expenses'))
 const Budget = lazy(() => import('@/pages/Budget'))
 const ExpenseForm = lazy(() => import('@/pages/ExpenseForm'))
+const Tracker = lazy(() => import('@/pages/Tracker'))
+const TrackerForm = lazy(() => import('@/pages/TrackerForm'))
+const TrackerCompanies = lazy(() => import('@/pages/TrackerCompanies'))
+const Partner = lazy(() => import('@/pages/Partner'))
 const Trash = lazy(() => import('@/pages/Trash'))
 const Notices = lazy(() => import('@/pages/Notices'))
 const Tasks = lazy(() => import('@/pages/Tasks'))
 const Songs = lazy(() => import('@/pages/Songs'))
 const SongSheet = lazy(() => import('@/pages/SongSheet'))
+const Tuner = lazy(() => import('@/pages/Tuner'))
 const SongForm = lazy(() => import('@/pages/SongForm'))
 const Journal = lazy(() => import('@/pages/Journal'))
 const Habits = lazy(() => import('@/pages/Habits'))
@@ -126,6 +114,11 @@ const HabitCheckin = lazy(() => import('@/pages/HabitCheckin'))
 const HabitForm = lazy(() => import('@/pages/HabitForm'))
 const Setlists = lazy(() => import('@/pages/Setlists'))
 const SetlistPlay = lazy(() => import('@/pages/SetlistPlay'))
+const Work = lazy(() => import('@/pages/Work'))
+const WorkMonth = lazy(() => import('@/pages/WorkMonth'))
+const Meals = lazy(() => import('@/pages/Meals'))
+const MealForm = lazy(() => import('@/pages/MealForm'))
+const Foods = lazy(() => import('@/pages/Foods'))
 const Supplies = lazy(() => import('@/pages/Supplies'))
 const SupplyForm = lazy(() => import('@/pages/SupplyForm'))
 const Monitor = lazy(() => import('@/pages/Monitor'))
@@ -153,12 +146,24 @@ const emptyMeta: Meta = {
   maintenance_kinds: [],
   supply_categories: [],
   supply_units: [],
+  meal_kinds: [],
   song_parts: [],
   budget_buckets: [],
+  tracker_priorities: [],
+  tracker_projects: [],
+  tracker_owners: [],
+  tracker_statuses: [],
+  tracker_companies: [],
 }
 
 const MetaContext = createContext<Meta>(emptyMeta)
 export const useMeta = () => useContext(MetaContext)
+
+// Meta is fetched once at sign-in, but some of it is now editable — the tracker's
+// companies live in a table. A page that changes such a list calls this to pull a
+// fresh copy, so its dropdowns and pills update without a full reload.
+const MetaRefreshContext = createContext<() => void>(() => {})
+export const useRefreshMeta = () => useContext(MetaRefreshContext)
 
 const THEME_ICONS = { system: MonitorIcon, light: Sun, dark: Moon } as const
 
@@ -184,8 +189,17 @@ export default function App() {
       .finally(() => setChecking(false))
   }, [])
 
+  const refreshMeta = useCallback(() => {
+    api.meta().then(setMeta).catch(() => undefined)
+  }, [])
+
   useEffect(() => {
-    if (session) api.meta().then(setMeta).catch(() => setMeta(emptyMeta))
+    if (session) {
+      api.meta().then(setMeta).catch(() => setMeta(emptyMeta))
+      // Pull the account's starred pages down, so the same favourites show up
+      // here as on any other device the moment you sign in.
+      void syncFavs()
+    }
   }, [session])
 
   // The alarm belongs to the app rather than to the timer page: a countdown
@@ -238,7 +252,9 @@ export default function App() {
       <ConfirmProvider>
       {session ? (
         <MetaContext.Provider value={meta}>
-          <Shell email={session.email} menus={menus} onSignOut={() => setSession(null)} />
+          <MetaRefreshContext.Provider value={refreshMeta}>
+            <Shell email={session.email} menus={menus} onSignOut={() => setSession(null)} />
+          </MetaRefreshContext.Provider>
         </MetaContext.Provider>
       ) : (
         <Login onDone={setSession} menus={menus} />
@@ -310,59 +326,30 @@ function LangMenu({ lang, onPick }: { lang: Lang; onPick: (l: Lang) => void }) {
   )
 }
 
-// Grouped for the sidebar; flattened for the phone's bottom bar. Nine
-// destinations is where a row of tabs stops working and a sidebar starts.
-const NAV_GROUPS = [
-  {
-    label: '',
-    items: [
-      { to: '/', key: 'home', icon: House, end: true },
-      { to: '/notes', key: 'notes', icon: PenLine, end: false },
-      { to: '/todo', key: 'todo', icon: ListTodo, end: false },
-      { to: '/habits', key: 'habits', icon: Repeat2, end: false },
-      { to: '/journal', key: 'journal', icon: NotebookPen, end: false },
-      { to: '/calendar', key: 'calendar', icon: CalendarIcon, end: false },
-      { to: '/notices', key: 'notices', icon: Bell, end: false },
-      { to: '/timer', key: 'timer', icon: TimerIcon, end: false },
-    ],
-  },
-  {
-    label: 'nav.group.work',
-    items: [
-      { to: '/projects', key: 'projects', icon: FolderGit2, end: false },
-      { to: '/clients', key: 'clients', icon: Users, end: false },
-      { to: '/assets', key: 'assets', icon: Server, end: false },
-      { to: '/credentials', key: 'credentials', icon: KeyRound, end: false },
-      { to: '/income', key: 'income', icon: Wallet, end: false },
-      { to: '/expenses', key: 'expenses', icon: Receipt, end: false },
-      { to: '/monitor', key: 'monitor', icon: Activity, end: false },
-    ],
-  },
-  {
-    label: 'nav.group.personal',
-    items: [
-      { to: '/budget', key: 'budget', icon: PiggyBank, end: false },
-      { to: '/documents', key: 'documents', icon: FileText, end: false },
-      { to: '/belongings', key: 'belongings', icon: Package, end: false },
-      { to: '/shopping', key: 'shopping', icon: ShoppingCart, end: false },
-      { to: '/supplies', key: 'supplies', icon: ShoppingBasket, end: false },
-      { to: '/people', key: 'people', icon: UserRound, end: false },
-      { to: '/songs', key: 'songs', icon: Music, end: false },
-      { to: '/setlists', key: 'setlists', icon: ListMusic, end: false },
-    ],
-  },
-]
-
-const NAV = NAV_GROUPS.flatMap((group) => group.items)
-
-// Eleven tabs do not fit a phone, and a bar you have to scroll sideways hides
-// half of itself. Three live in the bar, search takes the middle, and the rest
-// are one tap away in a drawer. Search earns the centre because it is the only
-// one that does something rather than going somewhere — and it reaches every
-// module anyway, which is why credentials no longer needs a tab of its own.
-const PRIMARY = ['home', 'calendar', 'habits']
-const TABS_LEFT = NAV.filter((item) => item.key === 'home' || item.key === 'calendar')
-const TABS_RIGHT = NAV.filter((item) => item.key === 'habits')
+// One row in the desktop sidebar. Favouriting lives in the page header now, so
+// the row is just the link; the same component draws the Favourites list up top
+// and the full groups below it.
+function SidebarLink({ item, unread }: { item: NavItem; unread: number }) {
+  const { t } = useT()
+  return (
+    <NavLink
+      to={item.to}
+      end={item.end}
+      className={({ isActive }) =>
+        cn(
+          'flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+          isActive
+            ? 'bg-secondary text-secondary-foreground'
+            : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground',
+        )
+      }
+    >
+      <item.icon className="size-4 shrink-0" />
+      <span className="flex-1 truncate">{t(`nav.${item.key}`)}</span>
+      {item.key === 'notices' && unread > 0 && <Badge>{unread}</Badge>}
+    </NavLink>
+  )
+}
 
 function Shell({
   email,
@@ -378,8 +365,18 @@ function Shell({
   const { t } = useT()
   const [drawer, setDrawer] = useState(false)
   const [finder, setFinder] = useState(false)
+  // Shared with the page header, where the star lives: toggling it there lights
+  // up the Favourites list here in the same frame.
+  const favs = useFavs()
   const unread = useUnread()
   useDisguise()
+
+  // The starred destinations, resolved to nav items in the order they were
+  // starred; a key left over from a renamed page simply drops out.
+  const favItems = favs
+    .map((key) => NAV.find((item) => item.key === key))
+    .filter((item): item is NavItem => Boolean(item))
+
   const hidden = disguisedAt(location.pathname)
 
   // Re-counted on every page change rather than on a timer: the badge only has
@@ -387,6 +384,9 @@ function Shell({
   // a page has just arrived.
   useEffect(() => {
     void refreshUnread()
+    // Same reasoning for the clocks: the pill counts up on its own from the
+    // start time, so it only has to be told what is running when you move.
+    void refreshRunning()
   }, [location.pathname])
 
   // The frosting on attachments is a stylesheet rule hanging off the root, and
@@ -479,6 +479,19 @@ function Shell({
         </button>
 
         <nav className="flex-1 overflow-y-auto p-3">
+          {/* The starred pages, up top. Only when there is at least one — an
+              empty heading is just noise. The star that fills this lives in the
+              page header now, next to the eye. */}
+          {favItems.length > 0 && (
+            <div className="mb-5">
+              <div className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {t('nav.group.favorites')}
+              </div>
+              {favItems.map((item) => (
+                <SidebarLink key={item.to} item={item} unread={unread} />
+              ))}
+            </div>
+          )}
           {NAV_GROUPS.map((group, index) => (
             <div key={group.label || index} className={index > 0 ? 'mt-5' : ''}>
               {group.label && (
@@ -487,23 +500,7 @@ function Shell({
                 </div>
               )}
               {group.items.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.end}
-                  className={({ isActive }) =>
-                    cn(
-                      'flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                      isActive
-                        ? 'bg-secondary text-secondary-foreground'
-                        : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground',
-                    )
-                  }
-                >
-                  <item.icon className="size-4 shrink-0" />
-                  <span className="flex-1">{t(`nav.${item.key}`)}</span>
-                  {item.key === 'notices' && unread > 0 && <Badge>{unread}</Badge>}
-                </NavLink>
+                <SidebarLink key={item.to} item={item} unread={unread} />
               ))}
             </div>
           ))}
@@ -524,14 +521,44 @@ function Shell({
           </Link>
           <div className="ml-auto flex items-center gap-1">
             <TimerPill />
+            {/* Where a magnifier is looked for. It used to be the raised
+                button in the bottom bar; that spot now goes to a place you
+                actually visit, and this is the more findable home anyway. */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setFinder(true)}
+              aria-label={t('search.open')}
+            >
+              <Search className="size-4" />
+            </Button>
+            {/* Beside the magnifier, because both are things you do now —
+                language, theme and the account are settings you touch once.
+                The bell before the account is also where every other app puts
+                it, so it costs nobody a moment's looking.
+
+                It carries the number rather than a dot: "3 waiting" is worth
+                opening for and "something is waiting" is not. */}
+            <Button variant="ghost" size="icon" asChild aria-label={t('nav.notices')}>
+              <Link to="/notices" className="relative">
+                <Bell className="size-4" />
+                {unread > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-medium leading-none text-primary-foreground">
+                    {unread > 99 ? '99+' : unread}
+                  </span>
+                )}
+              </Link>
+            </Button>
             {menus}
             {userMenu}
           </div>
         </div>
       </header>
 
-      {/* pb leaves room for the bottom tab bar plus the phone's home indicator. */}
-      <main className="pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-8 md:pb-16 md:pl-56">
+      {/* pb leaves room for the bottom tab bar plus the phone's home indicator.
+          Shorter than it was: the bar used to have a button standing proud of
+          it, and the extra room that needed is now just a gap. */}
+      <main className="pb-[calc(4.5rem+env(safe-area-inset-bottom))] pt-8 md:pb-16 md:pl-56">
         <div className="mx-auto max-w-5xl px-4 md:px-8">
           {/* One boundary for every route: the spinner shows only while a page
               chunk is in flight, which is the first visit and never again. */}
@@ -555,6 +582,9 @@ function Shell({
               <Route path="/documents/new" element={<DocumentForm />} />
               <Route path="/documents/:id" element={<DocumentForm />} />
               <Route path="/calendar" element={<Calendar />} />
+              {/* Literal 'new' beats the :id below, so it cannot be read as an id. */}
+              <Route path="/calendar/new" element={<CalendarEventForm />} />
+              <Route path="/calendar/:id" element={<CalendarEventForm />} />
               <Route path="/belongings" element={<Belongings />} />
               <Route path="/belongings/new" element={<BelongingForm />} />
               <Route path="/belongings/:id" element={<BelongingForm />} />
@@ -568,12 +598,25 @@ function Shell({
               <Route path="/expenses" element={<Expenses />} />
               <Route path="/expenses/new" element={<ExpenseForm />} />
               <Route path="/expenses/:id" element={<ExpenseForm />} />
+              <Route path="/tracker" element={<Tracker />} />
+              <Route path="/tracker/new" element={<TrackerForm />} />
+              {/* A literal segment, so it beats :id and cannot be read as a task. */}
+              <Route path="/tracker/companies" element={<TrackerCompanies />} />
+              <Route path="/tracker/:id" element={<TrackerForm />} />
+              <Route path="/pasangan" element={<Partner />} />
               <Route path="/supplies" element={<Supplies />} />
             <Route path="/supplies/new" element={<SupplyForm />} />
             <Route path="/supplies/:id" element={<SupplyForm />} />
             {/* One page, two lists. The key remounts it on the way across, so
                 the other list never flashes up under this one's heading. */}
             <Route path="/journal" element={<Journal />} />
+            <Route path="/waktu" element={<Work />} />
+            {/* The month sits under the log because it reads from it. */}
+            <Route path="/waktu/bulan" element={<WorkMonth />} />
+            <Route path="/makan" element={<Meals />} />
+            {/* The food table sits under the log because it exists for it. */}
+            <Route path="/makan/daftar" element={<Foods />} />
+            <Route path="/makan/:id" element={<MealForm />} />
             <Route path="/habits" element={<Habits />} />
             {/* Where the evening notification lands. A literal segment, so
                 it beats :id and cannot be read as a habit. */}
@@ -586,6 +629,7 @@ function Shell({
             {/* The chart is what gets opened; editing it is the rarer trip, so
                 it is the one that takes the longer path. */}
             <Route path="/songs/:id" element={<SongSheet />} />
+            <Route path="/tuner" element={<Tuner />} />
             <Route path="/songs/:id/edit" element={<SongForm />} />
             <Route path="/notes" element={<Tasks key="note" kind="note" />} />
           <Route path="/todo" element={<Tasks key="todo" kind="todo" />} />
@@ -603,43 +647,16 @@ function Shell({
 
       <SearchPalette open={finder} onOpenChange={setFinder} />
 
+      {/* Floats over everything for as long as a clock is going, and is not
+          there at all otherwise. */}
+      <WorkPill />
+
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+        {/* Five equal tabs. Nothing is raised any more: the lifted shape said
+            "this one is an action, not a place", and every one of these is a
+            place. */}
         <div className="flex items-end">
-          {TABS_LEFT.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) =>
-                cn(
-                  'flex flex-1 flex-col items-center gap-1 px-1 py-2.5 text-[10px] font-medium transition-colors',
-                  isActive ? 'text-primary' : 'text-muted-foreground',
-                )
-              }
-            >
-              <item.icon className="size-5" />
-              <span className="w-full truncate text-center">{t(`nav.${item.key}`)}</span>
-            </NavLink>
-          ))}
-
-          {/* Lifted out of the bar so the thumb's easiest reach goes to the one
-              control that gets you anywhere at all. It keeps a label like every
-              other tab: without one it reads as a stray blob rather than part
-              of the bar. */}
-          <button
-            type="button"
-            onClick={() => setFinder(true)}
-            className="-mt-6 flex flex-1 flex-col items-center gap-1 px-1 pb-2.5 transition-transform active:scale-95"
-          >
-            <span className="flex size-14 items-center justify-center rounded-2xl border-4 border-background bg-primary text-primary-foreground shadow-lg shadow-primary/30">
-              <Search className="size-6" />
-            </span>
-            <span className="w-full truncate text-center text-[10px] font-medium text-muted-foreground">
-              {t('search.tab')}
-            </span>
-          </button>
-
-          {TABS_RIGHT.map((item) => (
+          {TABS.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -678,6 +695,35 @@ function Shell({
             <SheetContent side="right" className="p-0">
               <SheetTitle className="border-b px-4 py-4">{t('nav.more')}</SheetTitle>
               <nav className="flex-1 overflow-y-auto p-3">
+                {/* Starred pages first, the same as the desktop sidebar, so a
+                    favourite is one tap away from the phone too. */}
+                {favItems.length > 0 && (
+                  <div className="mb-5">
+                    <div className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      {t('nav.group.favorites')}
+                    </div>
+                    {favItems.map((item) => (
+                      <NavLink
+                        key={item.to}
+                        to={item.to}
+                        end={item.end}
+                        onClick={() => setDrawer(false)}
+                        className={({ isActive }) =>
+                          cn(
+                            'flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                            isActive
+                              ? 'bg-secondary text-secondary-foreground'
+                              : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground',
+                          )
+                        }
+                      >
+                        <item.icon className="size-4" />
+                        <span className="flex-1">{t(`nav.${item.key}`)}</span>
+                        {item.key === 'notices' && unread > 0 && <Badge>{unread}</Badge>}
+                      </NavLink>
+                    ))}
+                  </div>
+                )}
                 {NAV_GROUPS.map((group, index) => {
                   const items = group.items.filter((item) => !PRIMARY.includes(item.key))
                   if (!items.length) return null

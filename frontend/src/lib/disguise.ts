@@ -137,6 +137,9 @@ const HIDE = new Set([
   // Free-typed text, including the unit he types on a habit: "pasal" says
   // what the habit is as plainly as its name does.
   'notes', 'summary', 'detail', 'description', 'subtitle', 'line', 'unit',
+  // A bare list of names rather than a list of records: the habits still open
+  // tonight, which the home page prints as they are.
+  'habits_left',
 ])
 
 /*
@@ -175,6 +178,11 @@ function walk(value: unknown): unknown {
       if (item === '') out[key] = item
       else if (key === 'url') out[key] = link(item)
       else out[key] = HIDE.has(key) ? cover(item) : item
+    } else if (HIDE.has(key) && Array.isArray(item)) {
+      // A hidden key holding bare strings rather than records. Walking into it
+      // would look at every string under its own key, and there is not one —
+      // so the cover has to be applied from out here.
+      out[key] = item.map((one) => (typeof one === 'string' && one !== '' ? cover(one) : walk(one)))
     } else {
       out[key] = walk(item)
     }

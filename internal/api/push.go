@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -160,6 +161,7 @@ func (s *Server) handleTestPush(w http.ResponseWriter, r *http.Request) {
 	// would leave out the half that identifies it.
 	lines := []string{}
 	sent := 0
+	now := time.Now()
 
 	for _, due := range s.dueNow(r.Context()) {
 		sent += s.pushEach(r.Context(), subs, func(lang string) payload {
@@ -167,6 +169,7 @@ func (s *Server) handleTestPush(w http.ResponseWriter, r *http.Request) {
 		})
 		shown := eventPayload(due, here)
 		lines = append(lines, shown.Title+" — "+shown.Body)
+		s.noteTest(r.Context(), due.Key, due.Label, now)
 	}
 
 	low, _ := s.store.LowSupplies(r.Context())
@@ -177,6 +180,7 @@ func (s *Server) handleTestPush(w http.ResponseWriter, r *http.Request) {
 		})
 		shown := roundupPayload(group, here)
 		lines = append(lines, shown.Title+" — "+shown.Body)
+		s.noteTest(r.Context(), group.baseKey(now), strings.Join(group.Names, ", "), now)
 	}
 
 	// A quiet morning still has to prove the path works, so it says so.
@@ -190,6 +194,9 @@ func (s *Server) handleTestPush(w http.ResponseWriter, r *http.Request) {
 			}
 		})
 		lines = append(lines, textNothingDue(here))
+		// No kind of its own in the calendar, because nothing is due — this
+		// row is only ever the drill saying the wiring works.
+		s.noteTest(r.Context(), "test|/supplies|"+now.Format("2006-01-02"), textNothingDue(defaultLang), now)
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -198,6 +205,33 @@ func (s *Server) handleTestPush(w http.ResponseWriter, r *http.Request) {
 		"notices": len(lines),
 		"preview": strings.Join(lines, "\n"),
 	})
+}
+
+/*
+testKey is the key the real thing would have used, with a marker on the end.
+
+Two things come out of that. The inbox still files the row under the right
+kind and the right link, because it reads the first three fields and the
+marker sits past them. And the morning keeps its claim: pressing test is not
+the same key as the seven o'clock run, so it cannot make tomorrow go quiet.
+
+The clock is in the marker because pressing test is a deliberate act and
+seeing it arrive is the point. Twice in one minute is one row; that is what a
+double tap means.
+*/
+func testKey(base string, at time.Time) string {
+	return base + "|test-" + at.Format("1504")
+}
+
+// noteTest files a test notification in the inbox. Failing to file one is
+// worth a line in the log and nothing more: the notification itself has
+// already gone out, which is what the button was pressed for.
+func (s *Server) noteTest(ctx context.Context, base, label string, at time.Time) {
+	y, m, d := at.Date()
+	day := time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+	if _, err := s.store.ClaimEventNotice(ctx, testKey(base, at), label, day); err != nil {
+		s.log.Error("claim test notice", "err", err)
+	}
 }
 
 // pushEach sends each device the wording of the language it subscribed in.
@@ -302,6 +336,13 @@ func (s *Server) RunReminders(ctx context.Context, hour int) {
 			if now.Hour() == s.cfg.HabitHour {
 				s.announceHabits(ctx)
 			}
+			// The shopping list is asked about more than once. It is the one
+			// roundup answered away from a screen, and seven in the morning is
+			// not when anybody passes a shop. Each hour claims its own slot,
+			// so this does not depend on the digest having run.
+			if slices.Contains(s.cfg.SupplyHours, now.Hour()) {
+				s.announceRoundup(ctx, "supply", now)
+			}
 			if now.Hour() != hour {
 				continue
 			}
@@ -313,10 +354,10 @@ func (s *Server) RunReminders(ctx context.Context, hour int) {
 			if !claimed {
 				continue
 			}
-			// Dated things get one notification each; the roundups below are
-			// left with what has no date — what has run out, what is broken.
+			// Dated things get one notification each; what is broken has no
+			// date and goes out as a roundup beside them.
 			s.announceDueEvents(ctx)
-			s.announceRoundups(ctx)
+			s.announceRoundup(ctx, "trouble", now)
 		}
 	}
 }
@@ -482,28 +523,52 @@ func roundupPayload(r roundup, lang string) payload {
 	}
 }
 
-// roundupKey is the shape noticeKey builds, so the inbox unpacks a roundup the
-// same way it unpacks a deadline.
-func roundupKey(r roundup, day time.Time) string {
-	return fmt.Sprintf("%s|%s|%s", r.Kind, r.URL, day.Format("2006-01-02"))
+/*
+roundupKey is the shape noticeKey builds, so the inbox unpacks a roundup the
+same way it unpacks a deadline — plus the hour it went out.
+
+The hour is what lets a roundup speak more than once a day: the claim is on
+the key, so each slot claims separately while a restart inside one slot still
+cannot say the same thing twice. The inbox reads the first three fields and
+ignores the rest, so the extra one costs it nothing.
+*/
+func roundupKey(r roundup, at time.Time) string {
+	return fmt.Sprintf("%s|%d", r.baseKey(at), at.Hour())
 }
 
-// announceRoundups sends what has no date on it. Each half is claimed the way
-// a deadline is, so it lands in the inbox as its own row with its own link and
-// a restart mid-morning cannot say it twice.
-func (s *Server) announceRoundups(ctx context.Context) {
-	low, err := s.store.LowSupplies(ctx)
-	if err != nil {
-		s.log.Error("roundup supplies", "err", err)
-		return
-	}
-	trouble, err := s.store.Trouble(ctx)
-	if err != nil {
-		s.log.Error("roundup trouble", "err", err)
-		return
-	}
+// baseKey is what it is and where it goes, on a day: the three fields the
+// inbox reads. The hour above and the test marker below both hang off it.
+func (r roundup) baseKey(at time.Time) string {
+	return fmt.Sprintf("%s|%s|%s", r.Kind, r.URL, at.Format("2006-01-02"))
+}
 
-	groups := roundups(low, trouble)
+/*
+announceRoundup sends one kind of dateless news: what has run out, or what is
+broken. It is claimed the way a deadline is, so it lands in the inbox as its
+own row with its own link.
+
+One kind at a time because they no longer keep the same hours — the shopping
+list goes out three times a day and the broken things once, with the morning
+digest.
+*/
+func (s *Server) announceRoundup(ctx context.Context, kind string, at time.Time) {
+	var groups []roundup
+	switch kind {
+	case "supply":
+		low, err := s.store.LowSupplies(ctx)
+		if err != nil {
+			s.log.Error("roundup supplies", "err", err)
+			return
+		}
+		groups = roundups(low, nil)
+	case "trouble":
+		trouble, err := s.store.Trouble(ctx)
+		if err != nil {
+			s.log.Error("roundup trouble", "err", err)
+			return
+		}
+		groups = roundups(nil, trouble)
+	}
 	if len(groups) == 0 {
 		return
 	}
@@ -514,14 +579,14 @@ func (s *Server) announceRoundups(ctx context.Context) {
 		return
 	}
 
-	y, m, d := time.Now().Date()
+	y, m, d := at.Date()
 	day := time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 
 	for _, group := range groups {
 		// The whole list, not the three the phone had room for. The inbox is
 		// read on a screen that can scroll.
 		label := strings.Join(group.Names, ", ")
-		claimed, err := s.store.ClaimEventNotice(ctx, roundupKey(group, day), label, day)
+		claimed, err := s.store.ClaimEventNotice(ctx, roundupKey(group, at), label, day)
 		if err != nil {
 			s.log.Error("claim roundup", "kind", group.Kind, "err", err)
 			continue

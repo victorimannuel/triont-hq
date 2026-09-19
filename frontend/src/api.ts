@@ -7,6 +7,18 @@ import type {
   ContactInput,
   Credential,
   CredentialInput,
+  DayTotal,
+  DayWork,
+  Food,
+  FoodInput,
+  ProjectPart,
+  ProjectWork,
+  TimeEntry,
+  TimeEntryInput,
+  GuessedItem,
+  Meal,
+  MealInput,
+  Nutrition,
   Link,
   LinkInput,
   Meta,
@@ -21,12 +33,19 @@ import type {
   MoneyAccount,
   MoneyAccountInput,
   CalendarEntry,
+  CalendarEvent,
+  CalendarEventInput,
   CalendarMark,
   Document,
   DocumentInput,
   Hit,
   ExpenseInput,
   ExpenseStream,
+  TrackerCompany,
+  TrackerInput,
+  TrackerTask,
+  PartnerItem,
+  PartnerInput,
   FxRate,
   Habit,
   HabitInput,
@@ -191,6 +210,10 @@ export const api = {
   me: () => request<{ email: string }>('/auth/me'),
   meta: () => request<Meta>('/meta'),
 
+  // Starred nav destinations, kept on the account so they follow every device.
+  favorites: () => request<{ keys: string[] }>('/favorites'),
+  setFavorites: (keys: string[]) => send<void>('PUT', '/favorites', { keys }),
+
   overview: () => request<Overview>('/overview'),
 
   monitor: () =>
@@ -324,6 +347,12 @@ export const api = {
       `/calendar${suffix}`,
     )
   },
+  calendarEvent: (id: number) => request<CalendarEvent>(`/calendar-events/${id}`),
+  createCalendarEvent: (input: CalendarEventInput) =>
+    send<CalendarEvent>('POST', '/calendar-events', input),
+  updateCalendarEvent: (id: number, input: CalendarEventInput) =>
+    send<CalendarEvent>('PUT', `/calendar-events/${id}`, input),
+  deleteCalendarEvent: (id: number) => send<void>('DELETE', `/calendar-events/${id}`),
 
   income: (query: Record<string, string> = {}) => {
     const params = new URLSearchParams(
@@ -354,6 +383,32 @@ export const api = {
   updateExpense: (id: number, input: ExpenseInput) =>
     send<ExpenseStream>('PUT', `/expenses/${id}`, input),
   deleteExpense: (id: number) => send<void>('DELETE', `/expenses/${id}`),
+  tracker: (query: Record<string, string> = {}) => {
+    const params = new URLSearchParams(
+      Object.entries(query).filter(([, value]) => value !== ''),
+    )
+    const suffix = params.toString() ? `?${params}` : ''
+    return request<{ tasks: TrackerTask[] }>(`/tracker${suffix}`)
+  },
+  trackerTask: (id: number) => request<TrackerTask>(`/tracker/${id}`),
+  createTracker: (input: TrackerInput) => send<TrackerTask>('POST', '/tracker', input),
+  updateTracker: (id: number, input: TrackerInput) =>
+    send<TrackerTask>('PUT', `/tracker/${id}`, input),
+  deleteTracker: (id: number) => send<void>('DELETE', `/tracker/${id}`),
+
+  // The editable company list behind the tracker's pills and its company field.
+  trackerCompanies: () => request<{ companies: TrackerCompany[] }>('/tracker-companies'),
+  createTrackerCompany: (name: string) =>
+    send<TrackerCompany>('POST', '/tracker-companies', { name }),
+  updateTrackerCompany: (id: number, name: string) =>
+    send<TrackerCompany>('PUT', `/tracker-companies/${id}`, { name }),
+  deleteTrackerCompany: (id: number) => send<void>('DELETE', `/tracker-companies/${id}`),
+
+  partnerItems: () => request<{ items: PartnerItem[] }>('/partner-items'),
+  createPartnerItem: (input: PartnerInput) => send<PartnerItem>('POST', '/partner-items', input),
+  updatePartnerItem: (id: number, input: PartnerInput) =>
+    send<PartnerItem>('PUT', `/partner-items/${id}`, input),
+  deletePartnerItem: (id: number) => send<void>('DELETE', `/partner-items/${id}`),
 
   journal: (days = 30) => request<{ journal: JournalDay[] }>(`/journal?days=${days}`),
   journalDay: (on: string) => request<JournalDay>(`/journal/${on}`),
@@ -371,6 +426,7 @@ export const api = {
   setHabitDay: (id: number, on: string, done: boolean, amount?: number) =>
     send<void>('POST', `/habits/${id}/day`, { on, done, amount: amount ?? 0 }),
   deleteHabit: (id: number) => send<void>('DELETE', `/habits/${id}`),
+  reorderHabits: (ids: number[]) => send<void>('POST', '/habits/order', { ids }),
 
   // Budgeting. The month is a query string on every one of these, so they are
   // all the same URL with a different ?month=YYYY-MM.
@@ -462,6 +518,55 @@ export const api = {
     send<Supply>('POST', `/supplies/${id}/adjust`, body),
   deleteSupply: (id: number) => send<void>('DELETE', `/supplies/${id}`),
 
+  foods: (query = '') =>
+    request<{ foods: Food[] }>(`/foods${query ? `?q=${encodeURIComponent(query)}` : ''}`),
+  createFood: (input: FoodInput) => send<Food>('POST', '/foods', input),
+  updateFood: (id: number, input: FoodInput) => send<Food>('PUT', `/foods/${id}`, input),
+  deleteFood: (id: number) => send<void>('DELETE', `/foods/${id}`),
+
+  /** One day's plates and the week behind them: the page shows both. */
+  meals: (on: string, days = 7) =>
+    request<{ on: string; meals: Meal[]; totals: Nutrition; days: DayTotal[] }>(
+      `/meals?on=${on}&days=${days}`,
+    ),
+  meal: (id: number) => request<Meal>(`/meals/${id}`),
+  createMeal: (input: MealInput) => send<Meal>('POST', '/meals', input),
+  updateMeal: (id: number, input: MealInput) => send<Meal>('PUT', `/meals/${id}`, input),
+  deleteMeal: (id: number) => send<void>('DELETE', `/meals/${id}`),
+  /** What the photo thinks is on the plate. Proposals only — nothing is saved. */
+  guessMeal: (id: number) => send<{ items: GuessedItem[] }>('POST', `/meals/${id}/guess`),
+
+  /** One day's work, plus the two summaries over the window behind it. The
+   *  clocks that are running come back whatever day is being looked at,
+   *  because the buttons that stop them are on every one of them. */
+  time: (on: string, days = 7) =>
+    request<{
+      on: string
+      entries: TimeEntry[]
+      running: TimeEntry[]
+      seconds: number
+      days: DayWork[]
+      projects: ProjectWork[]
+      parts: ProjectPart[]
+    }>(`/time?on=${on}&days=${days}`),
+  /** One calendar month, for the summary at the end of it. A trailing thirty
+   *  days would be easier and is not what anybody reports on. */
+  timeSummary: (month: string) =>
+    request<{
+      month: string
+      seconds: number
+      worked: number
+      days: DayWork[]
+      projects: ProjectWork[]
+    }>(`/time/summary?month=${month}`),
+  /** Just the clocks that are ticking, for the pill in the shell. */
+  timeRunning: () => request<{ running: TimeEntry[] }>('/time/running'),
+  startTime: (input: TimeEntryInput) => send<TimeEntry>('POST', '/time/start', input),
+  stopTime: (id: number) => send<TimeEntry>('POST', `/time/${id}/stop`),
+  createTime: (input: TimeEntryInput) => send<TimeEntry>('POST', '/time', input),
+  updateTime: (id: number, input: TimeEntryInput) => send<TimeEntry>('PUT', `/time/${id}`, input),
+  deleteTime: (id: number) => send<void>('DELETE', `/time/${id}`),
+
   /** Counts and cover images together: one call, because the page that wants
    *  one always wants the other. */
   attachmentCounts: (entity: string) =>
@@ -488,6 +593,9 @@ export const api = {
   // A plain link: the browser fetches it with the session cookie, and the
   // response is never cached because it is decrypted personal data.
   downloadUrl: (id: number) => `/api/files/${id}/download`,
+  /** The title of a YouTube video, so pasting a link can fill a song in. */
+  videoTitle: (url: string) =>
+    request<{ title: string; artist: string }>(`/video-title?url=${encodeURIComponent(url)}`),
   reorderAttachments: (entity: string, id: number, ids: number[]) =>
     send<void>('PUT', `/files/${entity}/${id}/order`, { ids }),
   deleteAttachment: (id: number) => send<void>('DELETE', `/files/${id}`),
