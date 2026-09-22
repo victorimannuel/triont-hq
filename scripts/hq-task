@@ -35,7 +35,7 @@ usage: hq-task "task text" [flags]
   --owner    kevin|victor|jaffy|unassigned (default unassigned)
   --status   todo|in_progress|needs_check|done|blocked|on_hold (default todo)
   --area     TEXT
-  --env      local|dev|staging|production
+  --env      local|dev|staging|production   (accepted for compatibility; NOT stored: table has no environment column)
   --next     TEXT     (next step)
   --comment  TEXT
   --by       TEXT     (created_by, default victor@triont.id)
@@ -73,9 +73,9 @@ case "$environment" in ""|local|dev|staging|production) ;; *) environment="" ;; 
 q() { printf "%s" "$1" | sed "s/'/''/g"; }
 
 sql="insert into tracker_tasks
-  (task, priority, area, owner, status, environment, next_step, comment, created_by, updated_by)
+  (task, priority, area, owner, status, next_step, comment, created_by, updated_by)
 values
-  ('$(q "$task")', '$priority', '$(q "$area")', '$owner', '$status', '$(q "$environment")', '$(q "$next")', '$(q "$comment")', '$(q "$by")', '$(q "$by")')
+  ('$(q "$task")', '$priority', '$(q "$area")', '$owner', '$status', '$(q "$next")', '$(q "$comment")', '$(q "$by")', '$(q "$by")')
 returning id, task, priority, owner, status;"
 
 if [ "$dry" -eq 1 ]; then
