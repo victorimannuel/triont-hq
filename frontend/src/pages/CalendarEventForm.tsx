@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Trash2 } from 'lucide-react'
 
 import { api } from '@/api'
@@ -30,8 +30,15 @@ export default function CalendarEventForm() {
   const navigate = useNavigate()
   const { t } = useT()
   const confirm = useConfirm()
+  const [params] = useSearchParams()
 
-  const [form, setForm] = useState<CalendarEventInput>({ title: '', on_date: today(), notes: '' })
+  // A new event opens on the day that was tapped, when one was, else today.
+  const [form, setForm] = useState<CalendarEventInput>({
+    title: '',
+    on_date: params.get('date') || today(),
+    end_on: '',
+    notes: '',
+  })
   const [loading, setLoading] = useState(editing)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -41,7 +48,12 @@ export default function CalendarEventForm() {
     api
       .calendarEvent(Number(id))
       .then((event) =>
-        setForm({ title: event.title, on_date: event.on_date.slice(0, 10), notes: event.notes }),
+        setForm({
+          title: event.title,
+          on_date: event.on_date.slice(0, 10),
+          end_on: event.end_on ? event.end_on.slice(0, 10) : '',
+          notes: event.notes,
+        }),
       )
       .catch((err) => setError(err instanceof Error ? err.message : t('common.requestFailed')))
       .finally(() => setLoading(false))
@@ -120,6 +132,17 @@ export default function CalendarEventForm() {
                 className="w-48"
                 value={form.on_date}
                 onChange={(event) => set('on_date', event.target.value)}
+              />
+            </Field>
+
+            <Field label={t('cal.event.end')} htmlFor="end" hint={t('cal.event.endHint')}>
+              <Input
+                id="end"
+                type="date"
+                className="w-48"
+                min={form.on_date}
+                value={form.end_on}
+                onChange={(event) => set('end_on', event.target.value)}
               />
             </Field>
 

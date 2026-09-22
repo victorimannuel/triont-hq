@@ -19,6 +19,9 @@ func (s *Server) readCalendarEvent(r *http.Request) (store.CalendarEventInput, s
 	if in.OnDate == "" {
 		return in, "tanggalnya wajib diisi"
 	}
+	// Optional end of a multi-day block. A blank, or a date not after the start,
+	// is handled in the store as a one-day event.
+	in.EndOn = trim(in.EndOn)
 	in.Notes = trim(in.Notes)
 	return in, ""
 }

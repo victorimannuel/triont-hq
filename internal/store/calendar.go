@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
 
@@ -16,6 +17,9 @@ type CalendarEntry struct {
 	// How many days lived, for a milestone. Zero everywhere else, which has
 	// no number to carry.
 	Count int `json:"count"`
+	// The last day of a multi-day block, for an event that spans one. Null for
+	// everything else, which lives on a single day.
+	End *time.Time `json:"end"`
 	// Set once the occurrence has been closed off, and holding whatever was
 	// written about it at the time. Empty means either not closed off or
 	// closed off without a word, which the Done flag tells apart.
@@ -111,13 +115,14 @@ func (s *Store) Calendar(ctx context.Context, from, to time.Time) ([]CalendarEnt
 		   and (c.birthday + m.n)::date between $1 and $2
 
 		union all
-		-- Events typed straight onto the calendar. Link back to the event itself,
-		-- which is the one calendar row you open to edit rather than to fix
-		-- something elsewhere.
+		-- Events typed straight onto the calendar. Emitted once, on the start day,
+		-- and any span is carried on the End field attached below; the overlap
+		-- test lets a block that began before the window still show inside it.
 		select on_date, 'event', title, coalesce(nullif(notes, ''), 'acara'),
 		       '/calendar/' || id, 0
 		  from calendar_events
-		 where deleted_at is null and on_date between $1 and $2
+		 where deleted_at is null
+		   and on_date <= $2 and coalesce(end_on, on_date) >= $1
 
 		order by 1, 3`, from, to)
 	if err != nil {
@@ -150,7 +155,42 @@ func (s *Store) Calendar(ctx context.Context, from, to time.Time) ([]CalendarEnt
 		e.Done = closed
 		e.Note = note
 	}
+
+	// Multi-day events carry their last day here, matched by the URL each event
+	// entry already reports. Kept off the union so no other kind needs the column.
+	ends, err := s.eventEnds(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for at := range out {
+		if out[at].Kind == "event" {
+			out[at].End = ends[out[at].URL]
+		}
+	}
 	return out, nil
+}
+
+// eventEnds is the end day of every multi-day event, keyed by the URL its
+// calendar entry uses, so a span can be attached after the fact.
+func (s *Store) eventEnds(ctx context.Context) (map[string]*time.Time, error) {
+	rows, err := s.pool.Query(ctx,
+		`select id, end_on from calendar_events where deleted_at is null and end_on is not null`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := map[string]*time.Time{}
+	for rows.Next() {
+		var id int64
+		var end time.Time
+		if err := rows.Scan(&id, &end); err != nil {
+			return nil, err
+		}
+		day := end
+		out[fmt.Sprintf("/calendar/%d", id)] = &day
+	}
+	return out, rows.Err()
 }
 
 /*

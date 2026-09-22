@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { CalendarDays, ChevronLeft, ChevronRight, Globe, List, Plus } from 'lucide-react'
 
 import { api } from '@/api'
@@ -31,6 +31,19 @@ function key(date: Date) {
   const m = `${date.getMonth() + 1}`.padStart(2, '0')
   const d = `${date.getDate()}`.padStart(2, '0')
   return `${date.getFullYear()}-${m}-${d}`
+}
+
+/** Every YYYY-MM-DD from start through end inclusive, so a multi-day event lands
+ *  in each of its cells. Capped so a typo'd range cannot spin forever. */
+function daySpan(start: string, end: string) {
+  const out: string[] = []
+  const day = new Date(`${start}T00:00:00`)
+  const last = new Date(`${end}T00:00:00`)
+  for (let i = 0; i < 366 && day <= last; i++) {
+    out.push(key(day))
+    day.setDate(day.getDate() + 1)
+  }
+  return out.length ? out : [start]
 }
 
 export default function Calendar() {
@@ -71,10 +84,15 @@ export default function Calendar() {
   const byDay = useMemo(() => {
     const map = new Map<string, CalendarEntry[]>()
     for (const entry of entries ?? []) {
-      const day = entry.date.slice(0, 10)
-      const list = map.get(day)
-      if (list) list.push(entry)
-      else map.set(day, [entry])
+      const start = entry.date.slice(0, 10)
+      // A multi-day event shows in every cell of its block; everything else in
+      // its one day.
+      const end = entry.end ? entry.end.slice(0, 10) : start
+      for (const day of daySpan(start, end)) {
+        const list = map.get(day)
+        if (list) list.push(entry)
+        else map.set(day, [entry])
+      }
     }
     return map
   }, [entries])
@@ -181,10 +199,22 @@ function MonthGrid({
   weekdayFormat: Intl.DateTimeFormat
 }) {
   const { t, lang } = useT()
+  const navigate = useNavigate()
 
   // Which day a phone tapped open. Never set on desktop, where the labels are
-  // already in the cells.
+  // already in the cells and a tap adds straight away.
   const [picked, setPicked] = useState<string | null>(null)
+
+  // Tapping a day: a desktop, which already shows the cell's entries, jumps
+  // straight to adding one; a phone opens the day sheet, where the entries and
+  // an add button both live because the cell is too small to hold them.
+  function openDay(dayKey: string) {
+    if (window.matchMedia('(min-width: 640px)').matches) {
+      navigate(`/calendar/new?date=${dayKey}`)
+    } else {
+      setPicked(dayKey)
+    }
+  }
 
   const dayFormat = useMemo(
     () =>
@@ -267,14 +297,14 @@ function MonthGrid({
             return (
               <div
                 key={dayKey}
-                // A phone cell is too narrow to read a label in, so tapping it
-                // opens the day. From sm up the labels are already there and a
-                // tap would only be a surprise.
-                onClick={items.length ? () => setPicked(dayKey) : undefined}
+                // Tapping the cell adds an event on that day (desktop) or opens
+                // the day sheet (phone). The entry links below stopPropagation so
+                // opening one does not also fire this.
+                onClick={() => openDay(dayKey)}
+                title={t('cal.event.addOn')}
                 className={cn(
-                  'min-h-14 border-b border-r p-1 last:border-r-0 sm:min-h-[5.5rem] sm:p-1.5',
+                  'min-h-14 cursor-pointer border-b border-r p-1 transition-colors last:border-r-0 hover:bg-accent/40 sm:min-h-[5.5rem] sm:p-1.5',
                   outside && 'bg-muted/30 text-muted-foreground',
-                  items.length > 0 && 'cursor-pointer active:bg-accent sm:cursor-default',
                 )}
               >
                 <div
@@ -315,6 +345,7 @@ function MonthGrid({
                       <Link
                         key={`${entry.url}-${index}`}
                         to={entry.url}
+                        onClick={(e) => e.stopPropagation()}
                         title={`${entry.label} · ${entry.detail}`}
                         className={cn(
                           'flex items-center gap-1 rounded px-1 py-0.5 text-[11px] transition-opacity hover:opacity-80',
@@ -354,6 +385,20 @@ function MonthGrid({
                 onPick={() => setPicked(null)}
               />
             ))}
+          </div>
+          {/* Add an event on the day being looked at. Works whether or not the
+              day already has anything on it. */}
+          <div className="border-t p-3">
+            <Button
+              className="w-full"
+              onClick={() => {
+                if (picked) navigate(`/calendar/new?date=${picked}`)
+                setPicked(null)
+              }}
+            >
+              <Plus className="size-4" />
+              {t('cal.event.addOn')}
+            </Button>
           </div>
         </SheetContent>
       </Sheet>

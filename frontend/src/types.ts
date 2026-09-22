@@ -1004,6 +1004,8 @@ export type CalendarEntry = {
   url: string
   // Days lived, for a milestone. Zero for every other kind.
   count: number
+  /** Last day of a multi-day block; null for single-day entries. */
+  end?: string | null
 }
 
 /** An event typed straight onto the calendar, editable on its own page. */
@@ -1011,12 +1013,15 @@ export type CalendarEvent = Audit & {
   id: number
   title: string
   on_date: string
+  /** Last day of a multi-day event; null for a one-day one. */
+  end_on: string | null
   notes: string
 }
 
 export type CalendarEventInput = {
   title: string
   on_date: string
+  end_on: string
   notes: string
 }
 

@@ -899,6 +899,9 @@ create table if not exists calendar_events (
     id         bigserial primary key,
     title      text not null,
     on_date    date not null,
+    -- Null for a one-day event; a later date makes it span the block from
+    -- on_date through end_on, shown across those cells on the calendar.
+    end_on     date,
     notes      text not null default '',
     created_by text not null default '',
     updated_by text not null default '',
@@ -907,6 +910,10 @@ create table if not exists calendar_events (
     deleted_at timestamptz,
     deleted_by text not null default ''
 );
+
+-- Added after the events feature first shipped single-day, so it arrives as an
+-- ALTER on a database that already has the table.
+alter table calendar_events add column if not exists end_on date;
 
 create index if not exists calendar_events_live_idx on calendar_events (deleted_at);
 create index if not exists calendar_events_date_idx on calendar_events (on_date);
