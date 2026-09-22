@@ -74,6 +74,12 @@ func (s *Server) handlePasskeyLoginFinish(w http.ResponseWriter, r *http.Request
 
 	s.clearCeremony(w)
 	s.clearHalfSession(w)
-	s.issueSession(w, user)
-	writeJSON(w, http.StatusOK, map[string]any{"email": user.Email})
+	expiry := s.issueSession(w, user)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"email": user.Email,
+		// The same session as the cookie, for the native app: it keeps this in
+		// secure storage and sends it as a bearer token.
+		"token":      signToken(s.cfg.SessionKey, user.ID, expiry),
+		"expires_at": expiry,
+	})
 }

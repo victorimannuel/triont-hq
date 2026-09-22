@@ -24,6 +24,10 @@ type Config struct {
 	// WebAuthn is bound to exactly one host; the browser refuses anything else.
 	RPID   string
 	Origin string
+	// Further origins a passkey assertion may carry: the Android app's, named
+	// by signing certificate. Not read from the environment — main fills it
+	// from the embedded assetlinks file, so the list lives in one place.
+	AppOrigins []string
 	// Web push. Without a key pair the notification endpoints simply report
 	// themselves as unavailable rather than failing; everything else runs.
 	VAPIDPublic  string

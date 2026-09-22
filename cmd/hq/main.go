@@ -103,6 +103,12 @@ func run(log *slog.Logger) error {
 		return fmt.Errorf("encryption key: %w", err)
 	}
 
+	// The Android app is a passkey origin of its own. Which apps count is what
+	// the assetlinks file published for Android already says.
+	if cfg.AppOrigins, err = web.AndroidOrigins(); err != nil {
+		return err
+	}
+
 	mux := http.NewServeMux()
 	server, err := api.New(cfg, st, box, log)
 	if err != nil {

@@ -1,0 +1,15 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "id.triont.hq",
+      "sha256_cert_fingerprints": [
+        "23:20:6B:D2:3A:4C:38:FA:3E:33:10:25:48:E9:3A:B4:BA:A5:59:95:4E:F7:43:E6:71:34:03:2F:6A:32:DF:C1"
+      ]
+    }
+  }
+]
