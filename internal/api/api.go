@@ -97,6 +97,9 @@ func (s *Server) Routes() http.Handler {
 	// Token-authenticated too, and read-only: the caller is an assistant
 	// asking questions about the data on your behalf.
 	mux.HandleFunc("POST /api/mcp", s.handleMCP)
+	// The phone widget's summary. Its own bearer check: the phone's session
+	// token, or the MCP token.
+	mux.HandleFunc("GET /api/widget", s.handleWidget)
 
 	// One table for every module, the way tags work: entity plus id.
 	// A literal last segment, so it beats {entity}/{id} and cannot collide
