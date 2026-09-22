@@ -10,12 +10,16 @@ import {
 } from 'react-router-dom'
 import {
   Bell,
+  Check,
+  ChevronDown,
+  ChevronUp,
   Eye,
   EyeOff,
   Languages,
   Loader2,
   LogOut,
   Menu,
+  Pencil,
   Search,
   Monitor as MonitorIcon,
   Moon,
@@ -63,7 +67,7 @@ import { WorkPill } from '@/components/WorkPill'
 import { notifyAlarm, playAlarm } from '@/lib/alarm'
 import { refreshUnread, useUnread } from '@/lib/notices'
 import { refreshRunning } from '@/lib/running'
-import { syncFavs, useFavs } from '@/lib/favnav'
+import { moveFav, syncFavs, useFavs } from '@/lib/favnav'
 import { NAV, NAV_GROUPS, PRIMARY, TABS, type NavItem } from '@/nav'
 import { clock, setRingHandler, useTimerAlarm } from '@/lib/timer'
 import { Toaster } from '@/components/ui/sonner'
@@ -351,6 +355,96 @@ function SidebarLink({ item, unread }: { item: NavItem; unread: number }) {
   )
 }
 
+// The Favourites block that sits atop both the desktop sidebar and the phone
+// drawer. The pencil by the heading flips the rows into edit mode, where each
+// carries an up/down pair; tapping one swaps it with its neighbour and the list
+// repaints from the shared store. Arrows rather than drag: a drawer scrolls, and
+// a drag that fights the scroll is worse on a phone than two taps. Only shown
+// when there are at least two to order.
+function FavNav({
+  items,
+  unread,
+  onNavigate,
+}: {
+  items: NavItem[]
+  unread: number
+  onNavigate?: () => void
+}) {
+  const { t } = useT()
+  const [editing, setEditing] = useState(false)
+
+  if (items.length === 0) return null
+  const canReorder = items.length > 1
+
+  return (
+    <div className="mb-5">
+      <div className="mb-1 flex items-center gap-1 pl-3 pr-1">
+        <span className="flex-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          {t('nav.group.favorites')}
+        </span>
+        {canReorder && (
+          <button
+            type="button"
+            onClick={() => setEditing((on) => !on)}
+            aria-label={t(editing ? 'nav.reorderDone' : 'nav.reorder')}
+            className={cn(
+              'grid size-6 shrink-0 place-items-center rounded transition-colors',
+              editing
+                ? 'text-foreground'
+                : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground',
+            )}
+          >
+            {editing ? <Check className="size-3.5" /> : <Pencil className="size-3.5" />}
+          </button>
+        )}
+      </div>
+      {items.map((item, index) => (
+        <div key={item.to} className="flex items-center gap-1">
+          <NavLink
+            to={item.to}
+            end={item.end}
+            onClick={onNavigate}
+            className={({ isActive }) =>
+              cn(
+                'flex flex-1 items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                isActive
+                  ? 'bg-secondary text-secondary-foreground'
+                  : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground',
+              )
+            }
+          >
+            <item.icon className="size-4 shrink-0" />
+            <span className="flex-1 truncate">{t(`nav.${item.key}`)}</span>
+            {item.key === 'notices' && unread > 0 && <Badge>{unread}</Badge>}
+          </NavLink>
+          {editing && (
+            <div className="flex shrink-0 items-center">
+              <button
+                type="button"
+                disabled={index === 0}
+                onClick={() => moveFav(item.key, -1)}
+                aria-label={t('nav.moveUp')}
+                className="grid size-8 place-items-center rounded text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-foreground disabled:pointer-events-none disabled:opacity-25"
+              >
+                <ChevronUp className="size-4" />
+              </button>
+              <button
+                type="button"
+                disabled={index === items.length - 1}
+                onClick={() => moveFav(item.key, 1)}
+                aria-label={t('nav.moveDown')}
+                className="grid size-8 place-items-center rounded text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-foreground disabled:pointer-events-none disabled:opacity-25"
+              >
+                <ChevronDown className="size-4" />
+              </button>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // The bell, in the corner of whichever header is showing. It carries the
 // number rather than a dot: "3 waiting" is worth opening for and "something
 // is waiting" is not.
@@ -501,19 +595,10 @@ function Shell({
         </button>
 
         <nav className="flex-1 overflow-y-auto p-3">
-          {/* The starred pages, up top. Only when there is at least one — an
-              empty heading is just noise. The star that fills this lives in the
-              page header now, next to the eye. */}
-          {favItems.length > 0 && (
-            <div className="mb-5">
-              <div className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                {t('nav.group.favorites')}
-              </div>
-              {favItems.map((item) => (
-                <SidebarLink key={item.to} item={item} unread={unread} />
-              ))}
-            </div>
-          )}
+          {/* The starred pages, up top. The star that fills this lives in the
+              page header now, next to the eye; the pencil beside the heading
+              reorders. */}
+          <FavNav items={favItems} unread={unread} />
           {NAV_GROUPS.map((group, index) => (
             <div key={group.label || index} className={index > 0 ? 'mt-5' : ''}>
               {group.label && (
@@ -707,33 +792,7 @@ function Shell({
               <nav className="flex-1 overflow-y-auto p-3">
                 {/* Starred pages first, the same as the desktop sidebar, so a
                     favourite is one tap away from the phone too. */}
-                {favItems.length > 0 && (
-                  <div className="mb-5">
-                    <div className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      {t('nav.group.favorites')}
-                    </div>
-                    {favItems.map((item) => (
-                      <NavLink
-                        key={item.to}
-                        to={item.to}
-                        end={item.end}
-                        onClick={() => setDrawer(false)}
-                        className={({ isActive }) =>
-                          cn(
-                            'flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                            isActive
-                              ? 'bg-secondary text-secondary-foreground'
-                              : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground',
-                          )
-                        }
-                      >
-                        <item.icon className="size-4" />
-                        <span className="flex-1">{t(`nav.${item.key}`)}</span>
-                        {item.key === 'notices' && unread > 0 && <Badge>{unread}</Badge>}
-                      </NavLink>
-                    ))}
-                  </div>
-                )}
+                <FavNav items={favItems} unread={unread} onNavigate={() => setDrawer(false)} />
                 {NAV_GROUPS.map((group, index) => {
                   const items = group.items.filter((item) => !PRIMARY.includes(item.key))
                   if (!items.length) return null

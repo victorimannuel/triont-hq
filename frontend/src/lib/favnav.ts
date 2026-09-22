@@ -64,6 +64,19 @@ export function toggleFav(key: string) {
   void api.setFavorites(favs).catch(() => {})
 }
 
+// Nudge one favourite up (-1) or down (+1). The whole point of storing the list
+// in pin order rather than nav order: the order is the user's to set, and this
+// is how they set it without unstarring and re-starring in sequence.
+export function moveFav(key: string, direction: -1 | 1) {
+  const from = favs.indexOf(key)
+  const to = from + direction
+  if (from < 0 || to < 0 || to >= favs.length) return
+  const next = [...favs]
+  ;[next[from], next[to]] = [next[to], next[from]]
+  cache(next)
+  void api.setFavorites(favs).catch(() => {})
+}
+
 export function useFavs() {
   const [current, setCurrent] = useState(favs)
   useEffect(() => {
