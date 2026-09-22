@@ -20,7 +20,7 @@ import { setUnread } from '@/lib/notices'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { ErrorNote, formatDate, formatTime, Loading, PageHeader } from '@/components/bits'
+import { daysUntil, ErrorNote, formatDate, formatTime, Loading, PageHeader } from '@/components/bits'
 import { KIND_ICON, tone, type Kind } from '@/components/EntryRow'
 
 /**
@@ -151,6 +151,11 @@ function NoticeRow({ notice, onRead }: { notice: SentNotice; onRead: () => void 
   const { t } = useT()
   const roundup = notice.kind in ROUNDUP_ICON
   const Icon = ROUNDUP_ICON[notice.kind] ?? KIND_ICON[notice.kind as Kind] ?? Globe
+  // The deadline the notice was about, for the kinds that have one. A roundup's
+  // third key segment is the morning it went out, not a due date, so it stays
+  // hidden there.
+  const dueOn = !roundup ? notice.due_on : ''
+  const dueIn = dueOn ? daysUntil(dueOn) : null
 
   const body = (
     <>
@@ -166,7 +171,7 @@ function NoticeRow({ notice, onRead }: { notice: SentNotice; onRead: () => void 
         <p className={cn('truncate text-sm', !notice.read && 'font-medium')}>
           {notice.label || t('notices.unnamed')}
         </p>
-        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
           {/* So a drill is never mistaken for the real thing having happened. */}
           {notice.test && (
             <span className="shrink-0 rounded border px-1 py-px text-[10px] leading-none uppercase">
@@ -176,6 +181,29 @@ function NoticeRow({ notice, onRead }: { notice: SentNotice; onRead: () => void 
           <span className="truncate">
             {roundup ? t(`notices.kind.${notice.kind}`) : t(`cal.kind.${notice.kind}`)}
           </span>
+          {/* When it falls due and how far off that is — the thing a renewal
+              notice is actually for. Late in red, close in amber, as on the
+              calendar. */}
+          {dueOn && (
+            <span className="shrink-0">
+              · {formatDate(dueOn)}
+              {dueIn !== null && (
+                <span
+                  className={cn(
+                    'ml-1',
+                    dueIn < 0 ? 'text-destructive' : dueIn <= 3 ? 'text-warning' : '',
+                  )}
+                >
+                  ·{' '}
+                  {dueIn < 0
+                    ? t('cal.late', { n: -dueIn })
+                    : dueIn === 0
+                      ? t('cal.today')
+                      : t('cal.inDays', { n: dueIn })}
+                </span>
+              )}
+            </span>
+          )}
         </p>
       </div>
       {/* The clock sits under the date because the shopping list now goes out
