@@ -40,6 +40,36 @@ function BoardLink() {
   )
 }
 
+type Mode = 'focus' | 'full'
+
+/*
+Focus or the full cycle. Focus is the default and the point of the page; the
+full cycle is here for the night you want to walk past everything, ticked or
+not. Flipping it starts the run over in the new order.
+*/
+function ModeToggle({ mode, onMode }: { mode: Mode; onMode: (mode: Mode) => void }) {
+  const { t } = useT()
+  return (
+    <div className="flex rounded-md border p-0.5 text-xs font-medium">
+      {(['focus', 'full'] as Mode[]).map((option) => (
+        <button
+          key={option}
+          type="button"
+          onClick={() => onMode(option)}
+          className={cn(
+            'rounded px-2 py-1 transition-colors',
+            mode === option
+              ? 'bg-secondary text-secondary-foreground'
+              : 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          {t(`checkin.${option}`)}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 /*
 The run is a frame rather than a page that grows around what is in it.
 
@@ -55,6 +85,10 @@ habits that have one it is the second thing touched, so it sits in the same
 place too, and its absence is absorbed by the space above rather than by
 sliding everything down.
 */
+// The frame is free to grow with its header; what must hold still is the answer
+// card, so that carries a fixed height of its own (below). A minimum here rather
+// than a fixed height means a tall header on a small screen scrolls instead of
+// clipping the card.
 const FRAME = 'mx-auto flex min-h-[calc(100dvh-15rem)] max-w-lg flex-col md:min-h-[32rem]'
 
 /** A bar rather than a number: it says "nearly there" at a glance. */
@@ -82,6 +116,26 @@ function BackStep({ show, onBack }: { show: boolean; onBack: () => void }) {
   )
 }
 
+/*
+The order the run walks its habits in. "full" is the plain stored order, every
+habit. "focus" front-loads what still needs doing: the plain yes/no ones you tap
+straight through, then the ones that want a number. The already-ticked ones come
+after, there only to be looked over — and among those the countable ones lead,
+since a recorded number is what you might come back and fix, a bare tick is not.
+Worked out once when a run starts and then held still, so answering a habit does
+not make it jump.
+*/
+function runOrder(list: Habit[], mode: Mode, today: string): number[] {
+  if (mode === 'full') return list.map((habit) => habit.id)
+  const undone = list.filter((habit) => !habit.days.includes(today))
+  const done = list.filter((habit) => habit.days.includes(today))
+  const counted = (rows: Habit[]) => rows.filter((habit) => habit.unit !== '')
+  const plain = (rows: Habit[]) => rows.filter((habit) => habit.unit === '')
+  return [...plain(undone), ...counted(undone), ...counted(done), ...plain(done)].map(
+    (habit) => habit.id,
+  )
+}
+
 export default function HabitCheckin() {
   const { t } = useT()
   const confirm = useConfirm()
@@ -96,7 +150,23 @@ export default function HabitCheckin() {
   // the typed string rather than a number so the field can be empty, which is
   // not the same as nought.
   const [count, setCount] = useState('')
+  // Default to focus: the point of the evening is the ones still open. "full"
+  // walks everything the way the board reads, for a deliberate review.
+  const [mode, setMode] = useState<Mode>('focus')
+  // The frozen run order as habit ids. Set on load, on a mode flip, and on
+  // "again" — never mid-run, so a habit stays put as it is answered.
+  const [order, setOrder] = useState<number[]>([])
   const today = useMemo(todayKey, [])
+
+  // The habits in run order, but live: the order is frozen while each habit
+  // still reflects what it recorded, so a tick shows without moving the row.
+  const seq = useMemo(
+    () =>
+      order
+        .map((id) => habits?.find((habit) => habit.id === id))
+        .filter((habit): habit is Habit => Boolean(habit)),
+    [order, habits],
+  )
 
   const load = useCallback(() => {
     api
@@ -104,7 +174,9 @@ export default function HabitCheckin() {
       .then((data) => {
         // Private habits stay in the run: hiding is about the board a passing
         // audience sees, not about the owner's own evening routine.
-        setHabits(data.habits.filter((habit) => habit.active))
+        const active = data.habits.filter((habit) => habit.active)
+        setHabits(active)
+        setOrder(runOrder(active, 'focus', todayKey()))
         setError('')
       })
       .catch((err) => setError(err instanceof Error ? err.message : t('habit.failed')))
@@ -129,11 +201,11 @@ export default function HabitCheckin() {
   nothing to one and looks like it did nothing at all.
   */
   useEffect(() => {
-    const current = habits?.[at]
+    const current = seq[at]
     // Starts on what today already recorded, else the habit's per-day figure —
     // so fish oil comes up as two without a tap, and a plain habit as one.
     setCount(current && current.today > 0 ? String(current.today) : String(current?.per_day || 1))
-  }, [at, habits])
+  }, [at, seq])
 
   async function answer(habit: Habit, done: boolean, amount = 0) {
     if (busy) return
@@ -178,6 +250,15 @@ export default function HabitCheckin() {
     answer(habit, false)
   }
 
+  // Flip focus/full and start the run over in the new order. A no-op on the
+  // mode already showing, and before the habits are in.
+  function switchMode(next: Mode) {
+    if (next === mode || !habits) return
+    setMode(next)
+    setOrder(runOrder(habits, next, today))
+    setAt(0)
+  }
+
   async function saveLine() {
     setAt((n) => n + 1)
     try {
@@ -212,9 +293,9 @@ export default function HabitCheckin() {
   // The habits, then one more question. A journal you have to go and open is
   // one you stop writing, so it rides along at the end of a run you are
   // already doing.
-  const steps = habits.length + 1
+  const steps = seq.length + 1
 
-  if (at === habits.length) {
+  if (at === seq.length) {
     return (
       <div className={FRAME}>
         <PageHeader
@@ -272,7 +353,7 @@ export default function HabitCheckin() {
   }
 
   // Past the last question: what the evening came to, and the way out.
-  if (at > habits.length) {
+  if (at > seq.length) {
     const done = habits.filter((habit) => habit.days.includes(today))
     return (
       <div className="mx-auto max-w-lg">
@@ -319,7 +400,14 @@ export default function HabitCheckin() {
             )}
 
             <div className="flex justify-center gap-2">
-              <Button variant="outline" onClick={() => setAt(0)}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  // Re-sort for the second pass: whatever got ticked drops to the back.
+                  setOrder(runOrder(habits, mode, today))
+                  setAt(0)
+                }}
+              >
                 <ArrowLeft className="size-4" />
                 {t('checkin.again')}
               </Button>
@@ -333,7 +421,7 @@ export default function HabitCheckin() {
     )
   }
 
-  const habit = habits[at]
+  const habit = seq[at]
   const ticked = habit.days.includes(today)
 
   return (
@@ -346,12 +434,22 @@ export default function HabitCheckin() {
           </>
         }
         back="/habits"
-        action={<BoardLink />}
+        action={
+          <div className="flex items-center gap-2">
+            <ModeToggle mode={mode} onMode={switchMode} />
+            <BoardLink />
+          </div>
+        }
       />
 
       <Progress at={at} steps={steps} />
 
-      <Card className="flex flex-1 flex-col">
+      {/* A fixed height, so the answer buttons at its foot land in the same
+          place every question. Whatever a habit carries above them — a picture,
+          a note, the counter, the already-ticked line — is taken up by the
+          reading area, which scrolls inside this height rather than growing the
+          card and sliding the buttons down. */}
+      <Card className="flex h-[26rem] shrink-0 flex-col md:h-[30rem]">
         <CardContent className="flex flex-1 flex-col gap-6 py-8">
           {/* Everything you read. It takes the room the answer does not, and
               scrolls within itself on a short screen rather than pushing the
@@ -381,12 +479,13 @@ export default function HabitCheckin() {
             </div>
           </div>
 
-          {/* A habit with a unit asks how many rather than whether. The field
-              carries the whole answer, so "ya" with it left empty still means
-              once — the point of the evening run is that it can be got through
-              without deciding anything twice. */}
-          {habit.unit !== '' && (
-            <div className="shrink-0">
+          {/* A habit with a unit asks how many rather than whether. The slot is
+              always drawn at a fixed height, empty on a plain yes/no habit, so
+              the two answer buttons below land in exactly the same place every
+              question instead of dropping whenever a counter appears. The field
+              left empty still means once, so a plain "ya" needs no number. */}
+          <div className="flex h-24 shrink-0 items-center justify-center">
+            {habit.unit !== '' && (
               <Stepper
                 big
                 value={count}
@@ -395,8 +494,8 @@ export default function HabitCheckin() {
                 caption={habit.unit}
                 disabled={busy}
               />
-            </div>
-          )}
+            )}
+          </div>
 
           <div className="flex shrink-0 gap-3">
             <Button
