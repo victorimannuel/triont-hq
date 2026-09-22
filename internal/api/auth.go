@@ -136,4 +136,62 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"email": user.Email})
 }
 
+type passwordChangeRequest struct {
+	Current string `json:"current"`
+	New     string `json:"new"`
+}
+
+const minPasswordLen = 8
+
+// Changing the password takes the old one, not just an open session: a tab
+// left open on a shared screen must not be enough to lock the owner out of
+// their own account.
+func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
+	user, _ := r.Context().Value(userKey).(store.User)
+	var in passwordChangeRequest
+	if err := readJSON(r, &in); err != nil {
+		fail(w, http.StatusBadRequest, "isian nggak kebaca")
+		return
+	}
+	if len(in.New) < minPasswordLen {
+		fail(w, http.StatusBadRequest, "password baru minimal 8 karakter")
+		return
+	}
+	if in.New == in.Current {
+		fail(w, http.StatusBadRequest, "password baru sama kayak yang lama")
+		return
+	}
+
+	// The old password can be guessed from inside a session as easily as from
+	// the login page, so it gets the same short leash.
+	byUser := "pw:" + itoa(int(user.ID))
+	if s.tooManyAttempts(w, quota{byUser, perAddress}) {
+		return
+	}
+	// Re-read rather than trust the session's copy, so a password changed from
+	// another device a moment ago is the one being checked.
+	fresh, err := s.store.UserByID(r.Context(), user.ID)
+	if err != nil {
+		s.oops(w, err)
+		return
+	}
+	if bcrypt.CompareHashAndPassword([]byte(fresh.PasswordHash), []byte(in.Current)) != nil {
+		failures.record(byUser)
+		fail(w, http.StatusUnauthorized, "password lama salah")
+		return
+	}
+	failures.clear(byUser)
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(in.New), bcrypt.DefaultCost)
+	if err != nil {
+		s.oops(w, err)
+		return
+	}
+	if err := s.store.SetPasswordHash(r.Context(), user.ID, string(hash)); err != nil {
+		s.oops(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
 func trim(v string) string { return strings.TrimSpace(v) }

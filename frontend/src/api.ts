@@ -141,6 +141,8 @@ export const api = {
   login: (email: string, password: string) =>
     send<{ email: string; step?: 'passkey' }>('POST', '/auth/login', { email, password }),
   logout: () => send<void>('POST', '/auth/logout'),
+  changePassword: (current: string, next: string) =>
+    send<{ status: string }>('PUT', '/auth/password', { current, new: next }),
 
   passkeys: () => request<{ passkeys: Passkey[] }>('/auth/passkeys'),
   // mode 'other' drops the platform pin so the browser offers its QR flow.

@@ -53,6 +53,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/auth/login", s.handleLogin)
 	mux.HandleFunc("POST /api/auth/logout", s.handleLogout)
 	mux.Handle("GET /api/auth/me", s.requireAuth(s.handleMe))
+	mux.Handle("PUT /api/auth/password", s.requireAuth(s.handleChangePassword))
 	mux.Handle("GET /api/favorites", s.requireAuth(s.handleGetFavorites))
 	mux.Handle("PUT /api/favorites", s.requireAuth(s.handleSetFavorites))
 	mux.HandleFunc("GET /api/meta", s.handleMeta)

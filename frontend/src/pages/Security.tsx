@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import {
   Check,
   Copy,
   Fingerprint,
+  KeyRound,
   Link2,
   Pencil,
   ShieldCheck,
@@ -51,6 +52,9 @@ export default function Security() {
   const [editing, setEditing] = useState<number | null>(null)
   const [draft, setDraft] = useState('')
   const [error, setError] = useState('')
+  const [pw, setPw] = useState({ current: '', next: '', repeat: '' })
+  const [pwBusy, setPwBusy] = useState(false)
+  const [pwError, setPwError] = useState('')
 
   const load = useCallback(() => {
     api
@@ -156,6 +160,31 @@ export default function Security() {
       toast.success(t('security.removed'))
     } catch (err) {
       toast.error(friendlyError(err, t('security.removeFailed')))
+    }
+  }
+
+  async function changePassword(event: FormEvent) {
+    event.preventDefault()
+    setPwError('')
+    // Both checked here as well as on the server, so a typo comes back before
+    // the round trip rather than after it.
+    if (pw.next.length < 8) {
+      setPwError(t('security.passwordShort'))
+      return
+    }
+    if (pw.next !== pw.repeat) {
+      setPwError(t('security.passwordMismatch'))
+      return
+    }
+    setPwBusy(true)
+    try {
+      await api.changePassword(pw.current, pw.next)
+      setPw({ current: '', next: '', repeat: '' })
+      toast.success(t('security.passwordChanged'))
+    } catch (err) {
+      setPwError(err instanceof Error ? err.message : t('security.passwordFailed'))
+    } finally {
+      setPwBusy(false)
     }
   }
 
@@ -298,6 +327,56 @@ export default function Security() {
       )}
 
       <p className="mb-8 mt-6 text-xs text-muted-foreground">{t('security.lockoutNote')}</p>
+
+      <SectionTitle>{t('security.password')}</SectionTitle>
+
+      <Card className="mb-8">
+        <CardContent>
+          <form onSubmit={changePassword} className="space-y-4">
+            <p className="text-sm text-muted-foreground">{t('security.passwordHint')}</p>
+
+            {pwError && <ErrorNote>{pwError}</ErrorNote>}
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Field label={t('security.currentPassword')} htmlFor="pw-current">
+                <Input
+                  id="pw-current"
+                  type="password"
+                  autoComplete="current-password"
+                  value={pw.current}
+                  onChange={(e) => setPw({ ...pw, current: e.target.value })}
+                  required
+                />
+              </Field>
+              <Field label={t('security.newPassword')} htmlFor="pw-next">
+                <Input
+                  id="pw-next"
+                  type="password"
+                  autoComplete="new-password"
+                  value={pw.next}
+                  onChange={(e) => setPw({ ...pw, next: e.target.value })}
+                  required
+                />
+              </Field>
+              <Field label={t('security.repeatPassword')} htmlFor="pw-repeat">
+                <Input
+                  id="pw-repeat"
+                  type="password"
+                  autoComplete="new-password"
+                  value={pw.repeat}
+                  onChange={(e) => setPw({ ...pw, repeat: e.target.value })}
+                  required
+                />
+              </Field>
+            </div>
+
+            <Button type="submit" disabled={pwBusy}>
+              {pwBusy ? <Spinner /> : <KeyRound className="size-4" />}
+              {t('security.changePassword')}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
       <PushSection />
     </div>

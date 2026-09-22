@@ -707,6 +707,17 @@ const dict: Record<Lang, Record<string, string>> = {
     'security.removed': 'perangkat dihapus',
     'security.removeFailed': 'gagal hapus perangkat',
     'security.renameFailed': 'gagal ganti nama',
+    'security.password': 'password',
+    'security.passwordHint':
+      'password itu langkah pertama buat masuk. ganti di sini, cukup tahu yang lama.',
+    'security.currentPassword': 'password lama',
+    'security.newPassword': 'password baru',
+    'security.repeatPassword': 'ulangi password baru',
+    'security.changePassword': 'ganti password',
+    'security.passwordShort': 'password baru minimal 8 karakter',
+    'security.passwordMismatch': 'password baru nggak sama dengan ulangannya',
+    'security.passwordChanged': 'password diganti',
+    'security.passwordFailed': 'gagal ganti password',
     'security.lockoutNote':
       'kalau semua perangkat hilang, jalanin "hq passkeys-reset <email>" di server buat balik pakai password aja.',
 
@@ -1758,6 +1769,17 @@ const dict: Record<Lang, Record<string, string>> = {
     'security.removed': 'device removed',
     'security.removeFailed': 'could not remove the device',
     'security.renameFailed': 'could not rename it',
+    'security.password': 'password',
+    'security.passwordHint':
+      'the password is the first step of signing in. change it here; the old one is all it takes.',
+    'security.currentPassword': 'current password',
+    'security.newPassword': 'new password',
+    'security.repeatPassword': 'repeat new password',
+    'security.changePassword': 'change password',
+    'security.passwordShort': 'the new password needs at least 8 characters',
+    'security.passwordMismatch': 'the new password and its repeat differ',
+    'security.passwordChanged': 'password changed',
+    'security.passwordFailed': 'could not change the password',
     'security.lockoutNote':
       'lost every device? run "hq passkeys-reset <email>" on the server to fall back to the password.',
 

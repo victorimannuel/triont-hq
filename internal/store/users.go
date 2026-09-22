@@ -65,6 +65,14 @@ func (s *Store) SetNavFavorites(ctx context.Context, userID int64, keys []string
 	return err
 }
 
+// SetPasswordHash replaces the password of an account that already exists. The
+// caller has checked the old one; this only stores the new.
+func (s *Store) SetPasswordHash(ctx context.Context, userID int64, hash string) error {
+	_, err := s.pool.Exec(ctx,
+		`update users set password_hash = $1 where id = $2`, hash, userID)
+	return err
+}
+
 // UpsertUser creates the account or resets its password. Used by the boot-time
 // owner bootstrap and by the `hq passwd` subcommand.
 func (s *Store) UpsertUser(ctx context.Context, email, passwordHash string) (User, error) {
