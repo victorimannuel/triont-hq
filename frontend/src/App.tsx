@@ -351,6 +351,25 @@ function SidebarLink({ item, unread }: { item: NavItem; unread: number }) {
   )
 }
 
+// The bell, in the corner of whichever header is showing. It carries the
+// number rather than a dot: "3 waiting" is worth opening for and "something
+// is waiting" is not.
+function BellLink({ unread }: { unread: number }) {
+  const { t } = useT()
+  return (
+    <Button variant="ghost" size="icon" asChild aria-label={t('nav.notices')}>
+      <Link to="/notices" className="relative">
+        <Bell className="size-4" />
+        {unread > 0 && (
+          <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-medium leading-none text-primary-foreground">
+            {unread > 99 ? '99+' : unread}
+          </span>
+        )}
+      </Link>
+    </Button>
+  )
+}
+
 function Shell({
   email,
   menus,
@@ -460,13 +479,16 @@ function Shell({
     <div className="min-h-svh">
       {/* Sidebar from md up; below that the header and bottom bar take over. */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-56 flex-col border-r bg-card md:flex">
-        <Link
-          to="/"
-          className="flex h-14 items-center gap-2 border-b px-4 font-semibold tracking-tight"
-        >
-          <Logo className="size-7 text-primary" />
-          HQ
-        </Link>
+        <div className="flex h-14 items-center gap-2 border-b px-4">
+          <Link to="/" className="flex min-w-0 flex-1 items-center gap-2 font-semibold tracking-tight">
+            <Logo className="size-7 text-primary" />
+            HQ
+          </Link>
+          {/* Up here as well as in the list below: the corner by the logo is
+              where the eye lands first, so a number waiting there is seen
+              before any scrolling — same spot the phone header uses. */}
+          <BellLink unread={unread} />
+        </div>
 
         <button
           type="button"
@@ -535,20 +557,8 @@ function Shell({
             {/* Beside the magnifier, because both are things you do now —
                 language, theme and the account are settings you touch once.
                 The bell before the account is also where every other app puts
-                it, so it costs nobody a moment's looking.
-
-                It carries the number rather than a dot: "3 waiting" is worth
-                opening for and "something is waiting" is not. */}
-            <Button variant="ghost" size="icon" asChild aria-label={t('nav.notices')}>
-              <Link to="/notices" className="relative">
-                <Bell className="size-4" />
-                {unread > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-medium leading-none text-primary-foreground">
-                    {unread > 99 ? '99+' : unread}
-                  </span>
-                )}
-              </Link>
-            </Button>
+                it, so it costs nobody a moment's looking. */}
+            <BellLink unread={unread} />
             {menus}
             {userMenu}
           </div>
